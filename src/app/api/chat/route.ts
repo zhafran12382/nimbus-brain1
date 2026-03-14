@@ -152,7 +152,9 @@ export async function POST(req: NextRequest) {
                 send({ type: "tool_result", name: action.action, result });
                 assistantMsg.content = assistantMsg.content.replace(/```json[\s\S]*?```/, '').trim();
               }
-            } catch {}
+            } catch (parseError) {
+              console.warn('Failed to parse JSON action from model response:', parseError);
+            }
           }
         }
 
