@@ -8,15 +8,12 @@ import { Header } from "@/components/layout/header";
 import { ChatContainer } from "@/components/chat/chat-container";
 import { ModelSelector } from "@/components/chat/model-selector";
 
-const STORAGE_KEY = "zhafran-hub-model";
-
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Load messages from DB and model preference from localStorage
+  // Load messages from DB
   useEffect(() => {
     const loadMessages = async () => {
       const { data } = await supabase
@@ -27,14 +24,6 @@ export default function ChatPage() {
       if (data) setMessages(data as ChatMessage[]);
     };
     loadMessages();
-
-    const savedModel = localStorage.getItem(STORAGE_KEY);
-    if (savedModel) setSelectedModel(savedModel);
-  }, []);
-
-  const handleModelChange = useCallback((modelId: string) => {
-    setSelectedModel(modelId);
-    localStorage.setItem(STORAGE_KEY, modelId);
   }, []);
 
   const handleSend = useCallback(async (content: string) => {
@@ -67,7 +56,7 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: apiMessages,
-          model: selectedModel,
+          model: DEFAULT_MODEL_ID,
         }),
       });
 
@@ -78,7 +67,7 @@ export default function ChatPage() {
           id: crypto.randomUUID(),
           role: "assistant",
           content: `❌ Error: ${data.error || "Terjadi kesalahan"}`,
-          model_used: selectedModel,
+          model_used: DEFAULT_MODEL_ID,
           created_at: new Date().toISOString(),
         };
         setMessages(prev => [...prev, errorMessage]);
@@ -114,15 +103,12 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, selectedModel]);
+  }, [messages]);
 
   return (
     <div className="flex flex-col h-screen">
       <Header title="💬 Chat" onMenuClick={() => setSidebarOpen(!sidebarOpen)}>
-        <ModelSelector
-          selectedModel={selectedModel}
-          onModelChange={handleModelChange}
-        />
+        <ModelSelector />
       </Header>
       <ChatContainer
         messages={messages}

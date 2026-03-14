@@ -37,7 +37,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         <div className="flex items-center justify-between p-4 border-b border-zinc-800">
           <Link href="/" className="flex items-center gap-2 text-lg font-bold text-zinc-100">
             <span>⚡</span>
-            <span>Zhafran Hub</span>
+            <span>Nimbus Brain</span>
           </Link>
           <button onClick={onClose} className="lg:hidden text-zinc-400 hover:text-zinc-100">
             <X className="h-5 w-5" />

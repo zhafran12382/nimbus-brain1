@@ -3,7 +3,7 @@ import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 
 export const metadata: Metadata = {
-  title: "Zhafran Hub",
+  title: "Nimbus Brain",
   description: "Agentic Personal Dashboard with AI Chatbot",
 };
 
