@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ChatMessage } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { DEFAULT_MODEL_ID } from "@/lib/models";
+import { sendChatStream } from "@/lib/chat-stream";
 import { Header } from "@/components/layout/header";
 import { ChatContainer } from "@/components/chat/chat-container";
 import { ModelSelector } from "@/components/chat/model-selector";
@@ -12,6 +13,8 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [streamStatus, setStreamStatus] = useState<string | null>(null);
+  const [pendingToolCalls, setPendingToolCalls] = useState<{ name?: string; result?: string }[]>([]);
 
   // Load messages from DB
   useEffect(() => {
@@ -35,8 +38,11 @@ export default function ChatPage() {
       created_at: new Date().toISOString(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setIsLoading(true);
+    setStreamStatus(null);
+    setPendingToolCalls([]);
 
     // Save user message to DB
     await supabase.from("chat_messages").insert({
@@ -45,63 +51,71 @@ export default function ChatPage() {
     });
 
     try {
-      // Build message history for API
-      const apiMessages = [...messages, userMessage].slice(-10).map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
+      const chatHistory = newMessages.map(m => ({ role: m.role, content: m.content }));
+      let finalContent = '';
+      let finalToolCalls: { name: string; args: Record<string, unknown>; result: string }[] = [];
+      let finalModelUsed = '';
 
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: apiMessages,
-          model: DEFAULT_MODEL_ID,
-        }),
+      await sendChatStream(chatHistory, DEFAULT_MODEL_ID, (event) => {
+        switch (event.type) {
+          case 'status':
+            setStreamStatus(event.message || null);
+            break;
+
+          case 'tool_start':
+            setStreamStatus(event.message || `🔧 ${event.name}...`);
+            break;
+
+          case 'tool_result':
+            setPendingToolCalls(prev => [...prev, {
+              name: event.name,
+              result: event.result,
+            }]);
+            break;
+
+          case 'done':
+            finalContent = event.content || '';
+            finalToolCalls = event.tool_calls || [];
+            finalModelUsed = event.model_used || DEFAULT_MODEL_ID;
+            break;
+
+          case 'error':
+            throw new Error(event.message);
+        }
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        const errorMessage: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: `❌ Error: ${data.error || "Terjadi kesalahan"}`,
-          model_used: DEFAULT_MODEL_ID,
-          created_at: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, errorMessage]);
-        return;
-      }
-
+      // Add assistant message to state
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: data.content,
-        tool_calls: data.tool_calls,
-        model_used: data.model_used,
+        content: finalContent,
+        tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
+        model_used: finalModelUsed,
         created_at: new Date().toISOString(),
       };
-
       setMessages(prev => [...prev, assistantMessage]);
 
-      // Save assistant message to DB
+      // Save to Supabase
       await supabase.from("chat_messages").insert({
         role: "assistant",
-        content: data.content,
-        tool_calls: data.tool_calls || null,
-        model_used: data.model_used,
+        content: finalContent,
+        tool_calls: finalToolCalls.length > 0 ? finalToolCalls : null,
+        model_used: finalModelUsed,
       });
-    } catch {
-      const errorMessage: ChatMessage = {
+
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Terjadi kesalahan.";
+      const errorMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: "❌ Gagal menghubungi server. Coba lagi nanti.",
+        content: `❌ Error: ${message}`,
         created_at: new Date().toISOString(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
+      setStreamStatus(null);
+      setPendingToolCalls([]);
     }
   }, [messages]);
 
@@ -114,6 +128,8 @@ export default function ChatPage() {
         messages={messages}
         onSend={handleSend}
         isLoading={isLoading}
+        streamStatus={streamStatus}
+        pendingToolCalls={pendingToolCalls}
       />
     </div>
   );
