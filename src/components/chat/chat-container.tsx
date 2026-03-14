@@ -5,20 +5,21 @@ import { ChatMessage as ChatMessageType } from "@/types";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2 } from "lucide-react";
 
 interface ChatContainerProps {
   messages: ChatMessageType[];
   onSend: (message: string) => void;
   isLoading: boolean;
+  streamStatus?: string | null;
+  pendingToolCalls?: { name?: string; result?: string }[];
 }
 
-export function ChatContainer({ messages, onSend, isLoading }: ChatContainerProps) {
+export function ChatContainer({ messages, onSend, isLoading, streamStatus, pendingToolCalls }: ChatContainerProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+  }, [messages, isLoading, streamStatus, pendingToolCalls]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -37,9 +38,28 @@ export function ChatContainer({ messages, onSend, isLoading }: ChatContainerProp
             <ChatMessage key={msg.id} message={msg} />
           ))}
           {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-zinc-800 rounded-2xl rounded-bl-sm px-4 py-3">
-                <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+            <div className="flex items-start gap-3 px-4">
+              <div className="bg-zinc-800 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[80%]">
+                {/* Status text */}
+                <div className="flex items-center gap-2 text-sm text-zinc-400">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0ms]" />
+                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:150ms]" />
+                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:300ms]" />
+                  </div>
+                  <span>{streamStatus || 'Thinking...'}</span>
+                </div>
+
+                {/* Tool calls yang sedang dijalankan */}
+                {pendingToolCalls && pendingToolCalls.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {pendingToolCalls.map((tc, i) => (
+                      <div key={i} className="text-xs bg-zinc-700/50 rounded px-2 py-1 text-green-400">
+                        ✅ {tc.name}: {tc.result}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
