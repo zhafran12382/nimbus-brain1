@@ -1,0 +1,38 @@
+export interface Target {
+  id: string;
+  title: string;
+  category: 'study' | 'fitness' | 'finance' | 'project' | 'custom';
+  description?: string;
+  target_value: number;
+  current_value: number;
+  unit: string;
+  deadline?: string;
+  status: 'active' | 'completed' | 'failed' | 'paused';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  tool_calls?: ToolCallResult[];
+  model_used?: string;
+  created_at: string;
+}
+
+export interface ToolCallResult {
+  name: string;
+  args: Record<string, unknown>;
+  result: string;
+}
+
+export interface AIModel {
+  id: string;
+  name: string;
+  provider: string;
+  capabilities: ('chat' | 'vision' | 'functions' | 'reasoning')[];
+  context_length: number | null;
+  supports_tools: boolean;
+  description: string;
+}
