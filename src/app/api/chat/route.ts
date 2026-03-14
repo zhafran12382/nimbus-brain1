@@ -14,6 +14,8 @@ Setelah mengeksekusi tool, berikan respons yang informatif dan encouraging.`;
 interface ChatRequestMessage {
   role: string;
   content: string;
+  tool_call_id?: string;
+  tool_calls?: unknown[];
 }
 
 export async function POST(req: NextRequest) {
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest) {
           role: "tool",
           tool_call_id: toolCall.id,
           content: result,
-        } as unknown as ChatRequestMessage);
+        });
       }
 
       response = await fetch(`${process.env.MAIA_BASE_URL}/chat/completions`, {
@@ -122,8 +124,8 @@ export async function POST(req: NextRequest) {
               .replace(/```json[\s\S]*?```/, '')
               .trim() + `\n\n✅ ${result}`;
           }
-        } catch {
-          // JSON parse failed, ignore
+        } catch (parseError) {
+          console.warn('Failed to parse JSON action from model response:', parseError);
         }
       }
     }

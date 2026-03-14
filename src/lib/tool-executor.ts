@@ -31,8 +31,9 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
 
       const target = targets[0];
       const updateData: Record<string, unknown> = { current_value: args.new_value };
+      const newValue = Number(args.new_value);
 
-      if (Number(args.new_value) >= target.target_value && !args.set_status) {
+      if (!isNaN(newValue) && newValue >= target.target_value && !args.set_status) {
         updateData.status = 'completed';
       } else if (args.set_status) {
         updateData.status = args.set_status;

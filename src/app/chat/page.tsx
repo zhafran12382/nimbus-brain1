@@ -117,7 +117,7 @@ export default function ChatPage() {
   }, [messages, selectedModel]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-0px)]">
+    <div className="flex flex-col h-screen">
       <Header title="💬 Chat" onMenuClick={() => setSidebarOpen(!sidebarOpen)}>
         <ModelSelector
           selectedModel={selectedModel}
