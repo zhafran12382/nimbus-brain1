@@ -1,36 +1,147 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧠 Nimbus Brain
 
-## Getting Started
+**Agentic Personal Dashboard** — AI chatbot yang terintegrasi dengan sistem manajemen target/goal pribadi. Dibangun dengan Next.js, Supabase, dan AI function calling.
 
-First, run the development server:
+## ✨ Fitur Utama
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### 🎯 Target Manager
+- Buat, edit, dan hapus target/goal pribadi
+- Tracking progress secara real-time
+- 5 kategori bawaan: **Study**, **Fitness**, **Finance**, **Project**, **Custom**
+- Status tracking: Active, Completed, Failed, Paused
+- Visualisasi progress dengan persentase
+- Deadline dan deskripsi untuk setiap target
+- Filter berdasarkan status dan kategori
+- Sinkronisasi real-time dengan database
+
+### 💬 AI Chat Assistant
+- Interface percakapan dengan bahasa Indonesia
+- AI agent dengan kemampuan function calling
+- Riwayat chat tersimpan di database
+- Pemilihan model AI
+
+### 🤖 AI Agent Tools
+AI dapat menjalankan aksi secara otomatis melalui percakapan:
+- **create_target** — Buat target baru
+- **update_target_progress** — Update progress target
+- **get_targets** — Ambil daftar target dengan filter
+- **delete_target** — Hapus target
+- **get_target_summary** — Ringkasan semua target aktif
+
+## 🛠️ Tech Stack
+
+| Kategori | Teknologi |
+|----------|-----------|
+| Framework | [Next.js 16](https://nextjs.org) (App Router) |
+| UI | [React 19](https://react.dev), [Radix UI](https://radix-ui.com), [Lucide Icons](https://lucide.dev) |
+| Styling | [Tailwind CSS 4](https://tailwindcss.com) |
+| Database | [Supabase](https://supabase.com) (PostgreSQL + Realtime) |
+| AI | Maia Router API (function calling) |
+| Deployment | [Netlify](https://netlify.com) |
+| Bahasa | TypeScript |
+
+## 📁 Struktur Project
+
+```
+src/
+├── app/
+│   ├── layout.tsx              # Root layout
+│   ├── page.tsx                # Home → redirect ke /targets
+│   ├── chat/page.tsx           # Halaman chat AI
+│   ├── targets/page.tsx        # Halaman target manager
+│   └── api/chat/route.ts       # API endpoint chat
+├── components/
+│   ├── chat/                   # Komponen chat
+│   ├── targets/                # Komponen target manager
+│   ├── layout/                 # App shell, sidebar, header
+│   └── ui/                     # Primitif UI (Radix-based)
+├── lib/
+│   ├── models.ts               # Konfigurasi model AI
+│   ├── supabase.ts             # Supabase client
+│   ├── tools.ts                # Definisi tools AI
+│   └── tool-executor.ts        # Eksekusi tools
+└── types/
+    └── index.ts                # TypeScript interfaces
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Getting Started
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Prerequisites
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- [Node.js](https://nodejs.org) v18+
+- [npm](https://www.npmjs.com)
+- Akun [Supabase](https://supabase.com)
 
-## Learn More
+### Instalasi
 
-To learn more about Next.js, take a look at the following resources:
+1. **Clone repository**
+   ```bash
+   git clone https://github.com/zhafran12382/nimbus-brain1.git
+   cd nimbus-brain1
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Setup environment variables**
 
-## Deploy on Vercel
+   Buat file `.env.local` di root project:
+   ```env
+   # Supabase
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   # Maia Router API
+   MAIA_BASE_URL=https://your-maia-api-url
+   MAIA_API_KEY=your-api-key
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. **Jalankan development server**
+   ```bash
+   npm run dev
+   ```
+
+5. Buka [http://localhost:3000](http://localhost:3000) di browser.
+
+## 📦 Scripts
+
+| Script | Deskripsi |
+|--------|-----------|
+| `npm run dev` | Jalankan development server |
+| `npm run build` | Build untuk production |
+| `npm run start` | Jalankan production server |
+| `npm run lint` | Jalankan ESLint |
+
+## 🌐 Deploy ke Netlify
+
+Project ini sudah dikonfigurasi untuk deploy ke Netlify dengan `netlify.toml`.
+
+### Deploy Otomatis
+
+1. Push repository ke GitHub
+2. Hubungkan repository di [Netlify Dashboard](https://app.netlify.com)
+3. Set environment variables di **Site settings → Environment variables**:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `MAIA_BASE_URL`
+   - `MAIA_API_KEY`
+4. Netlify akan otomatis build dan deploy setiap ada push ke branch utama
+
+### Deploy Manual (Netlify CLI)
+
+```bash
+# Install Netlify CLI
+npm install -g netlify-cli
+
+# Login ke Netlify
+netlify login
+
+# Deploy
+netlify deploy --prod
+```
+
+## 📄 Lisensi
+
+Project ini bersifat private.
