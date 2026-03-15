@@ -1,10 +1,12 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ChatMessage as ChatMessageType } from "@/types";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { messageBubble } from "@/lib/animations";
 
 interface ChatContainerProps {
   messages: ChatMessageType[];
@@ -24,32 +26,38 @@ export function ChatContainer({ messages, onSend, isLoading, streamStatus, pendi
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4 pb-4">
-          {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-4xl mb-4">⚡</p>
-              <p className="text-lg font-semibold text-zinc-300">Welcome to Nimbus Brain 👋</p>
-              <p className="text-sm text-zinc-500 mt-1">
-                Mulai percakapan atau coba salah satu contoh di bawah
+        <div className="mx-auto max-w-3xl space-y-5 sm:space-y-5 pb-4">
+          {messages.length === 0 && !isLoading && (
+            <div className="flex flex-col items-center justify-center pt-[25vh] text-center">
+              {/* Logo with glow */}
+              <div
+                className="logo-pulse flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 text-2xl font-bold text-white mb-4"
+                style={{ boxShadow: "0 0 60px hsl(217 91% 60% / 0.15)" }}
+              >
+                N
+              </div>
+              <p className="text-lg font-semibold text-[hsl(0_0%_93%)]">Nimbus Brain</p>
+              <p className="text-sm text-[hsl(0_0%_45%)] mt-1 max-w-xs">
+                Asisten personal cerdas. Tanya apa saja atau kelola target-mu.
               </p>
-              <div className="flex flex-wrap gap-2 mt-4 justify-center">
+              <div className="flex flex-wrap gap-2 mt-5 justify-center">
+                <button
+                  onClick={() => onSend("Apa berita terbaru hari ini?")}
+                  className="px-3.5 py-2 rounded-xl border border-dashed border-[hsl(0_0%_100%_/_0.08)] text-xs text-[hsl(0_0%_45%)] hover:text-[hsl(217_91%_60%)] hover:border-[hsl(217_91%_60%_/_0.3)] hover:bg-[hsl(217_91%_60%_/_0.05)] transition-colors"
+                >
+                  📰 Berita terbaru hari ini
+                </button>
                 <button
                   onClick={() => onSend("Buat target baru: baca 10 buku tahun ini")}
-                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors"
+                  className="px-3.5 py-2 rounded-xl border border-dashed border-[hsl(0_0%_100%_/_0.08)] text-xs text-[hsl(0_0%_45%)] hover:text-[hsl(217_91%_60%)] hover:border-[hsl(217_91%_60%_/_0.3)] hover:bg-[hsl(217_91%_60%_/_0.05)] transition-colors"
                 >
                   🎯 Buat target baru
                 </button>
                 <button
-                  onClick={() => onSend("Apa berita terbaru hari ini?")}
-                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors"
+                  onClick={() => onSend("Tampilkan semua target aktif dan progress-nya")}
+                  className="px-3.5 py-2 rounded-xl border border-dashed border-[hsl(0_0%_100%_/_0.08)] text-xs text-[hsl(0_0%_45%)] hover:text-[hsl(217_91%_60%)] hover:border-[hsl(217_91%_60%_/_0.3)] hover:bg-[hsl(217_91%_60%_/_0.05)] transition-colors"
                 >
-                  🔍 Web search
-                </button>
-                <button
-                  onClick={() => onSend("Tampilkan semua target aktif")}
-                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors"
-                >
-                  📋 Lihat target
+                  📊 Lihat progress target
                 </button>
               </div>
             </div>
@@ -57,32 +65,53 @@ export function ChatContainer({ messages, onSend, isLoading, streamStatus, pendi
           {messages.map((msg) => (
             <ChatMessage key={msg.id} message={msg} />
           ))}
-          {isLoading && (
-            <div className="flex items-start gap-3 px-4">
-              <div className="bg-zinc-800 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[80%]">
-                {/* Status text */}
-                <div className="flex items-center gap-2 text-sm text-zinc-400">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0ms]" />
-                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:150ms]" />
-                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:300ms]" />
-                  </div>
-                  <span>{streamStatus || 'Thinking...'}</span>
-                </div>
 
-                {/* Tool calls yang sedang dijalankan */}
-                {pendingToolCalls && pendingToolCalls.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {pendingToolCalls.map((tc, i) => (
-                      <div key={i} className="text-xs bg-zinc-700/50 rounded px-2 py-1 text-green-400">
-                        ✅ {tc.name}: {tc.result}
-                      </div>
-                    ))}
+          {/* Loading / streaming state */}
+          <AnimatePresence>
+            {isLoading && (
+              <motion.div
+                initial={messageBubble.initial}
+                animate={messageBubble.animate}
+                exit={{ opacity: 0 }}
+                transition={messageBubble.transition}
+                className="flex items-start gap-2.5"
+              >
+                {/* Avatar */}
+                <div className="hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 text-[11px] font-bold text-white mt-1">
+                  N
+                </div>
+                <div className="glass-card rounded-2xl rounded-bl-sm px-4 py-3 max-w-[75%] sm:max-w-[70%]">
+                  {/* Status text with pulse dots */}
+                  <div className="flex items-center gap-2.5 text-sm text-[hsl(0_0%_45%)]">
+                    <div className="flex gap-1 items-center">
+                      <span className="dot-1 h-1.5 w-1.5 rounded-full bg-[hsl(217_91%_60%)]" />
+                      <span className="dot-2 h-1.5 w-1.5 rounded-full bg-[hsl(217_91%_60%)]" />
+                      <span className="dot-3 h-1.5 w-1.5 rounded-full bg-[hsl(217_91%_60%)]" />
+                    </div>
+                    <span className="text-xs">{streamStatus || "Thinking..."}</span>
                   </div>
-                )}
-              </div>
-            </div>
-          )}
+
+                  {/* Tool call results */}
+                  {pendingToolCalls && pendingToolCalls.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {pendingToolCalls.map((tc, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2, ease: "easeOut" }}
+                          className="text-xs rounded-md px-2 py-1 bg-[hsl(0_0%_5%)] text-[hsl(160_84%_39%)]"
+                        >
+                          ✅ {tc.name}: {tc.result}
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div ref={bottomRef} />
         </div>
       </ScrollArea>

@@ -13,8 +13,8 @@ export function TargetList({ targets, onEdit, onDelete }: TargetListProps) {
   if (targets.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <p className="text-lg text-zinc-500">Belum ada target.</p>
-        <p className="text-sm text-zinc-600 mt-1">
+        <p className="text-sm text-[hsl(0_0%_45%)]">Belum ada target.</p>
+        <p className="text-xs text-[hsl(0_0%_30%)] mt-1">
           Buat lewat tombol di atas atau chat dengan AI! 💬
         </p>
       </div>
@@ -22,7 +22,7 @@ export function TargetList({ targets, onEdit, onDelete }: TargetListProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {targets.map((target) => (
         <TargetCard
           key={target.id}

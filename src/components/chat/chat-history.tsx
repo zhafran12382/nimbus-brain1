@@ -134,7 +134,7 @@ export function ChatHistory({
             initial={{ x: -300 }}
             animate={{ x: 0 }}
             exit={{ x: -300 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            transition={{ type: "tween", duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
             className="fixed inset-y-0 left-0 z-[70] w-[280px] max-w-[85vw] flex flex-col glass border-r border-border-subtle lg:relative lg:z-auto"
           >
             {/* Header */}

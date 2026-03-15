@@ -15,7 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-[100dvh]">
       <NavRail onSettingsClick={() => setSettingsOpen(true)} />
-      <BottomBar onSettingsClick={() => setSettingsOpen(true)} />
+      <BottomBar />
 
       <main className="sm:pl-16 pb-16 sm:pb-0 min-h-[100dvh]">
         <motion.div
