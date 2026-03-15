@@ -6,10 +6,9 @@ export function ModelSelector() {
   const model = AVAILABLE_MODELS[0];
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-xs text-zinc-300">
-      <span>🔧</span>
-      <span>{model.name}</span>
-      <span className="text-zinc-500">({model.provider})</span>
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[hsl(0_0%_10%)] border border-[hsl(0_0%_100%_/_0.06)] text-[11px] text-[hsl(0_0%_45%)]">
+      <span>⭐</span>
+      <span className="text-[hsl(0_0%_60%)]">{model.name}</span>
     </div>
   );
 }

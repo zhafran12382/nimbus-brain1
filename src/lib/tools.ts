@@ -81,7 +81,7 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "web_search",
-      description: "Search the web for current, real-time information. Use this when the user asks about recent events, news, people, facts, or anything that requires up-to-date knowledge beyond your training data.",
+      description: "Search the web for current, real-time information. Use when user asks about recent events, news, people, current facts, or anything beyond your training data. Always cite sources from results.",
       parameters: {
         type: "object",
         properties: {

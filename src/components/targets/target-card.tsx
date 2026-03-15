@@ -1,10 +1,7 @@
 "use client";
 
 import { Target } from "@/types";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,21 +13,21 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, AlertCircle } from "lucide-react";
 
-const categoryColors: Record<string, string> = {
-  study: "bg-blue-600",
-  fitness: "bg-green-600",
-  finance: "bg-amber-600",
-  project: "bg-purple-600",
-  custom: "bg-zinc-600",
+const categoryEmoji: Record<string, string> = {
+  study: "📚",
+  fitness: "💪",
+  finance: "💰",
+  project: "🚀",
+  custom: "📌",
 };
 
 const statusColors: Record<string, string> = {
-  active: "bg-blue-600",
-  completed: "bg-green-600",
-  failed: "bg-red-600",
-  paused: "bg-amber-600",
+  active: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  completed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  failed: "bg-red-500/10 text-red-400 border-red-500/20",
+  paused: "bg-amber-500/10 text-amber-400 border-amber-500/20",
 };
 
 interface TargetCardProps {
@@ -41,81 +38,107 @@ interface TargetCardProps {
 
 export function TargetCard({ target, onEdit, onDelete }: TargetCardProps) {
   const percentage = target.target_value > 0
-    ? (target.current_value / target.target_value) * 100
+    ? Math.min((target.current_value / target.target_value) * 100, 100)
     : 0;
   const pctText = percentage.toFixed(1);
 
-  const progressColor =
-    percentage >= 70 ? "bg-green-500" :
-    percentage >= 30 ? "bg-amber-500" :
-    "bg-red-500";
+  const progressGradient =
+    percentage >= 70 ? "from-emerald-500 to-emerald-400" :
+    percentage >= 30 ? "from-amber-500 to-amber-400" :
+    "from-red-500 to-red-400";
+
+  // Deadline logic
+  let deadlineClass = "text-[hsl(0_0%_30%)]";
+  let isOverdue = false;
+  let isNearDeadline = false;
+  if (target.deadline) {
+    const diff = new Date(target.deadline).getTime() - Date.now();
+    if (diff < 0 && target.status === "active") {
+      deadlineClass = "text-red-400";
+      isOverdue = true;
+    } else if (diff > 0 && diff < 7 * 24 * 60 * 60 * 1000) {
+      deadlineClass = "text-amber-400";
+      isNearDeadline = true;
+    }
+  }
 
   return (
-    <Card className="transition-all duration-200 hover:shadow-lg hover:shadow-zinc-900/50">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="space-y-1">
-            <h3 className="font-semibold text-zinc-100 leading-tight">{target.title}</h3>
-            {target.description && (
-              <p className="text-xs text-zinc-500 line-clamp-2">{target.description}</p>
-            )}
-          </div>
-          <Badge className={categoryColors[target.category] || categoryColors.custom}>
-            {target.category}
-          </Badge>
+    <div className="glass-card rounded-2xl p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-[hsl(0_0%_100%_/_0.08)] hover:shadow-[0_0_0_1px_hsl(0_0%_100%_/_0.03),0_12px_48px_hsl(0_0%_0%_/_0.4)] group">
+      <div className="flex items-start gap-3 mb-3">
+        {/* Category icon */}
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(0_0%_12%)] text-sm">
+          {categoryEmoji[target.category] || "📌"}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-zinc-400">
-              {target.current_value}/{target.target_value} {target.unit}
-            </span>
-            <span className="font-medium text-zinc-300">{pctText}%</span>
-          </div>
-          <Progress value={percentage} indicatorClassName={progressColor} />
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-medium text-[hsl(0_0%_93%)] leading-tight line-clamp-2">{target.title}</h3>
+          {target.description && (
+            <p className="text-[11px] text-[hsl(0_0%_30%)] line-clamp-1 mt-0.5">{target.description}</p>
+          )}
         </div>
+        <Badge variant="outline" className={`shrink-0 text-[10px] rounded-full border ${statusColors[target.status] || statusColors.active}`}>
+          {target.status}
+        </Badge>
+      </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {target.deadline && (
-              <span className="text-xs text-zinc-500">📅 {target.deadline}</span>
-            )}
-            <Badge variant="outline" className={`text-xs border-0 ${statusColors[target.status]}`}>
-              {target.status}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(target)}>
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-300">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Hapus Target?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Target &quot;{target.title}&quot; akan dihapus permanen. Aksi ini tidak bisa dibatalkan.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Batal</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-red-600 hover:bg-red-700"
-                    onClick={() => onDelete(target.id)}
-                  >
-                    Hapus
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+      {/* Progress section */}
+      <div className="space-y-1.5 mb-3">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-[hsl(0_0%_45%)]">
+            {target.current_value} / {target.target_value} {target.unit}
+          </span>
+          <span className="font-medium text-[hsl(0_0%_70%)]">{pctText}%</span>
         </div>
-      </CardContent>
-    </Card>
+        <div className="h-1.5 rounded-full bg-[hsl(0_0%_12%)] overflow-hidden">
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${progressGradient} progress-fill`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Bottom: deadline + actions */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          {target.deadline && (
+            <span className={`flex items-center gap-1 text-[10px] ${deadlineClass}`}>
+              {(isOverdue || isNearDeadline) && <AlertCircle className="h-3 w-3" />}
+              📅 {target.deadline}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => onEdit(target)}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-[hsl(0_0%_45%)] hover:text-[hsl(0_0%_93%)] hover:bg-[hsl(0_0%_12%)] transition-colors"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button className="flex h-7 w-7 items-center justify-center rounded-md text-[hsl(0_0%_45%)] hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Hapus Target?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Target &quot;{target.title}&quot; akan dihapus permanen. Aksi ini tidak bisa dibatalkan.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Batal</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={() => onDelete(target.id)}
+                >
+                  Hapus
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+    </div>
   );
 }

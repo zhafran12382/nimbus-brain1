@@ -128,26 +128,28 @@ export default function ChatPage() {
         }
       });
 
-      // Add assistant message to state
-      const assistantMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        conversation_id: conversationId || undefined,
-        role: "assistant",
-        content: finalContent,
-        tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
-        model_used: finalModelUsed,
-        created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      // Only add assistant message if there's actual content or tool calls
+      if (finalContent.trim() || finalToolCalls.length > 0) {
+        const assistantMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          conversation_id: conversationId || undefined,
+          role: "assistant",
+          content: finalContent || "(No response)",
+          tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
+          model_used: finalModelUsed,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
 
-      // Save to Supabase
-      await supabase.from("chat_messages").insert({
-        role: "assistant",
-        content: finalContent,
-        tool_calls: finalToolCalls.length > 0 ? finalToolCalls : null,
-        model_used: finalModelUsed,
-        conversation_id: conversationId,
-      });
+        // Save to Supabase
+        await supabase.from("chat_messages").insert({
+          role: "assistant",
+          content: finalContent || "(No response)",
+          tool_calls: finalToolCalls.length > 0 ? finalToolCalls : null,
+          model_used: finalModelUsed,
+          conversation_id: conversationId,
+        });
+      }
 
       // Update conversation timestamp
       if (conversationId) {

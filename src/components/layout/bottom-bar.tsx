@@ -3,19 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, Target, Settings } from "lucide-react";
+import { MessageSquare, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface BottomBarProps {
-  onSettingsClick: () => void;
-}
 
 const navItems = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/targets", label: "Targets", icon: Target },
 ];
 
-export function BottomBar({ onSettingsClick }: BottomBarProps) {
+export function BottomBar() {
   const pathname = usePathname();
 
   return (
@@ -37,7 +33,7 @@ export function BottomBar({ onSettingsClick }: BottomBarProps) {
               <item.icon
                 className={cn(
                   "h-5 w-5 transition-colors",
-                  isActive ? "text-accent" : "text-text-muted"
+                  isActive ? "text-[hsl(217_91%_60%)]" : "text-[hsl(0_0%_30%)]"
                 )}
               />
               <AnimatePresence>
@@ -46,7 +42,8 @@ export function BottomBar({ onSettingsClick }: BottomBarProps) {
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    className="text-[10px] font-medium text-accent"
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                    className="text-[10px] font-medium text-[hsl(217_91%_60%)]"
                   >
                     {item.label}
                   </motion.span>
@@ -55,12 +52,6 @@ export function BottomBar({ onSettingsClick }: BottomBarProps) {
             </Link>
           );
         })}
-        <button
-          onClick={onSettingsClick}
-          className="flex flex-col items-center gap-0.5"
-        >
-          <Settings className="h-5 w-5 text-text-muted" />
-        </button>
       </div>
     </nav>
   );

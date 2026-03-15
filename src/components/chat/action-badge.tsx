@@ -1,15 +1,14 @@
 "use client";
 
 import { ToolCallResult } from "@/types";
-import { Badge } from "@/components/ui/badge";
 
-const actionConfig: Record<string, { icon: string; label: string; color: string }> = {
-  create_target: { icon: "🎯", label: "Target dibuat", color: "bg-green-600/20 text-green-400 border-green-600/30" },
-  update_target_progress: { icon: "📈", label: "Progress diupdate", color: "bg-blue-600/20 text-blue-400 border-blue-600/30" },
-  delete_target: { icon: "🗑️", label: "Target dihapus", color: "bg-red-600/20 text-red-400 border-red-600/30" },
-  get_targets: { icon: "📋", label: "Daftar target", color: "bg-zinc-600/20 text-zinc-400 border-zinc-600/30" },
-  get_target_summary: { icon: "📊", label: "Summary", color: "bg-zinc-600/20 text-zinc-400 border-zinc-600/30" },
-  web_search: { icon: "🔍", label: "Web search", color: "bg-violet-600/20 text-violet-400 border-violet-600/30" },
+const actionConfig: Record<string, { icon: string; label: string; bgClass: string; textClass: string; borderClass: string }> = {
+  create_target: { icon: "🎯", label: "create target", bgClass: "bg-emerald-500/10", textClass: "text-emerald-400", borderClass: "border-emerald-500/20" },
+  update_target_progress: { icon: "📈", label: "update target", bgClass: "bg-blue-500/10", textClass: "text-blue-400", borderClass: "border-blue-500/20" },
+  delete_target: { icon: "🗑️", label: "delete target", bgClass: "bg-red-500/10", textClass: "text-red-400", borderClass: "border-red-500/20" },
+  get_targets: { icon: "📋", label: "get targets", bgClass: "bg-zinc-500/10", textClass: "text-zinc-400", borderClass: "border-zinc-500/20" },
+  get_target_summary: { icon: "📊", label: "get summary", bgClass: "bg-zinc-500/10", textClass: "text-zinc-400", borderClass: "border-zinc-500/20" },
+  web_search: { icon: "🔍", label: "web search", bgClass: "bg-violet-500/10", textClass: "text-violet-400", borderClass: "border-violet-500/20" },
 };
 
 interface ActionBadgeProps {
@@ -19,15 +18,15 @@ interface ActionBadgeProps {
 export function ActionBadge({ toolCall }: ActionBadgeProps) {
   const config = actionConfig[toolCall.name] || {
     icon: "⚡",
-    label: toolCall.name,
-    color: "bg-zinc-600/20 text-zinc-400 border-zinc-600/30",
+    label: toolCall.name.replace(/_/g, " "),
+    bgClass: "bg-zinc-500/10",
+    textClass: "text-zinc-400",
+    borderClass: "border-zinc-500/20",
   };
 
-  const detail = toolCall.args.title ? `: ${toolCall.args.title}` : toolCall.args.query ? `: ${toolCall.args.query}` : "";
-
   return (
-    <Badge variant="outline" className={`${config.color} text-xs font-normal`}>
-      {config.icon} {config.label}{detail}
-    </Badge>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium border ${config.bgClass} ${config.textClass} ${config.borderClass}`}>
+      {config.icon} {config.label}
+    </span>
   );
 }

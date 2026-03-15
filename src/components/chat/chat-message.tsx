@@ -1,7 +1,9 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { ChatMessage as ChatMessageType } from "@/types";
 import { ActionBadge } from "./action-badge";
+import { messageBubble } from "@/lib/animations";
 import Markdown from "react-markdown";
 
 interface ChatMessageProps {
@@ -17,11 +19,23 @@ export function ChatMessage({ message }: ChatMessageProps) {
   });
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[80%] space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
+    <motion.div
+      initial={messageBubble.initial}
+      animate={messageBubble.animate}
+      transition={messageBubble.transition}
+      className={`flex gap-2.5 ${isUser ? "justify-end" : "justify-start"}`}
+    >
+      {/* Assistant avatar — hidden on mobile */}
+      {!isUser && (
+        <div className="hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 text-[11px] font-bold text-white mt-1">
+          N
+        </div>
+      )}
+
+      <div className={`max-w-[75%] sm:max-w-[70%] space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
         {/* Action badges for assistant messages */}
         {!isUser && message.tool_calls && message.tool_calls.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-1">
+          <div className="flex flex-wrap gap-1 mb-0.5">
             {message.tool_calls.map((tc, i) => (
               <ActionBadge key={i} toolCall={tc} />
             ))}
@@ -30,16 +44,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
         {/* Message bubble */}
         <div
-          className={`rounded-2xl px-4 py-2.5 text-sm ${
+          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
             isUser
-              ? "bg-blue-600 text-white rounded-br-sm"
-              : "bg-zinc-800 text-zinc-100 rounded-bl-sm"
+              ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm"
+              : "glass-card text-[hsl(0_0%_93%)] rounded-bl-sm"
           }`}
         >
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+            <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
               <Markdown>{message.content}</Markdown>
             </div>
           )}
@@ -47,12 +61,19 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
         {/* Timestamp & model info */}
         <div className="flex items-center gap-2 px-1">
-          <span className="text-[10px] text-zinc-600">{timestamp}</span>
+          <span className="text-[10px] text-[hsl(0_0%_93%_/_0.4)]">{timestamp}</span>
           {!isUser && message.model_used && (
-            <span className="text-[10px] text-zinc-700">{message.model_used}</span>
+            <span className="hidden sm:inline text-[10px] text-[hsl(0_0%_93%_/_0.3)]">{message.model_used}</span>
           )}
         </div>
       </div>
-    </div>
+
+      {/* User avatar — hidden on mobile */}
+      {isUser && (
+        <div className="hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[hsl(0_0%_12%)] text-[11px] font-medium text-[hsl(0_0%_50%)] mt-1">
+          U
+        </div>
+      )}
+    </motion.div>
   );
 }
