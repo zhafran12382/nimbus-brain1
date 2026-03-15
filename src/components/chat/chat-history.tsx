@@ -115,7 +115,7 @@ export function ChatHistory({
     if (!error) {
       if (activeConversationId === id) {
         onSelectConversation(null);
-        try { localStorage.removeItem("nimbus-active-conv"); } catch {}
+        try { localStorage.removeItem("nimbus-active-conv"); } catch { /* localStorage may be unavailable */ }
       }
       fetchConversations();
     }

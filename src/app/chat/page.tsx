@@ -72,7 +72,7 @@ export default function ChatPage() {
         .eq("conversation_id", activeConversationId)
         .order("created_at", { ascending: true })
         .limit(50);
-      if (data) setMessages((data as ChatMessage[]).filter(m => m.content?.trim()));
+      if (data) setMessages((data as ChatMessage[]).filter(m => m.content && m.content.trim() !== ''));
     };
     loadMessages();
   }, [activeConversationId]);

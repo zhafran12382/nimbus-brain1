@@ -50,7 +50,7 @@ export default function SettingsPage() {
         setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
       }
     } catch {
-      // ignore
+      // localStorage may be unavailable or contain invalid JSON
     }
   }, []);
 

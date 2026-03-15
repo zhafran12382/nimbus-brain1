@@ -217,8 +217,8 @@ export async function POST(req: NextRequest) {
           try {
             const retryData = await callMaia(modelId, apiMessages, false);
             finalContent = retryData.choices[0]?.message?.content || "";
-          } catch {
-            // ignore retry error
+          } catch (retryErr) {
+            console.warn('Retry failed:', retryErr);
           }
         }
 

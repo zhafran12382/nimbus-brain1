@@ -76,9 +76,11 @@ export function ExpenseForm({ open, onOpenChange, editExpense }: ExpenseFormProp
     };
 
     if (editExpense) {
-      await supabase.from("expenses").update(payload).eq("id", editExpense.id);
+      const { error } = await supabase.from("expenses").update(payload).eq("id", editExpense.id);
+      if (error) { setSaving(false); return; }
     } else {
-      await supabase.from("expenses").insert(payload);
+      const { error } = await supabase.from("expenses").insert(payload);
+      if (error) { setSaving(false); return; }
     }
 
     setSaving(false);
