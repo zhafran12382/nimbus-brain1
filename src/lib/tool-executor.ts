@@ -1,5 +1,39 @@
 import { supabase } from './supabase';
 
+function getPeriodDateRange(period: string): { startDate: string | null; endDate: string | null; periodLabel: string } {
+  const now = new Date();
+  let startDate: string | null = null;
+  let endDate: string | null = null;
+  let periodLabel = '';
+
+  if (period === 'today') {
+    startDate = now.toISOString().split('T')[0];
+    endDate = startDate;
+    periodLabel = 'Hari Ini';
+  } else if (period === 'this_week') {
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+    startDate = monday.toISOString().split('T')[0];
+    endDate = now.toISOString().split('T')[0];
+    periodLabel = 'Minggu Ini';
+  } else if (period === 'this_month') {
+    startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    endDate = now.toISOString().split('T')[0];
+    periodLabel = 'Bulan Ini';
+  } else if (period === 'last_month') {
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+    startDate = lastMonth.toISOString().split('T')[0];
+    endDate = lastDay.toISOString().split('T')[0];
+    periodLabel = 'Bulan Lalu';
+  } else {
+    periodLabel = 'Semua Waktu';
+  }
+
+  return { startDate, endDate, periodLabel };
+}
+
 export async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
   switch (name) {
     case 'create_target': {
@@ -181,36 +215,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     }
 
     case 'get_expense_summary': {
-      const period = String(args.period || 'this_month');
-      const now = new Date();
-      let startDate: string | null = null;
-      let endDate: string | null = null;
-      let periodLabel = '';
-
-      if (period === 'today') {
-        startDate = now.toISOString().split('T')[0];
-        endDate = startDate;
-        periodLabel = 'Hari Ini';
-      } else if (period === 'this_week') {
-        const day = now.getDay();
-        const monday = new Date(now);
-        monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-        startDate = monday.toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
-        periodLabel = 'Minggu Ini';
-      } else if (period === 'this_month') {
-        startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-        endDate = now.toISOString().split('T')[0];
-        periodLabel = 'Bulan Ini';
-      } else if (period === 'last_month') {
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-        startDate = lastMonth.toISOString().split('T')[0];
-        endDate = lastDay.toISOString().split('T')[0];
-        periodLabel = 'Bulan Lalu';
-      } else {
-        periodLabel = 'Semua Waktu';
-      }
+      const { startDate, endDate, periodLabel } = getPeriodDateRange(String(args.period || 'this_month'));
 
       let query = supabase.from('expenses').select('*');
       if (startDate) query = query.gte('date', startDate);
@@ -295,36 +300,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     }
 
     case 'get_income_summary': {
-      const period = String(args.period || 'this_month');
-      const now = new Date();
-      let startDate: string | null = null;
-      let endDate: string | null = null;
-      let periodLabel = '';
-
-      if (period === 'today') {
-        startDate = now.toISOString().split('T')[0];
-        endDate = startDate;
-        periodLabel = 'Hari Ini';
-      } else if (period === 'this_week') {
-        const day = now.getDay();
-        const monday = new Date(now);
-        monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-        startDate = monday.toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
-        periodLabel = 'Minggu Ini';
-      } else if (period === 'this_month') {
-        startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-        endDate = now.toISOString().split('T')[0];
-        periodLabel = 'Bulan Ini';
-      } else if (period === 'last_month') {
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-        startDate = lastMonth.toISOString().split('T')[0];
-        endDate = lastDay.toISOString().split('T')[0];
-        periodLabel = 'Bulan Lalu';
-      } else {
-        periodLabel = 'Semua Waktu';
-      }
+      const { startDate, endDate, periodLabel } = getPeriodDateRange(String(args.period || 'this_month'));
 
       let query = supabase.from('incomes').select('*');
       if (startDate) query = query.gte('date', startDate);
@@ -365,36 +341,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     }
 
     case 'get_financial_summary': {
-      const period = String(args.period || 'this_month');
-      const now = new Date();
-      let startDate: string | null = null;
-      let endDate: string | null = null;
-      let periodLabel = '';
-
-      if (period === 'today') {
-        startDate = now.toISOString().split('T')[0];
-        endDate = startDate;
-        periodLabel = 'Hari Ini';
-      } else if (period === 'this_week') {
-        const day = now.getDay();
-        const monday = new Date(now);
-        monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-        startDate = monday.toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
-        periodLabel = 'Minggu Ini';
-      } else if (period === 'this_month') {
-        startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-        endDate = now.toISOString().split('T')[0];
-        periodLabel = 'Bulan Ini';
-      } else if (period === 'last_month') {
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-        startDate = lastMonth.toISOString().split('T')[0];
-        endDate = lastDay.toISOString().split('T')[0];
-        periodLabel = 'Bulan Lalu';
-      } else {
-        periodLabel = 'Semua Waktu';
-      }
+      const { startDate, endDate, periodLabel } = getPeriodDateRange(String(args.period || 'this_month'));
 
       // Query expenses
       let expQuery = supabase.from('expenses').select('*');
