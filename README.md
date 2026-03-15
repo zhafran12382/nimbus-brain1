@@ -27,6 +27,7 @@ AI dapat menjalankan aksi secara otomatis melalui percakapan:
 - **get_targets** — Ambil daftar target dengan filter
 - **delete_target** — Hapus target
 - **get_target_summary** — Ringkasan semua target aktif
+- **web_search** — Cari informasi terkini dari web
 
 ## 🛠️ Tech Stack
 
@@ -37,7 +38,7 @@ AI dapat menjalankan aksi secara otomatis melalui percakapan:
 | Styling | [Tailwind CSS 4](https://tailwindcss.com) |
 | Database | [Supabase](https://supabase.com) (PostgreSQL + Realtime) |
 | AI | Maia Router API (function calling) |
-| Deployment | [Netlify](https://netlify.com) |
+| Deployment | [Vercel](https://vercel.com) |
 | Bahasa | TypeScript |
 
 ## 📁 Struktur Project
@@ -46,7 +47,7 @@ AI dapat menjalankan aksi secara otomatis melalui percakapan:
 src/
 ├── app/
 │   ├── layout.tsx              # Root layout
-│   ├── page.tsx                # Home → redirect ke /targets
+│   ├── page.tsx                # Home → redirect ke /chat
 │   ├── chat/page.tsx           # Halaman chat AI
 │   ├── targets/page.tsx        # Halaman target manager
 │   └── api/chat/route.ts       # API endpoint chat
@@ -96,6 +97,9 @@ src/
    # Maia Router API
    MAIA_BASE_URL=https://your-maia-api-url
    MAIA_API_KEY=your-api-key
+
+   # Tavily Web Search (opsional — fallback ke DuckDuckGo)
+   TAVILY_API_KEY=your-tavily-key
    ```
 
 4. **Jalankan development server**
@@ -114,33 +118,25 @@ src/
 | `npm run start` | Jalankan production server |
 | `npm run lint` | Jalankan ESLint |
 
-## 🌐 Deploy ke Netlify
+## 🌐 Deploy ke Vercel
 
-Project ini sudah dikonfigurasi untuk deploy ke Netlify dengan `netlify.toml`.
+Project ini sudah dikonfigurasi untuk deploy ke Vercel dengan `vercel.json`.
 
 ### Deploy Otomatis
 
 1. Push repository ke GitHub
-2. Hubungkan repository di [Netlify Dashboard](https://app.netlify.com)
-3. Set environment variables di **Site settings → Environment variables**:
+2. Hubungkan repository di [Vercel Dashboard](https://vercel.com/dashboard)
+3. Set environment variables di **Settings → Environment Variables**:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `MAIA_BASE_URL`
    - `MAIA_API_KEY`
-4. Netlify akan otomatis build dan deploy setiap ada push ke branch utama
+   - `TAVILY_API_KEY` (opsional, untuk web search)
+4. Vercel akan otomatis build dan deploy setiap ada push ke branch utama
 
-### Deploy Manual (Netlify CLI)
+### Verifikasi Setelah Deploy
 
-```bash
-# Install Netlify CLI
-npm install -g netlify-cli
-
-# Login ke Netlify
-netlify login
-
-# Deploy
-netlify deploy --prod
-```
+Buka `/api/debug` untuk memastikan semua environment variables terkonfigurasi dengan benar.
 
 ## 📄 Lisensi
 

@@ -1,3 +1,10 @@
+export interface Conversation {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Target {
   id: string;
   title: string;
@@ -14,6 +21,7 @@ export interface Target {
 
 export interface ChatMessage {
   id: string;
+  conversation_id?: string;
   role: 'user' | 'assistant';
   content: string;
   tool_calls?: ToolCallResult[];

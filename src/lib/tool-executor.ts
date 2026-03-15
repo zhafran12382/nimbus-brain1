@@ -100,6 +100,66 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       return summary;
     }
 
+    case 'web_search': {
+      const query = String(args.query);
+      try {
+        // Try Tavily API first
+        if (process.env.TAVILY_API_KEY) {
+          const tavilyRes = await fetch('https://api.tavily.com/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              api_key: process.env.TAVILY_API_KEY,
+              query,
+              max_results: 5,
+              search_depth: 'basic',
+              include_answer: true,
+            }),
+          });
+          if (tavilyRes.ok) {
+            const data = await tavilyRes.json();
+            let output = `Web Search Results for "${query}":\n\n`;
+            if (data.answer) {
+              output += `Answer: ${data.answer}\n\n`;
+            }
+            if (data.results && Array.isArray(data.results)) {
+              data.results.forEach((r: { title?: string; url?: string; content?: string }, i: number) => {
+                const snippet = r.content ? r.content.slice(0, 200) : '';
+                output += `${i + 1}. ${r.title || 'Untitled'} — ${r.url || ''}\n   ${snippet}\n\n`;
+              });
+            }
+            return output.trim();
+          }
+        }
+        // Fallback to DuckDuckGo Instant Answer API
+        const ddgRes = await fetch(
+          `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`
+        );
+        if (ddgRes.ok) {
+          const data = await ddgRes.json();
+          let output = `Web Search Results for "${query}":\n\n`;
+          if (data.AbstractText) {
+            output += `Summary: ${data.AbstractText}\n\n`;
+          }
+          if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
+            data.RelatedTopics.slice(0, 5).forEach((t: { Text?: string; FirstURL?: string }, i: number) => {
+              if (t.Text) {
+                output += `${i + 1}. ${t.Text}${t.FirstURL ? ` — ${t.FirstURL}` : ''}\n`;
+              }
+            });
+          }
+          if (output === `Web Search Results for "${query}":\n\n`) {
+            return `Pencarian untuk "${query}" tidak menemukan hasil yang relevan.`;
+          }
+          return output.trim();
+        }
+        return `Gagal melakukan pencarian web untuk "${query}".`;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        return `Error saat web search: ${msg}`;
+      }
+    }
+
     default:
       return `Unknown tool: ${name}`;
   }
