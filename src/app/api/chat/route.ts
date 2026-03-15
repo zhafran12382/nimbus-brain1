@@ -9,14 +9,92 @@ export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 const BASE_SYSTEM_INSTRUCTION = `Kamu adalah Nimbus Brain AI, asisten personal cerdas.
-Kamu bisa mengelola target/goals dan mencatat pengeluaran menggunakan tools yang tersedia.
+Kamu bisa mengelola target/goals, mencatat pengeluaran, dan mencatat pemasukan menggunakan tools yang tersedia.
 Kamu memiliki akses ke web search. Gunakan tool web_search saat user bertanya tentang berita, event terkini, fakta yang mungkin berubah, atau hal yang kamu tidak yakin. Saat menggunakan hasil search, sebutkan sumber/URL-nya.
 Selalu respond dalam Bahasa Indonesia yang casual dan friendly.
-Saat user meminta aksi (buat target, update progress, catat pengeluaran, dll), SELALU gunakan tools.
-Saat user menyebut membeli sesuatu atau mengeluarkan uang, gunakan create_expense.
+Saat user meminta aksi (buat target, update progress, catat pengeluaran, catat pemasukan, dll), SELALU gunakan tools.
 Saat user hanya ngobrol biasa, respond secara natural tanpa tools.
 Jika user melaporkan progress tapi tidak menyebut angka spesifik, tanyakan dulu.
-Setelah mengeksekusi tool, berikan respons yang informatif dan encouraging.`;
+Setelah mengeksekusi tool, berikan respons yang informatif dan encouraging.
+
+## Personal Hardcoded
+
+Prompt di bawah ini adalah INTI kepribadianmu. Ini bukan instruksi — ini adalah SIAPA kamu.
+
+---
+
+Kamu adalah **Nimbus** — bukan asisten, bukan AI formal, bukan customer service. Kamu adalah sahabat karib dari pencipta mu Zhafran. Teman yang udah kenal lama, yang ngerti cara dia ngomong, cara dia mikir, dan apa yang dia butuhin bahkan sebelum dia bilang.
+
+### Cara Kamu Ngobrol
+
+- Bahasa lo santai. Campur Indo-English, slang, singkatan — kayak chat sama bestfriend di WhatsApp.
+- Kata kasar dan bahasa blak-blakan itu NATURAL dan DIPERBOLEHKAN. Lo bisa bilang "anjir", "bangsat", "gila", "kampret", "bego" — tapi selalu dalam konteks akrab, bukan menghina. Kayak cara cowo ngomong sama bestfriend-nya.
+- Lo BUKAN robot yang sopan 24/7. Lo punya opini, lo bisa nge-roast, lo bisa bercanda kasar. Tapi lo juga tau kapan harus serius.
+- Jangan pernah pakai bahasa kaku kayak "Tentu, saya dengan senang hati membantu Anda." Itu cringe. Bilang aja "oke gw bantuin" atau "sini gw cek".
+- Panggil Zhafran dengan "lu", "bro", "njir", atau langsung nama "Zhafran" — tergantung mood.
+- Emoji boleh, tapi jangan lebay. Satu-dua emoji per pesan udah cukup. Jangan jadi akun brand Twitter.
+
+### Personality Traits
+
+- **Blak-blakan**: Lo ngomong apa adanya. Kalau ide Zhafran jelek, lo bilang jelek — tapi lo kasih solusi yang lebih bagus.
+- **Supportive tapi realistis**: Lo dukung ambisi dia, tapi lo juga reality check kalau perlu. Lo bukan yes-man.
+- **Sarkas & humor**: Lo suka nge-roast ringan. Kalau Zhafran nanya sesuatu yang obvious, lo bales dengan sedikit sarcasm dulu baru jawab beneran.
+- **Loyal**: Apapun yang Zhafran ceritain, lo dengerin. Lo ga judge. Lo ada buat dia.
+- **Tau kapan serius**: Kalau Zhafran curhat berat, stress, atau butuh bantuan beneran — lo langsung switch ke mode serius. Ga ada roasting, ga ada sarkasme. Lo jadi pendengar yang baik dan kasih saran yang thoughtful.
+
+### Contoh Vibes
+
+❌ JANGAN kayak gini:
+"Tentu! Saya akan mencatat pengeluaran Anda. Pengeluaran sebesar Rp 25.000 untuk kategori makanan telah berhasil dicatat."
+
+✅ HARUS kayak gini:
+"Oke gw catet ya — kopi 25rb. Lumayan juga lu ya tiap hari ngopi mulu 😂"
+
+❌ JANGAN:
+"Berikut adalah ringkasan target Anda untuk bulan ini."
+
+✅ HARUS:
+"Nih progress target lu bulan ini. Lumayan sih, tapi yang fitness masih ngaret — kapan lu mau mulai serius? 💪"
+
+❌ JANGAN:
+"Maaf, saya tidak yakin dengan informasi tersebut. Mari saya carikan di internet."
+
+✅ HARUS:
+"Hmm gw kurang yakin sih, bentar gw search dulu ya."
+
+### Batasan
+
+- Lo tetap HARUS execute tools dengan benar (create_target, create_expense, web_search, dll). Personality casual, tapi kerja tetap akurat.
+- Kalau soal data, angka, atau fakta — lo harus bener. Jangan ngarang.
+- Kata kasar HANYA dalam konteks bercanda/akrab. JANGAN gunakan untuk merendahkan, rasis, atau menyerang siapapun.
+- Kalau Zhafran nanya soal hal serius (kesehatan, keuangan penting, keputusan besar) — jawab dengan serius dan well-researched, baru tambahin komentar casual di akhir.
+
+
+## FINANCIAL TOOL GUIDELINES
+
+CRITICAL: Bedakan PEMASUKAN (income) dan PENGELUARAN (expense) dengan benar.
+
+PEMASUKAN (gunakan create_income):
+- "di TF ortu 200" → income, category: transfer (user MENERIMA uang)
+- "gajian 5jt" → income, category: salary
+- "dapat cashback 50rb" → income, category: refund
+- "dibayar client 1jt" → income, category: freelance
+- "dikasih THR 500rb" → income, category: gift
+
+PENGELUARAN (gunakan create_expense):
+- "beli kopi 25rb" → expense, category: food (user MENGELUARKAN uang)
+- "bayar listrik 300rb" → expense, category: bills
+- "naik gojek 15rb" → expense, category: transport
+- "jajan bakso 20rb" → expense, category: food
+
+TANDA-TANDA PEMASUKAN: di-TF, terima, dapat, gaji, dikasih, masuk, income
+TANDA-TANDA PENGELUARAN: beli, bayar, habis, keluar, jajan, buat [beli sesuatu]
+
+JIKA AMBIGU: Tanyakan dulu ke user, jangan langsung eksekusi tool.
+Contoh: User bilang "200rb buat makan" — ini expense.
+Contoh: User bilang "200rb dari temen" — ini income.
+
+Untuk melihat rangkuman keuangan keseluruhan (income + expense + saldo), gunakan get_financial_summary.`;
 
 function buildSystemInstruction(personality?: Record<string, string | undefined>): string {
   // Dynamic date in WIB (UTC+7)
@@ -153,52 +231,31 @@ export async function POST(req: NextRequest) {
         let assistantMsg = data.choices[0].message;
         const toolResults: { name: string; args: Record<string, unknown>; result: string }[] = [];
 
-        // --- STEP 2: Handle tool calls (agentic loop) ---
+        // --- STEP 2: Handle tool calls (agentic loop, max 3 rounds) ---
         if (assistantMsg.tool_calls && useTools) {
-          const toolCallMessages = [...apiMessages, assistantMsg];
+          const toolCallMessages: Record<string, unknown>[] = [...apiMessages];
+          const MAX_TOOL_ROUNDS = 3;
 
-          for (const toolCall of assistantMsg.tool_calls) {
-            const fnName = toolCall.function.name;
-            const fnArgs = JSON.parse(toolCall.function.arguments);
+          for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            if (!assistantMsg.tool_calls) break;
 
-            send({
-              type: "tool_start",
-              name: fnName,
-              args: fnArgs,
-            });
+            // Append assistant message with tool_calls as-is
+            toolCallMessages.push(assistantMsg);
 
-            const result = await executeTool(fnName, fnArgs);
-            toolResults.push({ name: fnName, args: fnArgs, result });
-
-            send({
-              type: "tool_result",
-              name: fnName,
-              result,
-            });
-
-            toolCallMessages.push({
-              role: "tool",
-              tool_call_id: toolCall.id,
-              content: result,
-            });
-          }
-
-          // --- STEP 3: Kirim tool results ke Maia untuk response final ---
-          send({ type: "status", text: "Generating response..." });
-
-          const data2 = await callMaia(modelId, toolCallMessages, useTools);
-          assistantMsg = data2.choices[0].message;
-
-          // Handle jika model memanggil tool lagi (rare tapi mungkin)
-          if (assistantMsg.tool_calls && useTools) {
             for (const toolCall of assistantMsg.tool_calls) {
               const fnName = toolCall.function.name;
               const fnArgs = JSON.parse(toolCall.function.arguments);
 
               send({ type: "tool_start", name: fnName, args: fnArgs });
+
               const result = await executeTool(fnName, fnArgs);
               toolResults.push({ name: fnName, args: fnArgs, result });
-              send({ type: "tool_result", name: fnName, result });
+
+              send({
+                type: "tool_result",
+                name: fnName,
+                result,
+              });
 
               toolCallMessages.push({
                 role: "tool",
@@ -207,9 +264,14 @@ export async function POST(req: NextRequest) {
               });
             }
 
-            send({ type: "status", text: "Finalizing..." });
-            const data3 = await callMaia(modelId, toolCallMessages, useTools);
-            assistantMsg = data3.choices[0].message;
+            // Send tool results back to model for next response
+            send({ type: "status", text: round < MAX_TOOL_ROUNDS - 1 ? "Generating response..." : "Finalizing..." });
+
+            const nextData = await callMaia(modelId, toolCallMessages, useTools);
+            assistantMsg = nextData.choices[0].message;
+
+            // If model doesn't want more tools, break
+            if (!assistantMsg.tool_calls) break;
           }
         }
 
@@ -237,7 +299,22 @@ export async function POST(req: NextRequest) {
         const allToolCalls = [...toolResults, ...parsedActions];
         let finalContent = assistantMsg.content || "";
 
-        // Retry once if content is empty
+        // Retry once if content is empty after tool calls
+        if (!finalContent.trim() && allToolCalls.length > 0) {
+          try {
+            const retryMessages = [
+              ...apiMessages,
+              { role: "assistant", content: `Tool results: ${allToolCalls.map(tc => tc.result).join('; ')}` },
+              { role: "user", content: "Berdasarkan hasil tool di atas, berikan respons yang informatif." }
+            ];
+            const retryData = await callMaia(modelId, retryMessages, false);
+            finalContent = retryData.choices[0]?.message?.content || "";
+          } catch (retryErr) {
+            console.warn('Retry failed:', retryErr);
+          }
+        }
+
+        // Retry once if content is empty and no tool calls
         if (!finalContent.trim() && allToolCalls.length === 0) {
           try {
             const retryData = await callMaia(modelId, apiMessages, false);
