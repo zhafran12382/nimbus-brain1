@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { tools } from '@/lib/tools';
 import { executeTool } from '@/lib/tool-executor';
 import { getModelById } from '@/lib/models';
+import { supabase } from '@/lib/supabase';
 
 // Vercel Serverless: max 60 detik
 export const maxDuration = 60;
@@ -94,7 +95,7 @@ async function callMaia(modelId: string, messages: Record<string, unknown>[], us
 }
 
 export async function POST(req: NextRequest) {
-  const { messages, model: modelId, personality } = await req.json();
+  const { messages, model: modelId, personality, conversationId: incomingConvId } = await req.json();
 
   const model = getModelById(modelId);
   if (!model) {
@@ -102,6 +103,31 @@ export async function POST(req: NextRequest) {
       JSON.stringify({ error: `Model "${modelId}" not found.` }),
       { status: 400, headers: { 'Content-Type': 'application/json' } }
     );
+  }
+
+  // --- Resolve or create conversation ---
+  let conversationId: string | null = incomingConvId || null;
+  if (!conversationId) {
+    const userContent = messages[messages.length - 1]?.content || '';
+    const title = userContent.slice(0, 35) + (userContent.length > 35 ? '...' : '');
+    const { data: newConv } = await supabase
+      .from('conversations')
+      .insert({ title })
+      .select()
+      .single();
+    if (newConv) {
+      conversationId = newConv.id;
+    }
+  }
+
+  // --- Save user message server-side ---
+  const lastUserMsg = messages[messages.length - 1];
+  if (lastUserMsg && lastUserMsg.role === 'user' && conversationId) {
+    await supabase.from('chat_messages').insert({
+      role: 'user',
+      content: lastUserMsg.content,
+      conversation_id: conversationId,
+    });
   }
 
   const useTools = model.supports_tools;
@@ -121,7 +147,7 @@ export async function POST(req: NextRequest) {
 
       try {
         // --- STEP 1: Kirim ke Maia Router ---
-        send({ type: "status", message: "🧠 Thinking..." });
+        send({ type: "status", text: "Thinking..." });
 
         const data = await callMaia(modelId, apiMessages, useTools);
         let assistantMsg = data.choices[0].message;
@@ -139,7 +165,6 @@ export async function POST(req: NextRequest) {
               type: "tool_start",
               name: fnName,
               args: fnArgs,
-              message: `🔧 Executing: ${fnName}`,
             });
 
             const result = await executeTool(fnName, fnArgs);
@@ -159,7 +184,7 @@ export async function POST(req: NextRequest) {
           }
 
           // --- STEP 3: Kirim tool results ke Maia untuk response final ---
-          send({ type: "status", message: "✍️ Generating response..." });
+          send({ type: "status", text: "Generating response..." });
 
           const data2 = await callMaia(modelId, toolCallMessages, useTools);
           assistantMsg = data2.choices[0].message;
@@ -170,7 +195,7 @@ export async function POST(req: NextRequest) {
               const fnName = toolCall.function.name;
               const fnArgs = JSON.parse(toolCall.function.arguments);
 
-              send({ type: "tool_start", name: fnName, args: fnArgs, message: `🔧 Executing: ${fnName}` });
+              send({ type: "tool_start", name: fnName, args: fnArgs });
               const result = await executeTool(fnName, fnArgs);
               toolResults.push({ name: fnName, args: fnArgs, result });
               send({ type: "tool_result", name: fnName, result });
@@ -182,7 +207,7 @@ export async function POST(req: NextRequest) {
               });
             }
 
-            send({ type: "status", message: "✍️ Finalizing..." });
+            send({ type: "status", text: "Finalizing..." });
             const data3 = await callMaia(modelId, toolCallMessages, useTools);
             assistantMsg = data3.choices[0].message;
           }
@@ -196,7 +221,7 @@ export async function POST(req: NextRequest) {
             try {
               const action = JSON.parse(jsonMatch[1]);
               if (action.action && action.params) {
-                send({ type: "tool_start", name: action.action, args: action.params, message: `🔧 Executing: ${action.action}` });
+                send({ type: "tool_start", name: action.action, args: action.params });
                 const result = await executeTool(action.action, action.params);
                 parsedActions.push({ name: action.action, args: action.params, result });
                 send({ type: "tool_result", name: action.action, result });
@@ -208,7 +233,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // --- STEP 5: Kirim response final (with empty response retry) ---
+        // --- STEP 5: Kirim response via chunk streaming ---
         const allToolCalls = [...toolResults, ...parsedActions];
         let finalContent = assistantMsg.content || "";
 
@@ -229,11 +254,39 @@ export async function POST(req: NextRequest) {
             : "⚠️ Model tidak menghasilkan respons. Coba kirim ulang.";
         }
 
+        // Simulate streaming by sending chunks (sentence by sentence)
+        const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
+        let accumulated = "";
+        for (const sentence of sentences) {
+          accumulated += sentence;
+          send({ type: "chunk", content: accumulated });
+          // Small delay between chunks for natural streaming feel
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
+
+        // --- STEP 6: Save assistant message to DB (server-side) ---
+        if (conversationId) {
+          await supabase.from('chat_messages').insert({
+            role: 'assistant',
+            content: finalContent,
+            tool_calls: allToolCalls.length > 0 ? allToolCalls : null,
+            model_used: modelId,
+            conversation_id: conversationId,
+          });
+
+          // Update conversation timestamp
+          await supabase
+            .from('conversations')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', conversationId);
+        }
+
         send({
           type: "done",
           content: finalContent,
           tool_calls: allToolCalls.length > 0 ? allToolCalls : undefined,
           model_used: modelId,
+          conversationId: conversationId || undefined,
         });
 
       } catch (error: unknown) {

@@ -1,5 +1,5 @@
 export interface StreamEvent {
-  type: 'status' | 'tool_start' | 'tool_result' | 'done' | 'error';
+  type: 'status' | 'tool_start' | 'tool_result' | 'chunk' | 'done' | 'error';
   message?: string;
   content?: string;
   name?: string;
@@ -7,21 +7,26 @@ export interface StreamEvent {
   result?: string;
   tool_calls?: { name: string; args: Record<string, unknown>; result: string }[];
   model_used?: string;
+  conversationId?: string;
 }
 
 export async function sendChatStream(
   messages: { role: string; content: string }[],
   model: string,
   onEvent: (event: StreamEvent) => void,
-  personality?: Record<string, string>
+  personality?: Record<string, string>,
+  conversationId?: string | null,
+  signal?: AbortSignal,
 ): Promise<void> {
   const body: Record<string, unknown> = { messages, model };
   if (personality) body.personality = personality;
+  if (conversationId) body.conversationId = conversationId;
 
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!response.ok) {
@@ -33,24 +38,32 @@ export async function sendChatStream(
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n\n');
-    buffer = lines.pop() || '';
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
 
-      try {
-        const data: StreamEvent = JSON.parse(trimmed.slice(6));
-        onEvent(data);
-      } catch {
-        // Skip malformed events
+        try {
+          const data: StreamEvent = JSON.parse(trimmed.slice(6));
+          onEvent(data);
+        } catch {
+          // Skip malformed events
+        }
       }
     }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      // Request was aborted (e.g. component unmounted) — not an error
+      return;
+    }
+    throw err;
   }
 }

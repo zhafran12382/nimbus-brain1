@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChatMessage as ChatMessageType } from "@/types";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
+import { AssistantMessage, AssistantMessageState } from "./assistant-message";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { messageBubble } from "@/lib/animations";
 
@@ -12,16 +13,17 @@ interface ChatContainerProps {
   messages: ChatMessageType[];
   onSend: (message: string) => void;
   isLoading: boolean;
+  streamingState?: AssistantMessageState | null;
   streamStatus?: string | null;
   pendingToolCalls?: { name?: string; result?: string }[];
 }
 
-export function ChatContainer({ messages, onSend, isLoading, streamStatus, pendingToolCalls }: ChatContainerProps) {
+export function ChatContainer({ messages, onSend, isLoading, streamingState }: ChatContainerProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading, streamStatus, pendingToolCalls]);
+  }, [messages, isLoading, streamingState?.phase, streamingState?.content]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -66,48 +68,17 @@ export function ChatContainer({ messages, onSend, isLoading, streamStatus, pendi
             <ChatMessage key={msg.id} message={msg} />
           ))}
 
-          {/* Loading / streaming state */}
+          {/* Streaming assistant response (Perplexity-style) */}
           <AnimatePresence>
-            {isLoading && (
+            {isLoading && streamingState && (
               <motion.div
+                key="streaming-assistant"
                 initial={messageBubble.initial}
                 animate={messageBubble.animate}
                 exit={{ opacity: 0 }}
                 transition={messageBubble.transition}
-                className="flex items-start gap-2.5"
               >
-                {/* Avatar */}
-                <div className="hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 text-[11px] font-bold text-white mt-1">
-                  N
-                </div>
-                <div className="glass-card rounded-2xl rounded-bl-sm px-4 py-3 max-w-[75%] sm:max-w-[70%]">
-                  {/* Status text with pulse dots */}
-                  <div className="flex items-center gap-2.5 text-sm text-[hsl(0_0%_45%)]">
-                    <div className="flex gap-1 items-center">
-                      <span className="dot-1 h-1.5 w-1.5 rounded-full bg-[hsl(217_91%_60%)]" />
-                      <span className="dot-2 h-1.5 w-1.5 rounded-full bg-[hsl(217_91%_60%)]" />
-                      <span className="dot-3 h-1.5 w-1.5 rounded-full bg-[hsl(217_91%_60%)]" />
-                    </div>
-                    <span className="text-xs">{streamStatus || "Thinking..."}</span>
-                  </div>
-
-                  {/* Tool call results */}
-                  {pendingToolCalls && pendingToolCalls.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {pendingToolCalls.map((tc, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ opacity: 0, y: 4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.2, ease: "easeOut" }}
-                          className="text-xs rounded-md px-2 py-1 bg-[hsl(0_0%_5%)] text-[hsl(160_84%_39%)]"
-                        >
-                          ✅ {tc.name}: {tc.result}
-                        </motion.div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <AssistantMessage state={streamingState} />
               </motion.div>
             )}
           </AnimatePresence>

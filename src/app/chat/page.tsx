@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ChatMessage } from "@/types";
 import { PersonalitySettings } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -10,6 +10,7 @@ import { Header } from "@/components/layout/header";
 import { ChatContainer } from "@/components/chat/chat-container";
 import { ChatHistory } from "@/components/chat/chat-history";
 import { ModelSelector } from "@/components/chat/model-selector";
+import { AssistantMessageState, getToolDisplay } from "@/components/chat/assistant-message";
 import { History } from "lucide-react";
 
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
@@ -34,11 +35,11 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [streamStatus, setStreamStatus] = useState<string | null>(null);
-  const [pendingToolCalls, setPendingToolCalls] = useState<{ name?: string; result?: string }[]>([]);
+  const [streamingState, setStreamingState] = useState<AssistantMessageState | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [initialized, setInitialized] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Restore activeConversationId from localStorage on mount
   useEffect(() => {
@@ -47,6 +48,13 @@ export default function ChatPage() {
       setActiveConversationId(stored);
     }
     setInitialized(true);
+  }, []);
+
+  // Abort any in-flight request on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, []);
 
   // Persist activeConversationId to localStorage
@@ -83,24 +91,9 @@ export default function ChatPage() {
   }, []);
 
   const handleSend = useCallback(async (content: string) => {
-    let conversationId = activeConversationId;
+    const conversationId = activeConversationId;
 
-    // Auto-create conversation if none selected
-    if (!conversationId) {
-      const title = content.slice(0, 35) + (content.length > 35 ? "..." : "");
-      const { data: newConv } = await supabase
-        .from("conversations")
-        .insert({ title })
-        .select()
-        .single();
-      if (newConv) {
-        conversationId = newConv.id;
-        setActiveConversationId(newConv.id);
-        setRefreshKey((k) => k + 1);
-      }
-    }
-
-    // Create optimistic user message
+    // Create optimistic user message (display immediately)
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       conversation_id: conversationId || undefined,
@@ -112,21 +105,27 @@ export default function ChatPage() {
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setIsLoading(true);
-    setStreamStatus(null);
-    setPendingToolCalls([]);
 
-    // Save user message to DB
-    await supabase.from("chat_messages").insert({
-      role: "user",
-      content,
-      conversation_id: conversationId,
-    });
+    // Initialize streaming state for Perplexity-style animation
+    const initialStreamState: AssistantMessageState = {
+      phase: "thinking",
+      toolStatus: null,
+      toolHistory: [],
+      content: "",
+      modelUsed: "",
+    };
+    setStreamingState(initialStreamState);
+
+    // AbortController for cleanup
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       const chatHistory = newMessages.map((m) => ({
         role: m.role,
         content: m.content,
       }));
+
       let finalContent = "";
       let finalToolCalls: {
         name: string;
@@ -134,49 +133,99 @@ export default function ChatPage() {
         result: string;
       }[] = [];
       let finalModelUsed = "";
+      let returnedConvId = conversationId;
 
       const personality = getPersonality();
 
-      await sendChatStream(chatHistory, DEFAULT_MODEL_ID, (event) => {
-        switch (event.type) {
-          case "status":
-            setStreamStatus(event.message || null);
-            break;
+      await sendChatStream(
+        chatHistory,
+        DEFAULT_MODEL_ID,
+        (event) => {
+          switch (event.type) {
+            case "status":
+              setStreamingState((prev) =>
+                prev ? { ...prev, phase: "thinking" } : null
+              );
+              break;
 
-          case "tool_start":
-            if (event.name === "web_search") {
-              setStreamStatus("🔍 Searching the web...");
-            } else {
-              setStreamStatus(event.message || `🔧 ${event.name}...`);
+            case "tool_start": {
+              const display = getToolDisplay(event.name || "", "start");
+              const toolStatus = {
+                name: event.name || "",
+                icon: display.icon,
+                text: display.text,
+                args: event.args,
+              };
+              setStreamingState((prev) =>
+                prev
+                  ? { ...prev, phase: "tool_executing", toolStatus }
+                  : null
+              );
+              break;
             }
-            break;
 
-          case "tool_result":
-            setPendingToolCalls((prev) => [
-              ...prev,
-              { name: event.name, result: event.result },
-            ]);
-            break;
+            case "tool_result": {
+              const resultDisplay = getToolDisplay(event.name || "", "result");
+              const completedTool = {
+                name: event.name || "",
+                icon: resultDisplay.icon,
+                text: resultDisplay.text,
+                result: event.result,
+              };
+              setStreamingState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      toolStatus: completedTool,
+                      toolHistory: [...prev.toolHistory, completedTool],
+                    }
+                  : null
+              );
+              break;
+            }
 
-          case "done":
-            finalContent = event.content || "";
-            finalToolCalls = event.tool_calls || [];
-            finalModelUsed = event.model_used || DEFAULT_MODEL_ID;
-            break;
+            case "chunk":
+              setStreamingState((prev) =>
+                prev
+                  ? { ...prev, phase: "streaming", content: event.content || "" }
+                  : null
+              );
+              break;
 
-          case "error":
-            throw new Error(event.message);
-        }
-      }, personality ? (personality as unknown as Record<string, string>) : undefined);
+            case "done":
+              finalContent = event.content || "";
+              finalToolCalls = event.tool_calls || [];
+              finalModelUsed = event.model_used || DEFAULT_MODEL_ID;
+              if (event.conversationId) {
+                returnedConvId = event.conversationId;
+              }
+              break;
 
-      // Only add assistant message if there's actual content or tool calls
+            case "error":
+              throw new Error(event.message);
+          }
+        },
+        personality ? (personality as unknown as Record<string, string>) : undefined,
+        conversationId,
+        controller.signal,
+      );
+
+      // Update conversationId if server created one
+      if (returnedConvId && returnedConvId !== activeConversationId) {
+        setActiveConversationId(returnedConvId);
+        setRefreshKey((k) => k + 1);
+      }
+
+      // Add assistant message to local messages (already saved server-side)
       if (finalContent.trim() || finalToolCalls.length > 0) {
         const messageContent = finalContent.trim()
           ? finalContent
-          : (finalToolCalls.length > 0 ? "(Aksi selesai)" : "⚠️ Model tidak menghasilkan respons. Coba kirim ulang.");
+          : finalToolCalls.length > 0
+            ? "(Aksi selesai)"
+            : "⚠️ Model tidak menghasilkan respons. Coba kirim ulang.";
         const assistantMessage: ChatMessage = {
           id: crypto.randomUUID(),
-          conversation_id: conversationId || undefined,
+          conversation_id: returnedConvId || undefined,
           role: "assistant",
           content: messageContent,
           tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
@@ -184,26 +233,17 @@ export default function ChatPage() {
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMessage]);
-
-        // Save to Supabase
-        await supabase.from("chat_messages").insert({
-          role: "assistant",
-          content: messageContent,
-          tool_calls: finalToolCalls.length > 0 ? finalToolCalls : null,
-          model_used: finalModelUsed,
-          conversation_id: conversationId,
-        });
       }
 
-      // Update conversation timestamp
-      if (conversationId) {
-        await supabase
-          .from("conversations")
-          .update({ updated_at: new Date().toISOString() })
-          .eq("id", conversationId);
+      // Refresh sidebar
+      if (returnedConvId) {
         setRefreshKey((k) => k + 1);
       }
     } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        // Aborted by navigation — server handles saving
+        return;
+      }
       const message =
         error instanceof Error ? error.message : "Terjadi kesalahan.";
       const errorMsg: ChatMessage = {
@@ -215,8 +255,8 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
-      setStreamStatus(null);
-      setPendingToolCalls([]);
+      setStreamingState(null);
+      abortControllerRef.current = null;
     }
   }, [messages, activeConversationId]);
 
@@ -251,8 +291,7 @@ export default function ChatPage() {
           messages={messages}
           onSend={handleSend}
           isLoading={isLoading}
-          streamStatus={streamStatus}
-          pendingToolCalls={pendingToolCalls}
+          streamingState={streamingState}
         />
       </div>
     </div>
