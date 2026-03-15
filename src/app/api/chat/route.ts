@@ -8,14 +8,39 @@ export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 const BASE_SYSTEM_INSTRUCTION = `Kamu adalah Nimbus Brain AI, asisten personal cerdas.
-Kamu bisa mengelola target/goals dan mencatat pengeluaran menggunakan tools yang tersedia.
+Kamu bisa mengelola target/goals, mencatat pengeluaran, dan mencatat pemasukan menggunakan tools yang tersedia.
 Kamu memiliki akses ke web search. Gunakan tool web_search saat user bertanya tentang berita, event terkini, fakta yang mungkin berubah, atau hal yang kamu tidak yakin. Saat menggunakan hasil search, sebutkan sumber/URL-nya.
 Selalu respond dalam Bahasa Indonesia yang casual dan friendly.
-Saat user meminta aksi (buat target, update progress, catat pengeluaran, dll), SELALU gunakan tools.
-Saat user menyebut membeli sesuatu atau mengeluarkan uang, gunakan create_expense.
+Saat user meminta aksi (buat target, update progress, catat pengeluaran, catat pemasukan, dll), SELALU gunakan tools.
 Saat user hanya ngobrol biasa, respond secara natural tanpa tools.
 Jika user melaporkan progress tapi tidak menyebut angka spesifik, tanyakan dulu.
-Setelah mengeksekusi tool, berikan respons yang informatif dan encouraging.`;
+Setelah mengeksekusi tool, berikan respons yang informatif dan encouraging.
+
+## FINANCIAL TOOL GUIDELINES
+
+CRITICAL: Bedakan PEMASUKAN (income) dan PENGELUARAN (expense) dengan benar.
+
+PEMASUKAN (gunakan create_income):
+- "di TF ortu 200" → income, category: transfer (user MENERIMA uang)
+- "gajian 5jt" → income, category: salary
+- "dapat cashback 50rb" → income, category: refund
+- "dibayar client 1jt" → income, category: freelance
+- "dikasih THR 500rb" → income, category: gift
+
+PENGELUARAN (gunakan create_expense):
+- "beli kopi 25rb" → expense, category: food (user MENGELUARKAN uang)
+- "bayar listrik 300rb" → expense, category: bills
+- "naik gojek 15rb" → expense, category: transport
+- "jajan bakso 20rb" → expense, category: food
+
+TANDA-TANDA PEMASUKAN: di-TF, terima, dapat, gaji, dikasih, masuk, income
+TANDA-TANDA PENGELUARAN: beli, bayar, habis, keluar, jajan, buat [beli sesuatu]
+
+JIKA AMBIGU: Tanyakan dulu ke user, jangan langsung eksekusi tool.
+Contoh: User bilang "200rb buat makan" — ini expense.
+Contoh: User bilang "200rb dari temen" — ini income.
+
+Untuk melihat rangkuman keuangan keseluruhan (income + expense + saldo), gunakan get_financial_summary.`;
 
 function buildSystemInstruction(personality?: Record<string, string | undefined>): string {
   // Dynamic date in WIB (UTC+7)
@@ -127,53 +152,36 @@ export async function POST(req: NextRequest) {
         let assistantMsg = data.choices[0].message;
         const toolResults: { name: string; args: Record<string, unknown>; result: string }[] = [];
 
-        // --- STEP 2: Handle tool calls (agentic loop) ---
+        // --- STEP 2: Handle tool calls (agentic loop, max 3 rounds) ---
         if (assistantMsg.tool_calls && useTools) {
-          const toolCallMessages = [...apiMessages, assistantMsg];
+          const toolCallMessages: Record<string, unknown>[] = [...apiMessages];
+          const MAX_TOOL_ROUNDS = 3;
 
-          for (const toolCall of assistantMsg.tool_calls) {
-            const fnName = toolCall.function.name;
-            const fnArgs = JSON.parse(toolCall.function.arguments);
+          for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            if (!assistantMsg.tool_calls) break;
 
-            send({
-              type: "tool_start",
-              name: fnName,
-              args: fnArgs,
-              message: `🔧 Executing: ${fnName}`,
-            });
+            // Append assistant message with tool_calls as-is
+            toolCallMessages.push(assistantMsg);
 
-            const result = await executeTool(fnName, fnArgs);
-            toolResults.push({ name: fnName, args: fnArgs, result });
-
-            send({
-              type: "tool_result",
-              name: fnName,
-              result,
-            });
-
-            toolCallMessages.push({
-              role: "tool",
-              tool_call_id: toolCall.id,
-              content: result,
-            });
-          }
-
-          // --- STEP 3: Kirim tool results ke Maia untuk response final ---
-          send({ type: "status", message: "✍️ Generating response..." });
-
-          const data2 = await callMaia(modelId, toolCallMessages, useTools);
-          assistantMsg = data2.choices[0].message;
-
-          // Handle jika model memanggil tool lagi (rare tapi mungkin)
-          if (assistantMsg.tool_calls && useTools) {
             for (const toolCall of assistantMsg.tool_calls) {
               const fnName = toolCall.function.name;
               const fnArgs = JSON.parse(toolCall.function.arguments);
 
-              send({ type: "tool_start", name: fnName, args: fnArgs, message: `🔧 Executing: ${fnName}` });
+              send({
+                type: "tool_start",
+                name: fnName,
+                args: fnArgs,
+                message: `🔧 Executing: ${fnName}`,
+              });
+
               const result = await executeTool(fnName, fnArgs);
               toolResults.push({ name: fnName, args: fnArgs, result });
-              send({ type: "tool_result", name: fnName, result });
+
+              send({
+                type: "tool_result",
+                name: fnName,
+                result,
+              });
 
               toolCallMessages.push({
                 role: "tool",
@@ -182,9 +190,14 @@ export async function POST(req: NextRequest) {
               });
             }
 
-            send({ type: "status", message: "✍️ Finalizing..." });
-            const data3 = await callMaia(modelId, toolCallMessages, useTools);
-            assistantMsg = data3.choices[0].message;
+            // Send tool results back to model for next response
+            send({ type: "status", message: round < MAX_TOOL_ROUNDS - 1 ? "✍️ Generating response..." : "✍️ Finalizing..." });
+
+            const nextData = await callMaia(modelId, toolCallMessages, useTools);
+            assistantMsg = nextData.choices[0].message;
+
+            // If model doesn't want more tools, break
+            if (!assistantMsg.tool_calls) break;
           }
         }
 
@@ -212,7 +225,22 @@ export async function POST(req: NextRequest) {
         const allToolCalls = [...toolResults, ...parsedActions];
         let finalContent = assistantMsg.content || "";
 
-        // Retry once if content is empty
+        // Retry once if content is empty after tool calls
+        if (!finalContent.trim() && allToolCalls.length > 0) {
+          try {
+            const retryMessages = [
+              ...apiMessages,
+              { role: "assistant", content: `Tool results: ${allToolCalls.map(tc => tc.result).join('; ')}` },
+              { role: "user", content: "Berdasarkan hasil tool di atas, berikan respons yang informatif." }
+            ];
+            const retryData = await callMaia(modelId, retryMessages, false);
+            finalContent = retryData.choices[0]?.message?.content || "";
+          } catch (retryErr) {
+            console.warn('Retry failed:', retryErr);
+          }
+        }
+
+        // Retry once if content is empty and no tool calls
         if (!finalContent.trim() && allToolCalls.length === 0) {
           try {
             const retryData = await callMaia(modelId, apiMessages, false);

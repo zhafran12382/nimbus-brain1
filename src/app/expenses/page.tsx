@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Wallet, Plus, Trash2 } from "lucide-react";
-import { Expense } from "@/types";
+import { Expense, Income } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -17,26 +17,49 @@ import {
 import { ExpenseForm } from "@/components/expenses/expense-form";
 import { staggerItem } from "@/lib/animations";
 
-const categoryConfig: Record<string, { emoji: string; color: string; bgClass: string; textClass: string }> = {
-  food: { emoji: "🍔", color: "orange", bgClass: "bg-orange-500/15", textClass: "text-orange-400" },
-  transport: { emoji: "🚗", color: "blue", bgClass: "bg-blue-500/15", textClass: "text-blue-400" },
-  shopping: { emoji: "🛍️", color: "pink", bgClass: "bg-pink-500/15", textClass: "text-pink-400" },
-  entertainment: { emoji: "🎮", color: "purple", bgClass: "bg-purple-500/15", textClass: "text-purple-400" },
-  health: { emoji: "💊", color: "emerald", bgClass: "bg-emerald-500/15", textClass: "text-emerald-400" },
-  education: { emoji: "📚", color: "cyan", bgClass: "bg-cyan-500/15", textClass: "text-cyan-400" },
-  bills: { emoji: "📄", color: "red", bgClass: "bg-red-500/15", textClass: "text-red-400" },
-  other: { emoji: "📦", color: "gray", bgClass: "bg-zinc-500/15", textClass: "text-zinc-400" },
+const expenseCategoryConfig: Record<string, { emoji: string; bgClass: string; textClass: string }> = {
+  food: { emoji: "🍔", bgClass: "bg-orange-500/15", textClass: "text-orange-400" },
+  transport: { emoji: "🚗", bgClass: "bg-blue-500/15", textClass: "text-blue-400" },
+  shopping: { emoji: "🛍️", bgClass: "bg-pink-500/15", textClass: "text-pink-400" },
+  entertainment: { emoji: "🎮", bgClass: "bg-purple-500/15", textClass: "text-purple-400" },
+  health: { emoji: "💊", bgClass: "bg-emerald-500/15", textClass: "text-emerald-400" },
+  education: { emoji: "📚", bgClass: "bg-cyan-500/15", textClass: "text-cyan-400" },
+  bills: { emoji: "📄", bgClass: "bg-red-500/15", textClass: "text-red-400" },
+  other: { emoji: "📦", bgClass: "bg-zinc-500/15", textClass: "text-zinc-400" },
 };
 
-export default function ExpensesPage() {
+const incomeCategoryConfig: Record<string, { emoji: string; bgClass: string; textClass: string }> = {
+  salary: { emoji: "💼", bgClass: "bg-emerald-500/15", textClass: "text-emerald-400" },
+  transfer: { emoji: "🔄", bgClass: "bg-blue-500/15", textClass: "text-blue-400" },
+  freelance: { emoji: "💻", bgClass: "bg-violet-500/15", textClass: "text-violet-400" },
+  gift: { emoji: "🎁", bgClass: "bg-pink-500/15", textClass: "text-pink-400" },
+  investment: { emoji: "📈", bgClass: "bg-amber-500/15", textClass: "text-amber-400" },
+  refund: { emoji: "↩️", bgClass: "bg-cyan-500/15", textClass: "text-cyan-400" },
+  other: { emoji: "📦", bgClass: "bg-zinc-500/15", textClass: "text-zinc-400" },
+};
+
+type TabFilter = "all" | "income" | "expenses";
+
+interface FinanceItem {
+  id: string;
+  title: string;
+  amount: number;
+  category: string;
+  date: string;
+  notes?: string | null;
+  created_at: string;
+  type: "income" | "expense";
+}
+
+export default function FinancesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [periodFilter, setPeriodFilter] = useState("this_month");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [tabFilter, setTabFilter] = useState<TabFilter>("all");
 
-  const fetchExpenses = useCallback(async () => {
-    setLoading(true);
+  const getDateRange = useCallback(() => {
     const now = new Date();
     let startDate: string | null = null;
     let endDate: string | null = null;
@@ -56,36 +79,51 @@ export default function ExpensesPage() {
       startDate = lastMonth.toISOString().split("T")[0];
       endDate = lastDay.toISOString().split("T")[0];
     }
+    return { startDate, endDate };
+  }, [periodFilter]);
 
-    let query = supabase.from("expenses").select("*").order("date", { ascending: false });
-    if (startDate) query = query.gte("date", startDate);
-    if (endDate) query = query.lte("date", endDate);
-    if (categoryFilter !== "all") query = query.eq("category", categoryFilter);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const { startDate, endDate } = getDateRange();
 
-    const { data } = await query;
-    setExpenses((data as Expense[]) || []);
+    let expQuery = supabase.from("expenses").select("*").order("date", { ascending: false });
+    if (startDate) expQuery = expQuery.gte("date", startDate);
+    if (endDate) expQuery = expQuery.lte("date", endDate);
+
+    let incQuery = supabase.from("incomes").select("*").order("date", { ascending: false });
+    if (startDate) incQuery = incQuery.gte("date", startDate);
+    if (endDate) incQuery = incQuery.lte("date", endDate);
+
+    const [{ data: expData }, { data: incData }] = await Promise.all([expQuery, incQuery]);
+    setExpenses((expData as Expense[]) || []);
+    setIncomes((incData as Income[]) || []);
     setLoading(false);
-  }, [periodFilter, categoryFilter]);
+  }, [getDateRange]);
 
   useEffect(() => {
-    fetchExpenses();
-  }, [fetchExpenses]);
+    fetchData();
+  }, [fetchData]);
 
-  const handleDelete = async (id: string) => {
-    await supabase.from("expenses").delete().eq("id", id);
-    fetchExpenses();
+  const handleDelete = async (id: string, type: "income" | "expense") => {
+    const table = type === "income" ? "incomes" : "expenses";
+    await supabase.from(table).delete().eq("id", id);
+    fetchData();
   };
 
-  const total = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const transactionCount = expenses.length;
+  const expenseTotal = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const incomeTotal = incomes.reduce((sum, e) => sum + Number(e.amount), 0);
+  const netBalance = incomeTotal - expenseTotal;
+  const totalTransactions = expenses.length + incomes.length;
 
-  // Category summary for chart
-  const categoryTotals: Record<string, number> = {};
-  for (const e of expenses) {
-    categoryTotals[e.category] = (categoryTotals[e.category] || 0) + Number(e.amount);
-  }
-  const sortedCategories = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
-  const topCategory = sortedCategories[0];
+  // Build combined list
+  const allItems: FinanceItem[] = [
+    ...expenses.map((e) => ({ ...e, type: "expense" as const, notes: e.notes ?? null })),
+    ...incomes.map((e) => ({ ...e, type: "income" as const, notes: e.notes ?? null })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const filteredItems = tabFilter === "all"
+    ? allItems
+    : allItems.filter((item) => item.type === (tabFilter === "income" ? "income" : "expense"));
 
   return (
     <div className="flex flex-col min-h-[100dvh]">
@@ -94,7 +132,7 @@ export default function ExpensesPage() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-400">
             <Wallet className="h-4 w-4 text-white" />
           </div>
-          <span className="font-semibold text-text-primary">Expenses</span>
+          <span className="font-semibold text-text-primary">Finances</span>
         </div>
         <Button
           size="sm"
@@ -102,72 +140,41 @@ export default function ExpensesPage() {
           className="gap-1.5"
         >
           <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Add Expense</span>
+          <span className="hidden sm:inline">Add Transaction</span>
         </Button>
       </Header>
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto max-w-4xl space-y-6">
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="glass-card rounded-xl p-4">
-              <p className="text-xs text-text-muted mb-1">Total</p>
-              <p className="text-xl font-bold text-text-primary">
-                Rp {total.toLocaleString("id-ID")}
+              <p className="text-xs text-emerald-400/70 mb-1">💰 Income</p>
+              <p className="text-lg font-bold text-emerald-400">
+                Rp {incomeTotal.toLocaleString("id-ID")}
               </p>
             </div>
             <div className="glass-card rounded-xl p-4">
-              <p className="text-xs text-text-muted mb-1">Transaksi</p>
-              <p className="text-xl font-bold text-text-primary">
-                {transactionCount}
+              <p className="text-xs text-rose-400/70 mb-1">💸 Expenses</p>
+              <p className="text-lg font-bold text-rose-400">
+                Rp {expenseTotal.toLocaleString("id-ID")}
               </p>
             </div>
             <div className="glass-card rounded-xl p-4">
-              <p className="text-xs text-text-muted mb-1">Kategori Tertinggi</p>
-              <p className="text-xl font-bold text-text-primary">
-                {topCategory
-                  ? `${categoryConfig[topCategory[0]]?.emoji || "📦"} ${topCategory[0]}`
-                  : "-"}
+              <p className="text-xs text-text-muted mb-1">💎 Net Balance</p>
+              <p className={`text-lg font-bold ${netBalance >= 0 ? "text-blue-400" : "text-rose-400"}`}>
+                {netBalance >= 0 ? "+" : "-"}Rp {Math.abs(netBalance).toLocaleString("id-ID")}
+              </p>
+            </div>
+            <div className="glass-card rounded-xl p-4">
+              <p className="text-xs text-text-muted mb-1">📊 Transaksi</p>
+              <p className="text-lg font-bold text-text-primary">
+                {totalTransactions}
               </p>
             </div>
           </div>
 
-          {/* Category Bar Chart */}
-          {sortedCategories.length > 0 && (
-            <div className="glass-card rounded-xl p-4">
-              <p className="text-xs font-medium text-text-muted mb-3">Per Kategori</p>
-              <div className="space-y-2">
-                {sortedCategories.map(([cat, catTotal]) => {
-                  const pct = total > 0 ? (catTotal / total) * 100 : 0;
-                  const config = categoryConfig[cat] || categoryConfig.other;
-                  return (
-                    <div key={cat} className="flex items-center gap-3">
-                      <span className="w-20 text-xs text-text-secondary truncate">
-                        {config.emoji} {cat}
-                      </span>
-                      <div className="flex-1 h-5 rounded-full bg-[hsl(0_0%_10%)] overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${config.bgClass} flex items-center justify-end pr-2`}
-                          style={{ width: `${Math.max(pct, 3)}%`, transition: "width 0.5s ease" }}
-                        >
-                          {pct > 15 && (
-                            <span className={`text-[10px] font-medium ${config.textClass}`}>
-                              {pct.toFixed(0)}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-xs text-text-secondary w-24 text-right">
-                        Rp {catTotal.toLocaleString("id-ID")}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Filters */}
+          {/* Period Filter */}
           <div className="flex gap-2">
             <Select value={periodFilter} onValueChange={setPeriodFilter}>
               <SelectTrigger className="w-40">
@@ -180,22 +187,26 @@ export default function ExpensesPage() {
                 <SelectItem value="all">All</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {Object.entries(categoryConfig).map(([key, val]) => (
-                  <SelectItem key={key} value={key}>
-                    {val.emoji} {key}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
-          {/* Expense List */}
+          {/* Tab Toggle */}
+          <div className="flex gap-1 p-1 glass-card rounded-xl w-fit">
+            {(["all", "income", "expenses"] as TabFilter[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setTabFilter(tab)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  tabFilter === tab
+                    ? "bg-[hsl(217_91%_60%)] text-white"
+                    : "text-text-muted hover:text-text-secondary"
+                }`}
+              >
+                {tab === "all" ? "All" : tab === "income" ? "💰 Income" : "💸 Expenses"}
+              </button>
+            ))}
+          </div>
+
+          {/* Transaction List */}
           {loading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
@@ -208,19 +219,22 @@ export default function ExpensesPage() {
                 </div>
               ))}
             </div>
-          ) : expenses.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <div className="text-center py-12 text-text-muted">
               <Wallet className="h-10 w-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Belum ada pengeluaran</p>
+              <p className="text-sm">Belum ada transaksi</p>
             </div>
           ) : (
             <div className="space-y-2">
               <AnimatePresence>
-                {expenses.map((expense) => {
-                  const config = categoryConfig[expense.category] || categoryConfig.other;
+                {filteredItems.map((item) => {
+                  const isIncome = item.type === "income";
+                  const catConfig = isIncome
+                    ? (incomeCategoryConfig[item.category] || incomeCategoryConfig.other)
+                    : (expenseCategoryConfig[item.category] || expenseCategoryConfig.other);
                   return (
                     <motion.div
-                      key={expense.id}
+                      key={`${item.type}-${item.id}`}
                       variants={staggerItem}
                       initial="hidden"
                       animate="show"
@@ -228,19 +242,22 @@ export default function ExpensesPage() {
                       className="glass-card rounded-xl px-4 py-3 flex items-center gap-3 group"
                     >
                       <span className="text-xs font-mono text-text-muted w-20 shrink-0">
-                        {expense.date}
+                        {item.date}
+                      </span>
+                      <span className={`text-sm shrink-0 ${isIncome ? "text-emerald-400" : "text-rose-400"}`}>
+                        {isIncome ? "💰" : "💸"}
                       </span>
                       <span className="flex-1 min-w-0 truncate text-sm text-text-primary">
-                        {expense.title}
+                        {item.title}
                       </span>
-                      <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${config.bgClass} ${config.textClass}`}>
-                        {config.emoji} {expense.category}
+                      <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${catConfig.bgClass} ${catConfig.textClass}`}>
+                        {catConfig.emoji} {item.category}
                       </span>
-                      <span className="text-sm font-semibold text-text-primary text-right w-28 shrink-0">
-                        Rp {Number(expense.amount).toLocaleString("id-ID")}
+                      <span className={`text-sm font-semibold text-right w-28 shrink-0 ${isIncome ? "text-emerald-400" : "text-rose-400"}`}>
+                        {isIncome ? "+" : "-"}Rp {Number(item.amount).toLocaleString("id-ID")}
                       </span>
                       <button
-                        onClick={() => handleDelete(expense.id)}
+                        onClick={() => handleDelete(item.id, item.type)}
                         className="opacity-0 group-hover:opacity-100 flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:text-red-400 transition-all shrink-0"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -258,7 +275,7 @@ export default function ExpensesPage() {
         open={formOpen}
         onOpenChange={(open) => {
           setFormOpen(open);
-          if (!open) fetchExpenses();
+          if (!open) fetchData();
         }}
       />
     </div>
