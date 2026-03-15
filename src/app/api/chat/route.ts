@@ -8,6 +8,35 @@ import { supabase } from '@/lib/supabase';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
+function log(tag: string, ...args: unknown[]) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] [${tag}]`, ...args);
+}
+
+function logError(tag: string, ...args: unknown[]) {
+  const timestamp = new Date().toISOString();
+  console.error(`[${timestamp}] [${tag}]`, ...args);
+}
+
+const toolLabels: Record<string, string> = {
+  web_search: "🔍 Searching the web...",
+  create_target: "🎯 Creating target...",
+  update_target: "🔄 Updating target...",
+  update_target_progress: "🔄 Updating target...",
+  delete_target: "🗑️ Deleting target...",
+  get_targets: "📋 Fetching targets...",
+  get_target_summary: "📊 Analyzing targets...",
+  create_expense: "💸 Recording expense...",
+  get_expenses: "📋 Fetching expenses...",
+  get_expense_summary: "📊 Analyzing expenses...",
+  delete_expense: "🗑️ Deleting expense...",
+  create_income: "💰 Recording income...",
+  get_incomes: "📋 Fetching income...",
+  get_income_summary: "📊 Analyzing income...",
+  delete_income: "🗑️ Deleting income...",
+  get_financial_summary: "📊 Analyzing finances...",
+};
+
 const BASE_SYSTEM_INSTRUCTION = `Kamu adalah Nimbus Brain AI, asisten personal cerdas.
 Kamu bisa mengelola target/goals, mencatat pengeluaran, dan mencatat pemasukan menggunakan tools yang tersedia.
 Kamu memiliki akses ke web search. Gunakan tool web_search saat user bertanya tentang berita, event terkini, fakta yang mungkin berubah, atau hal yang kamu tidak yakin. Saat menggunakan hasil search, sebutkan sumber/URL-nya.
@@ -94,7 +123,18 @@ JIKA AMBIGU: Tanyakan dulu ke user, jangan langsung eksekusi tool.
 Contoh: User bilang "200rb buat makan" — ini expense.
 Contoh: User bilang "200rb dari temen" — ini income.
 
-Untuk melihat rangkuman keuangan keseluruhan (income + expense + saldo), gunakan get_financial_summary.`;
+Untuk melihat rangkuman keuangan keseluruhan (income + expense + saldo), gunakan get_financial_summary.
+
+## MULTI-ACTION HANDLING
+
+PENTING: Jika user meminta LEBIH DARI SATU aksi dalam satu pesan (contoh: "catat pengeluaran X DAN buat target Y"), kamu HARUS menjalankan SEMUA aksi satu per satu.
+
+Setelah menjalankan satu tool, SELALU evaluasi ulang pesan user:
+- Apakah ada aksi lain yang belum dijalankan?
+- Jika YA, jalankan tool berikutnya.
+- Jika TIDAK, baru berikan respons final.
+
+Jangan pernah mengabaikan sebagian permintaan user.`;
 
 function buildSystemInstruction(personality?: Record<string, string | undefined>): string {
   // Dynamic date in WIB (UTC+7)
@@ -175,6 +215,8 @@ async function callMaia(modelId: string, messages: Record<string, unknown>[], us
 export async function POST(req: NextRequest) {
   const { messages, model: modelId, personality, conversationId: incomingConvId } = await req.json();
 
+  log('REQUEST', `model=${modelId}, messages=${messages.length}, convId=${incomingConvId || 'new'}, personality=${personality?.preset || 'none'}`);
+
   const model = getModelById(modelId);
   if (!model) {
     return new Response(
@@ -188,28 +230,38 @@ export async function POST(req: NextRequest) {
   if (!conversationId) {
     const userContent = messages[messages.length - 1]?.content || '';
     const title = userContent.slice(0, 35) + (userContent.length > 35 ? '...' : '');
-    const { data: newConv } = await supabase
+    const { data: newConv, error: convErr } = await supabase
       .from('conversations')
       .insert({ title })
       .select()
       .single();
+    if (convErr) {
+      logError('DB ERROR', 'Failed to create conversation:', convErr.message);
+    }
     if (newConv) {
       conversationId = newConv.id;
     }
   }
+  log('CONV', `conversationId=${conversationId}, isNew=${!incomingConvId}`);
 
   // --- Save user message server-side ---
   const lastUserMsg = messages[messages.length - 1];
   if (lastUserMsg && lastUserMsg.role === 'user' && conversationId) {
-    await supabase.from('chat_messages').insert({
+    const { error: userMsgErr } = await supabase.from('chat_messages').insert({
       role: 'user',
       content: lastUserMsg.content,
       conversation_id: conversationId,
     });
+    if (userMsgErr) {
+      logError('DB ERROR', 'Failed to save user message:', userMsgErr.message);
+    } else {
+      log('DB SAVE', `User message saved to conv ${conversationId}`);
+    }
   }
 
   const useTools = model.supports_tools;
   const systemInstruction = buildSystemInstruction(personality);
+  log('SYSTEM', `instruction length=${systemInstruction.length}, useTools=${useTools}`);
   const apiMessages = [
     { role: "system", content: systemInstruction },
     ...messages.slice(-10),
@@ -227,51 +279,125 @@ export async function POST(req: NextRequest) {
         // --- STEP 1: Kirim ke Maia Router ---
         send({ type: "status", text: "Thinking..." });
 
+        log('MAIA CALL', `Sending ${apiMessages.length} messages, useTools=${useTools}`);
         const data = await callMaia(modelId, apiMessages, useTools);
         let assistantMsg = data.choices[0].message;
+        log('MAIA RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
+
         const toolResults: { name: string; args: Record<string, unknown>; result: string }[] = [];
 
-        // --- STEP 2: Handle tool calls (agentic loop, max 3 rounds) ---
+        // --- STEP 2: Handle tool calls (agentic loop, max 5 rounds) ---
         if (assistantMsg.tool_calls && useTools) {
           const toolCallMessages: Record<string, unknown>[] = [...apiMessages];
-          const MAX_TOOL_ROUNDS = 3;
+          const MAX_TOOL_ROUNDS = 5;
+          let continuationChecked = false;
 
           for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-            if (!assistantMsg.tool_calls) break;
+            if (!assistantMsg.tool_calls) {
+              // Model tidak mau call tool lagi
+              // Tapi cek apakah kita sudah lakukan continuation check
+              if (!continuationChecked && toolResults.length > 0) {
+                continuationChecked = true;
 
-            // Append assistant message with tool_calls as-is
+                log('TOOL LOOP', `Round ${round}: No more tool_calls. Running continuation check...`);
+
+                // Append current assistant response
+                toolCallMessages.push(assistantMsg);
+
+                // Ask model to check if there are remaining actions
+                toolCallMessages.push({
+                  role: "user",
+                  content: "Periksa kembali pesan user sebelumnya. Apakah ada permintaan atau aksi lain yang BELUM kamu jalankan? Jika ya, jalankan tool-nya sekarang. Jika semua sudah selesai, berikan respons final."
+                });
+
+                log('MAIA CALL', `Continuation check with ${toolCallMessages.length} messages`);
+                const checkData = await callMaia(modelId, toolCallMessages, useTools);
+                assistantMsg = checkData.choices[0].message;
+
+                log('TOOL LOOP', `Continuation check result: ${assistantMsg.tool_calls ? 'More tools needed' : 'All done'}`);
+
+                if (assistantMsg.tool_calls) {
+                  // Ada tool lagi yang perlu dijalankan, continue loop
+                  continue;
+                } else {
+                  // Semua selesai
+                  break;
+                }
+              } else {
+                break;
+              }
+            }
+
+            // Append assistant message with tool_calls
             toolCallMessages.push(assistantMsg);
+
+            log('TOOL LOOP', `Round ${round}: Processing ${assistantMsg.tool_calls.length} tool call(s)`);
 
             for (const toolCall of assistantMsg.tool_calls) {
               const fnName = toolCall.function.name;
-              const fnArgs = JSON.parse(toolCall.function.arguments);
+              let fnArgs: Record<string, unknown>;
 
-              send({ type: "tool_start", name: fnName, args: fnArgs });
+              try {
+                fnArgs = JSON.parse(toolCall.function.arguments);
+              } catch (parseErr) {
+                logError('PARSE ERROR', `Failed to parse arguments for ${fnName}:`, toolCall.function.arguments, parseErr);
+                toolCallMessages.push({
+                  role: "tool",
+                  tool_call_id: toolCall.id,
+                  content: `Error: Invalid tool arguments — ${parseErr}`,
+                });
+                continue;
+              }
 
-              const result = await executeTool(fnName, fnArgs);
-              toolResults.push({ name: fnName, args: fnArgs, result });
+              log('TOOL EXEC', `Executing: ${fnName}`, JSON.stringify(fnArgs));
 
               send({
-                type: "tool_result",
+                type: "tool_start",
                 name: fnName,
-                result,
+                args: fnArgs,
+                text: toolLabels[fnName] || `🔧 Executing ${fnName}...`,
               });
 
-              toolCallMessages.push({
-                role: "tool",
-                tool_call_id: toolCall.id,
-                content: result,
-              });
+              try {
+                const result = await executeTool(fnName, fnArgs);
+                log('TOOL EXEC', `${fnName} result:`, result.substring(0, 200));
+
+                toolResults.push({ name: fnName, args: fnArgs, result });
+                send({ type: "tool_result", name: fnName, result });
+
+                toolCallMessages.push({
+                  role: "tool",
+                  tool_call_id: toolCall.id,
+                  content: result,
+                });
+              } catch (execErr) {
+                const errMsg = execErr instanceof Error ? execErr.message : String(execErr);
+                logError('TOOL ERROR', `${fnName} execution failed:`, errMsg);
+
+                toolCallMessages.push({
+                  role: "tool",
+                  tool_call_id: toolCall.id,
+                  content: `Error executing ${fnName}: ${errMsg}`,
+                });
+
+                send({ type: "tool_result", name: fnName, result: `❌ Error: ${errMsg}` });
+              }
             }
 
-            // Send tool results back to model for next response
-            send({ type: "status", text: round < MAX_TOOL_ROUNDS - 1 ? "Generating response..." : "Finalizing..." });
+            // Send tool results back to model
+            const statusText = round < MAX_TOOL_ROUNDS - 1 ? "Generating response..." : "Finalizing...";
+            send({ type: "status", text: statusText });
 
-            const nextData = await callMaia(modelId, toolCallMessages, useTools);
-            assistantMsg = nextData.choices[0].message;
+            log('MAIA CALL', `Sending ${toolCallMessages.length} messages back to model...`);
 
-            // If model doesn't want more tools, break
-            if (!assistantMsg.tool_calls) break;
+            try {
+              const nextData = await callMaia(modelId, toolCallMessages, useTools);
+              assistantMsg = nextData.choices[0].message;
+              log('MAIA RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
+            } catch (maiaErr) {
+              logError('MAIA ERROR', `Failed to get response after tool round ${round}:`, maiaErr);
+              break;
+            }
           }
         }
 
@@ -283,52 +409,82 @@ export async function POST(req: NextRequest) {
             try {
               const action = JSON.parse(jsonMatch[1]);
               if (action.action && action.params) {
-                send({ type: "tool_start", name: action.action, args: action.params });
+                send({
+                  type: "tool_start",
+                  name: action.action,
+                  args: action.params,
+                  text: toolLabels[action.action] || `🔧 Executing ${action.action}...`,
+                });
                 const result = await executeTool(action.action, action.params);
                 parsedActions.push({ name: action.action, args: action.params, result });
                 send({ type: "tool_result", name: action.action, result });
                 assistantMsg.content = assistantMsg.content.replace(/```json[\s\S]*?```/, '').trim();
               }
             } catch (parseError) {
-              console.warn('Failed to parse JSON action from model response:', parseError);
+              logError('PARSE ERROR', 'Failed to parse JSON action from model response:', parseError);
             }
           }
         }
 
-        // --- STEP 5: Kirim response via chunk streaming ---
+        // --- STEP 5: Handle empty response ---
         const allToolCalls = [...toolResults, ...parsedActions];
         let finalContent = assistantMsg.content || "";
 
-        // Retry once if content is empty after tool calls
+        // Retry jika kosong DAN ada tool calls (model seharusnya merespons tool results)
         if (!finalContent.trim() && allToolCalls.length > 0) {
+          log('EMPTY RESP', `Content empty after ${allToolCalls.length} tool calls. Retrying...`);
+
           try {
+            const toolSummary = allToolCalls.map(tc => `${tc.name}: ${tc.result}`).join('\n');
             const retryMessages = [
-              ...apiMessages,
-              { role: "assistant", content: `Tool results: ${allToolCalls.map(tc => tc.result).join('; ')}` },
-              { role: "user", content: "Berdasarkan hasil tool di atas, berikan respons yang informatif." }
+              { role: "system", content: systemInstruction },
+              ...messages.slice(-5),
+              {
+                role: "user",
+                content: `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan respons yang informatif dan natural untuk user berdasarkan hasil di atas. JANGAN panggil tool lagi.`
+              }
             ];
+
+            // Disable tools on retry to force text response
             const retryData = await callMaia(modelId, retryMessages, false);
             finalContent = retryData.choices[0]?.message?.content || "";
+            log('EMPTY RESP', `Retry result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
-            console.warn('Retry failed:', retryErr);
+            logError('EMPTY RESP', 'Retry failed:', retryErr);
           }
         }
 
-        // Retry once if content is empty and no tool calls
+        // Retry jika kosong tanpa tool calls
         if (!finalContent.trim() && allToolCalls.length === 0) {
+          log('EMPTY RESP', 'Content empty, no tools. Retrying without tools...');
           try {
             const retryData = await callMaia(modelId, apiMessages, false);
             finalContent = retryData.choices[0]?.message?.content || "";
+            log('EMPTY RESP', `Retry result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
-            console.warn('Retry failed:', retryErr);
+            logError('EMPTY RESP', 'Retry failed:', retryErr);
           }
         }
 
-        // Fallback if still empty
+        // FINAL fallback — generate summary manually
         if (!finalContent.trim()) {
-          finalContent = allToolCalls.length > 0
-            ? "Aksi berhasil dijalankan."
-            : "⚠️ Model tidak menghasilkan respons. Coba kirim ulang.";
+          logError('EMPTY RESP', 'All retries failed. Using manual fallback.');
+
+          if (allToolCalls.length > 0) {
+            // Generate readable summary dari tool results
+            const summaryParts = allToolCalls.map(tc => {
+              if (tc.result.startsWith('✅')) return tc.result;
+              if (tc.result.startsWith('🗑️')) return tc.result;
+              if (tc.result.startsWith('📊')) return tc.result;
+              if (tc.result.startsWith('📋')) return tc.result;
+              if (tc.result.startsWith('💰')) return tc.result;
+              if (tc.result.startsWith('💸')) return tc.result;
+              return `${tc.name}: ${tc.result}`;
+            });
+            finalContent = summaryParts.join('\n\n');
+          } else {
+            finalContent = "⚠️ Model tidak menghasilkan respons. Coba kirim ulang.";
+          }
         }
 
         // Simulate streaming by sending chunks (sentence by sentence)
@@ -343,20 +499,30 @@ export async function POST(req: NextRequest) {
 
         // --- STEP 6: Save assistant message to DB (server-side) ---
         if (conversationId) {
-          await supabase.from('chat_messages').insert({
+          const { error: asstMsgErr } = await supabase.from('chat_messages').insert({
             role: 'assistant',
             content: finalContent,
             tool_calls: allToolCalls.length > 0 ? allToolCalls : null,
             model_used: modelId,
             conversation_id: conversationId,
           });
+          if (asstMsgErr) {
+            logError('DB ERROR', 'Failed to save assistant message:', asstMsgErr.message);
+          } else {
+            log('DB SAVE', `Assistant message saved. Length: ${finalContent.length} chars`);
+          }
 
           // Update conversation timestamp
-          await supabase
+          const { error: convUpdateErr } = await supabase
             .from('conversations')
             .update({ updated_at: new Date().toISOString() })
             .eq('id', conversationId);
+          if (convUpdateErr) {
+            logError('DB ERROR', 'Failed to update conversation timestamp:', convUpdateErr.message);
+          }
         }
+
+        log('DONE', `Tools: ${allToolCalls.length}, Content: ${finalContent.length} chars, ConvId: ${conversationId}`);
 
         send({
           type: "done",
@@ -368,6 +534,7 @@ export async function POST(req: NextRequest) {
 
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Terjadi kesalahan.";
+        logError('REQUEST', 'Unhandled error:', message);
         send({
           type: "error",
           message,
