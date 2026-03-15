@@ -45,6 +45,16 @@ export interface Expense {
   created_at: string;
 }
 
+export interface Income {
+  id: string;
+  title: string;
+  amount: number;
+  category: 'salary' | 'transfer' | 'freelance' | 'gift' | 'investment' | 'refund' | 'other';
+  date: string;
+  notes?: string;
+  created_at: string;
+}
+
 export interface PersonalitySettings {
   preset: 'friendly' | 'professional' | 'minimal' | 'custom';
   language: 'id' | 'en' | 'mixed';

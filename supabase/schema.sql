@@ -47,6 +47,17 @@ CREATE TABLE IF NOT EXISTS expenses (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 5. Incomes table
+CREATE TABLE IF NOT EXISTS incomes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  amount FLOAT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'other' CHECK (category IN ('salary', 'transfer', 'freelance', 'gift', 'investment', 'refund', 'other')),
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ========================================
 -- Indexes
 -- ========================================
@@ -57,6 +68,8 @@ CREATE INDEX IF NOT EXISTS idx_targets_status ON targets(status);
 CREATE INDEX IF NOT EXISTS idx_targets_category ON targets(category);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date DESC);
 CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
+CREATE INDEX IF NOT EXISTS idx_incomes_date ON incomes(date DESC);
+CREATE INDEX IF NOT EXISTS idx_incomes_category ON incomes(category);
 
 -- ========================================
 -- RLS Policies (allow all for simplicity)
@@ -66,6 +79,7 @@ DO $$ BEGIN
   ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
   ALTER TABLE targets ENABLE ROW LEVEL SECURITY;
   ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE incomes ENABLE ROW LEVEL SECURITY;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
@@ -86,6 +100,11 @@ END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Allow all on expenses" ON expenses FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow all on incomes" ON incomes FOR ALL USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

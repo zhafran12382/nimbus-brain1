@@ -256,6 +256,191 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       return '🗑️ Pengeluaran berhasil dihapus.';
     }
 
+    case 'create_income': {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('incomes')
+        .insert({
+          title: args.title,
+          amount: args.amount,
+          category: args.category || 'other',
+          date: args.date || today,
+          notes: args.notes || null,
+        })
+        .select()
+        .single();
+      if (error) return `Error: ${error.message}`;
+      const amt = Number(data.amount).toLocaleString('id-ID');
+      return `✅ Pemasukan dicatat: ${data.title} — Rp ${amt} (${data.category}, ${data.date})`;
+    }
+
+    case 'get_incomes': {
+      const limit = Number(args.limit) || 20;
+      let query = supabase.from('incomes').select('*').order('date', { ascending: false }).limit(limit);
+      if (args.start_date) query = query.gte('date', args.start_date as string);
+      if (args.end_date) query = query.lte('date', args.end_date as string);
+      if (args.category) query = query.eq('category', args.category as string);
+
+      const { data, error } = await query;
+      if (error) return `Error: ${error.message}`;
+      if (!data?.length) return 'Belum ada pemasukan tercatat.';
+
+      const total = data.reduce((sum, e) => sum + Number(e.amount), 0);
+      let output = `💰 Pemasukan (${data.length} records):\n`;
+      data.forEach((e, i) => {
+        output += `${i + 1}. ${e.date} — ${e.title} — Rp ${Number(e.amount).toLocaleString('id-ID')} (${e.category})\n`;
+      });
+      output += `\nTotal: Rp ${total.toLocaleString('id-ID')}`;
+      return output;
+    }
+
+    case 'get_income_summary': {
+      const period = String(args.period || 'this_month');
+      const now = new Date();
+      let startDate: string | null = null;
+      let endDate: string | null = null;
+      let periodLabel = '';
+
+      if (period === 'today') {
+        startDate = now.toISOString().split('T')[0];
+        endDate = startDate;
+        periodLabel = 'Hari Ini';
+      } else if (period === 'this_week') {
+        const day = now.getDay();
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+        startDate = monday.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+        periodLabel = 'Minggu Ini';
+      } else if (period === 'this_month') {
+        startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        endDate = now.toISOString().split('T')[0];
+        periodLabel = 'Bulan Ini';
+      } else if (period === 'last_month') {
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+        startDate = lastMonth.toISOString().split('T')[0];
+        endDate = lastDay.toISOString().split('T')[0];
+        periodLabel = 'Bulan Lalu';
+      } else {
+        periodLabel = 'Semua Waktu';
+      }
+
+      let query = supabase.from('incomes').select('*');
+      if (startDate) query = query.gte('date', startDate);
+      if (endDate) query = query.lte('date', endDate);
+
+      const { data, error } = await query;
+      if (error) return `Error: ${error.message}`;
+      if (!data?.length) return `Tidak ada pemasukan untuk periode ${periodLabel}.`;
+
+      const total = data.reduce((sum, e) => sum + Number(e.amount), 0);
+      const categoryMap: Record<string, { total: number; count: number }> = {};
+      for (const e of data) {
+        if (!categoryMap[e.category]) categoryMap[e.category] = { total: 0, count: 0 };
+        categoryMap[e.category].total += Number(e.amount);
+        categoryMap[e.category].count += 1;
+      }
+
+      const categoryEmoji: Record<string, string> = {
+        salary: '💼', transfer: '🔄', freelance: '💻', gift: '🎁',
+        investment: '📈', refund: '↩️', other: '📦'
+      };
+
+      let output = `💰 Ringkasan Pemasukan ${periodLabel}:\nTotal: Rp ${total.toLocaleString('id-ID')} (${data.length} transaksi)\n\nPer Kategori:\n`;
+
+      const sorted = Object.entries(categoryMap).sort((a, b) => b[1].total - a[1].total);
+      for (const [cat, info] of sorted) {
+        const pct = ((info.total / total) * 100).toFixed(1);
+        output += `${categoryEmoji[cat] || '📦'} ${cat}: Rp ${info.total.toLocaleString('id-ID')} (${info.count} transaksi, ${pct}%)\n`;
+      }
+
+      return output;
+    }
+
+    case 'delete_income': {
+      const { error } = await supabase.from('incomes').delete().eq('id', args.id as string);
+      if (error) return `Error: ${error.message}`;
+      return '🗑️ Record pemasukan berhasil dihapus.';
+    }
+
+    case 'get_financial_summary': {
+      const period = String(args.period || 'this_month');
+      const now = new Date();
+      let startDate: string | null = null;
+      let endDate: string | null = null;
+      let periodLabel = '';
+
+      if (period === 'today') {
+        startDate = now.toISOString().split('T')[0];
+        endDate = startDate;
+        periodLabel = 'Hari Ini';
+      } else if (period === 'this_week') {
+        const day = now.getDay();
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+        startDate = monday.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+        periodLabel = 'Minggu Ini';
+      } else if (period === 'this_month') {
+        startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        endDate = now.toISOString().split('T')[0];
+        periodLabel = 'Bulan Ini';
+      } else if (period === 'last_month') {
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+        startDate = lastMonth.toISOString().split('T')[0];
+        endDate = lastDay.toISOString().split('T')[0];
+        periodLabel = 'Bulan Lalu';
+      } else {
+        periodLabel = 'Semua Waktu';
+      }
+
+      // Query expenses
+      let expQuery = supabase.from('expenses').select('*');
+      if (startDate) expQuery = expQuery.gte('date', startDate);
+      if (endDate) expQuery = expQuery.lte('date', endDate);
+      const { data: expData } = await expQuery;
+
+      // Query incomes
+      let incQuery = supabase.from('incomes').select('*');
+      if (startDate) incQuery = incQuery.gte('date', startDate);
+      if (endDate) incQuery = incQuery.lte('date', endDate);
+      const { data: incData } = await incQuery;
+
+      const expenseTotal = (expData || []).reduce((sum, e) => sum + Number(e.amount), 0);
+      const incomeTotal = (incData || []).reduce((sum, e) => sum + Number(e.amount), 0);
+      const net = incomeTotal - expenseTotal;
+
+      // Top categories
+      const expCatMap: Record<string, number> = {};
+      for (const e of (expData || [])) {
+        expCatMap[e.category] = (expCatMap[e.category] || 0) + Number(e.amount);
+      }
+      const topExpCat = Object.entries(expCatMap).sort((a, b) => b[1] - a[1])[0];
+
+      const incCatMap: Record<string, number> = {};
+      for (const e of (incData || [])) {
+        incCatMap[e.category] = (incCatMap[e.category] || 0) + Number(e.amount);
+      }
+      const topIncCat = Object.entries(incCatMap).sort((a, b) => b[1] - a[1])[0];
+
+      let output = `📊 Ringkasan Keuangan ${periodLabel}:\n\n`;
+      output += `💰 Total Pemasukan: Rp ${incomeTotal.toLocaleString('id-ID')}\n`;
+      output += `💸 Total Pengeluaran: Rp ${expenseTotal.toLocaleString('id-ID')}\n`;
+      output += `━━━━━━━━━━━━━━━━━━\n`;
+      output += `💎 Saldo Bersih: Rp ${Math.abs(net).toLocaleString('id-ID')} (${net >= 0 ? 'surplus' : 'defisit'})\n`;
+
+      if (topExpCat) {
+        output += `\nTop Pengeluaran: ${topExpCat[0]} (Rp ${topExpCat[1].toLocaleString('id-ID')})`;
+      }
+      if (topIncCat) {
+        output += `\nTop Pemasukan: ${topIncCat[0]} (Rp ${topIncCat[1].toLocaleString('id-ID')})`;
+      }
+
+      return output;
+    }
+
     default:
       return `Unknown tool: ${name}`;
   }

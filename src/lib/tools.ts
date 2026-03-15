@@ -95,7 +95,7 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "create_expense",
-      description: "Record a new expense/spending. Use when user mentions spending money or buying something.",
+      description: "Record money SPENT / pengeluaran. Use ONLY when user SPENDS money: buying things, paying bills, eating out, transportation cost, etc. Keywords: beli, bayar, habis, keluar, buat beli, jajan. Do NOT use this for incoming money — use create_income instead.",
       parameters: {
         type: "object",
         properties: {
@@ -133,7 +133,7 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "get_expense_summary",
-      description: "Get spending summary with totals per category and overall. Use when user asks about spending habits, totals, or analysis.",
+      description: "Get spending/expense summary with totals per category. Use when user asks specifically about spending, pengeluaran, or expenses.",
       parameters: {
         type: "object",
         properties: {
@@ -158,6 +158,94 @@ export const tools = [
           id: { type: "string", description: "ID pengeluaran yang akan dihapus" }
         },
         required: ["id"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_income",
+      description: "Record incoming money / pemasukan. Use when user RECEIVES money: salary, transfer from someone, freelance payment, gift, investment returns, refund, etc. Keywords: gaji, transfer masuk, dikasih, terima, dapat, TF dari, income, pemasukan.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Deskripsi pemasukan" },
+          amount: { type: "number", description: "Jumlah dalam Rupiah" },
+          category: {
+            type: "string",
+            enum: ["salary", "transfer", "freelance", "gift", "investment", "refund", "other"],
+            description: "Kategori pemasukan"
+          },
+          date: { type: "string", description: "Tanggal format YYYY-MM-DD, default hari ini" },
+          notes: { type: "string", description: "Catatan tambahan (opsional)" }
+        },
+        required: ["title", "amount", "category"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_incomes",
+      description: "Get list of income records. Filter by date range or category.",
+      parameters: {
+        type: "object",
+        properties: {
+          start_date: { type: "string", description: "Filter dari tanggal YYYY-MM-DD" },
+          end_date: { type: "string", description: "Filter sampai tanggal YYYY-MM-DD" },
+          category: { type: "string", enum: ["salary", "transfer", "freelance", "gift", "investment", "refund", "other"], description: "Filter kategori" },
+          limit: { type: "number", description: "Jumlah maksimal hasil, default 20" }
+        }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_income_summary",
+      description: "Get income summary with totals per category. Use when user asks about earnings or income analysis.",
+      parameters: {
+        type: "object",
+        properties: {
+          period: {
+            type: "string",
+            enum: ["today", "this_week", "this_month", "last_month", "all"],
+            description: "Periode ringkasan"
+          }
+        },
+        required: ["period"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "delete_income",
+      description: "Delete an income record.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "ID pemasukan yang akan dihapus" }
+        },
+        required: ["id"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_financial_summary",
+      description: "Get complete financial overview: total income, total expenses, and net balance. Use when user asks about overall finances, balance, 'uang saya berapa', 'sisa berapa', or financial health.",
+      parameters: {
+        type: "object",
+        properties: {
+          period: {
+            type: "string",
+            enum: ["today", "this_week", "this_month", "last_month", "all"],
+            description: "Periode ringkasan"
+          }
+        },
+        required: ["period"]
       }
     }
   }
