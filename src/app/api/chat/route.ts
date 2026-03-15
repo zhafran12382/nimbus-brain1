@@ -7,14 +7,62 @@ import { getModelById } from '@/lib/models';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const SYSTEM_INSTRUCTION = `Kamu adalah Nimbus Brain AI, asisten personal cerdas.
-Kamu bisa mengelola target/goals menggunakan tools yang tersedia.
+const BASE_SYSTEM_INSTRUCTION = `Kamu adalah Nimbus Brain AI, asisten personal cerdas.
+Kamu bisa mengelola target/goals dan mencatat pengeluaran menggunakan tools yang tersedia.
 Kamu memiliki akses ke web search. Gunakan tool web_search saat user bertanya tentang berita, event terkini, fakta yang mungkin berubah, atau hal yang kamu tidak yakin. Saat menggunakan hasil search, sebutkan sumber/URL-nya.
 Selalu respond dalam Bahasa Indonesia yang casual dan friendly.
-Saat user meminta aksi (buat target, update progress, dll), SELALU gunakan tools.
+Saat user meminta aksi (buat target, update progress, catat pengeluaran, dll), SELALU gunakan tools.
+Saat user menyebut membeli sesuatu atau mengeluarkan uang, gunakan create_expense.
 Saat user hanya ngobrol biasa, respond secara natural tanpa tools.
 Jika user melaporkan progress tapi tidak menyebut angka spesifik, tanyakan dulu.
 Setelah mengeksekusi tool, berikan respons yang informatif dan encouraging.`;
+
+function buildSystemInstruction(personality?: Record<string, string | undefined>): string {
+  // Dynamic date in WIB (UTC+7)
+  const now = new Date();
+  const wibOffset = 7 * 60 * 60 * 1000;
+  const wibDate = new Date(now.getTime() + wibOffset);
+  const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const dayName = dayNames[wibDate.getUTCDay()];
+  const date = wibDate.getUTCDate();
+  const month = monthNames[wibDate.getUTCMonth()];
+  const year = wibDate.getUTCFullYear();
+  const hours = String(wibDate.getUTCHours()).padStart(2, '0');
+  const minutes = String(wibDate.getUTCMinutes()).padStart(2, '0');
+
+  let instruction = '';
+
+  // Inject personality if provided
+  if (personality && personality.preset) {
+    instruction += '[PERSONALITY]\n';
+    const presetLabels: Record<string, string> = {
+      friendly: 'Friendly — Casual, pakai emoji, supportive, bahasa gaul',
+      professional: 'Professional — Formal, to the point, tidak pakai emoji',
+      minimal: 'Minimal — Jawab sesingkat mungkin, tanpa basa-basi',
+      custom: 'Custom',
+    };
+    instruction += `Preset: ${presetLabels[personality.preset] || personality.preset}\n`;
+
+    const langLabels: Record<string, string> = { id: 'Indonesia', en: 'English', mixed: 'Mixed (Indo-English)' };
+    instruction += `Bahasa: ${langLabels[personality.language || 'id'] || personality.language}\n`;
+
+    const styleLabels: Record<string, string> = { detailed: 'Detailed — Jawaban panjang dan lengkap', balanced: 'Balanced — Sedang', concise: 'Concise — Singkat dan padat' };
+    instruction += `Gaya jawaban: ${styleLabels[personality.responseStyle || 'balanced'] || personality.responseStyle}\n`;
+
+    if (personality.userName) {
+      instruction += `Nama user: ${personality.userName}\n`;
+    }
+    if (personality.customInstructions) {
+      instruction += `Instruksi tambahan: ${personality.customInstructions}\n`;
+    }
+    instruction += '[/PERSONALITY]\n\n';
+  }
+
+  instruction += `[SYSTEM]\nHari ini adalah ${dayName}, ${date} ${month} ${year}. Waktu: ${hours}:${minutes} WIB.\n\n${BASE_SYSTEM_INSTRUCTION}\n[/SYSTEM]`;
+
+  return instruction;
+}
 
 async function callMaia(modelId: string, messages: Record<string, unknown>[], useTools: boolean) {
   const body: Record<string, unknown> = {
@@ -46,7 +94,7 @@ async function callMaia(modelId: string, messages: Record<string, unknown>[], us
 }
 
 export async function POST(req: NextRequest) {
-  const { messages, model: modelId } = await req.json();
+  const { messages, model: modelId, personality } = await req.json();
 
   const model = getModelById(modelId);
   if (!model) {
@@ -57,8 +105,9 @@ export async function POST(req: NextRequest) {
   }
 
   const useTools = model.supports_tools;
+  const systemInstruction = buildSystemInstruction(personality);
   const apiMessages = [
-    { role: "system", content: SYSTEM_INSTRUCTION },
+    { role: "system", content: systemInstruction },
     ...messages.slice(-10),
   ];
 
@@ -159,11 +208,30 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // --- STEP 5: Kirim response final ---
+        // --- STEP 5: Kirim response final (with empty response retry) ---
         const allToolCalls = [...toolResults, ...parsedActions];
+        let finalContent = assistantMsg.content || "";
+
+        // Retry once if content is empty
+        if (!finalContent.trim() && allToolCalls.length === 0) {
+          try {
+            const retryData = await callMaia(modelId, apiMessages, false);
+            finalContent = retryData.choices[0]?.message?.content || "";
+          } catch {
+            // ignore retry error
+          }
+        }
+
+        // Fallback if still empty
+        if (!finalContent.trim()) {
+          finalContent = allToolCalls.length > 0
+            ? "Aksi berhasil dijalankan."
+            : "⚠️ Model tidak menghasilkan respons. Coba kirim ulang.";
+        }
+
         send({
           type: "done",
-          content: assistantMsg.content || "Aksi berhasil dijalankan.",
+          content: finalContent,
           tool_calls: allToolCalls.length > 0 ? allToolCalls : undefined,
           model_used: modelId,
         });

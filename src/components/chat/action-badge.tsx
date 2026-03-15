@@ -9,6 +9,10 @@ const actionConfig: Record<string, { icon: string; label: string; bgClass: strin
   get_targets: { icon: "📋", label: "get targets", bgClass: "bg-zinc-500/10", textClass: "text-zinc-400", borderClass: "border-zinc-500/20" },
   get_target_summary: { icon: "📊", label: "get summary", bgClass: "bg-zinc-500/10", textClass: "text-zinc-400", borderClass: "border-zinc-500/20" },
   web_search: { icon: "🔍", label: "web search", bgClass: "bg-violet-500/10", textClass: "text-violet-400", borderClass: "border-violet-500/20" },
+  create_expense: { icon: "💰", label: "catat pengeluaran", bgClass: "bg-amber-500/10", textClass: "text-amber-400", borderClass: "border-amber-500/20" },
+  get_expenses: { icon: "📋", label: "daftar pengeluaran", bgClass: "bg-orange-500/10", textClass: "text-orange-400", borderClass: "border-orange-500/20" },
+  get_expense_summary: { icon: "📊", label: "ringkasan pengeluaran", bgClass: "bg-orange-500/10", textClass: "text-orange-400", borderClass: "border-orange-500/20" },
+  delete_expense: { icon: "🗑️", label: "hapus pengeluaran", bgClass: "bg-red-500/10", textClass: "text-red-400", borderClass: "border-red-500/20" },
 };
 
 interface ActionBadgeProps {

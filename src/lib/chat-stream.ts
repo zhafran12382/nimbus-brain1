@@ -12,12 +12,16 @@ export interface StreamEvent {
 export async function sendChatStream(
   messages: { role: string; content: string }[],
   model: string,
-  onEvent: (event: StreamEvent) => void
+  onEvent: (event: StreamEvent) => void,
+  personality?: Record<string, string>
 ): Promise<void> {
+  const body: Record<string, unknown> = { messages, model };
+  if (personality) body.personality = personality;
+
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, model }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
