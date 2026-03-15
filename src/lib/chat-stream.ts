@@ -1,6 +1,7 @@
 export interface StreamEvent {
   type: 'status' | 'tool_start' | 'tool_result' | 'chunk' | 'done' | 'error';
   message?: string;
+  text?: string;
   content?: string;
   name?: string;
   args?: Record<string, unknown>;

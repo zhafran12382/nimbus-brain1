@@ -123,7 +123,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
 
   // Gather web search sources from tool history
   const webSearchTool = toolHistory.find((t) => t.name === "web_search" && t.result);
-  const sources = webSearchTool ? extractSources(webSearchTool.result!) : [];
+  const sources = webSearchTool?.result ? extractSources(webSearchTool.result) : [];
 
   // Non-search tool preview
   const previewTool = toolHistory.find(
