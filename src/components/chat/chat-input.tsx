@@ -28,7 +28,7 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
         ref={inputRef}
         value={input}
         onChange={(e) => setInput(e.target.value)}
-        placeholder="Ketik pesan... (contoh: 'target baru: baca 5 paper')"
+        placeholder="Message Nimbus Brain..."
         disabled={isLoading}
         className="flex-1"
       />

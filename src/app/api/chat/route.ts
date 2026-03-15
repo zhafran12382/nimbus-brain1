@@ -3,12 +3,13 @@ import { tools } from '@/lib/tools';
 import { executeTool } from '@/lib/tool-executor';
 import { getModelById } from '@/lib/models';
 
-// Vercel Serverless: max 30 detik (Hobby plan bisa sampai 60 detik)
-export const maxDuration = 30;
+// Vercel Serverless: max 60 detik
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const SYSTEM_INSTRUCTION = `Kamu adalah Zhafran Hub AI, asisten personal Zhafran yang cerdas dan helpful.
-Kamu bisa mengelola target/goals Zhafran menggunakan tools yang tersedia.
+const SYSTEM_INSTRUCTION = `Kamu adalah Nimbus Brain AI, asisten personal cerdas.
+Kamu bisa mengelola target/goals menggunakan tools yang tersedia.
+Kamu memiliki akses ke web search. Gunakan tool web_search saat user bertanya tentang berita, event terkini, fakta yang mungkin berubah, atau hal yang kamu tidak yakin. Saat menggunakan hasil search, sebutkan sumber/URL-nya.
 Selalu respond dalam Bahasa Indonesia yang casual dan friendly.
 Saat user meminta aksi (buat target, update progress, dll), SELALU gunakan tools.
 Saat user hanya ngobrol biasa, respond secara natural tanpa tools.

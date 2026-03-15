@@ -27,11 +27,31 @@ export function ChatContainer({ messages, onSend, isLoading, streamStatus, pendi
         <div className="space-y-4 pb-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-4xl mb-4">💬</p>
-              <p className="text-lg text-zinc-500">Mulai percakapan!</p>
-              <p className="text-sm text-zinc-600 mt-1">
-                Coba: &quot;target baru: bench press 60kg&quot;
+              <p className="text-4xl mb-4">⚡</p>
+              <p className="text-lg font-semibold text-zinc-300">Welcome to Nimbus Brain 👋</p>
+              <p className="text-sm text-zinc-500 mt-1">
+                Mulai percakapan atau coba salah satu contoh di bawah
               </p>
+              <div className="flex flex-wrap gap-2 mt-4 justify-center">
+                <button
+                  onClick={() => onSend("Buat target baru: baca 10 buku tahun ini")}
+                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors"
+                >
+                  🎯 Buat target baru
+                </button>
+                <button
+                  onClick={() => onSend("Apa berita terbaru hari ini?")}
+                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors"
+                >
+                  🔍 Web search
+                </button>
+                <button
+                  onClick={() => onSend("Tampilkan semua target aktif")}
+                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition-colors"
+                >
+                  📋 Lihat target
+                </button>
+              </div>
             </div>
           )}
           {messages.map((msg) => (

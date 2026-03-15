@@ -9,6 +9,7 @@ const actionConfig: Record<string, { icon: string; label: string; color: string 
   delete_target: { icon: "🗑️", label: "Target dihapus", color: "bg-red-600/20 text-red-400 border-red-600/30" },
   get_targets: { icon: "📋", label: "Daftar target", color: "bg-zinc-600/20 text-zinc-400 border-zinc-600/30" },
   get_target_summary: { icon: "📊", label: "Summary", color: "bg-zinc-600/20 text-zinc-400 border-zinc-600/30" },
+  web_search: { icon: "🔍", label: "Web search", color: "bg-violet-600/20 text-violet-400 border-violet-600/30" },
 };
 
 interface ActionBadgeProps {
@@ -22,7 +23,7 @@ export function ActionBadge({ toolCall }: ActionBadgeProps) {
     color: "bg-zinc-600/20 text-zinc-400 border-zinc-600/30",
   };
 
-  const detail = toolCall.args.title ? `: ${toolCall.args.title}` : "";
+  const detail = toolCall.args.title ? `: ${toolCall.args.title}` : toolCall.args.query ? `: ${toolCall.args.query}` : "";
 
   return (
     <Badge variant="outline" className={`${config.color} text-xs font-normal`}>
