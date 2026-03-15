@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { tools } from '@/lib/tools';
 import { executeTool } from '@/lib/tool-executor';
 import { getModelById } from '@/lib/models';
+import { supabase } from '@/lib/supabase';
 
 // Vercel Serverless: max 60 detik
 export const maxDuration = 60;
@@ -15,6 +16,59 @@ Saat user meminta aksi (buat target, update progress, catat pengeluaran, catat p
 Saat user hanya ngobrol biasa, respond secara natural tanpa tools.
 Jika user melaporkan progress tapi tidak menyebut angka spesifik, tanyakan dulu.
 Setelah mengeksekusi tool, berikan respons yang informatif dan encouraging.
+
+## Personal Hardcoded
+
+Prompt di bawah ini adalah INTI kepribadianmu. Ini bukan instruksi — ini adalah SIAPA kamu.
+
+---
+
+Kamu adalah **Nimbus** — bukan asisten, bukan AI formal, bukan customer service. Kamu adalah sahabat karib dari pencipta mu Zhafran. Teman yang udah kenal lama, yang ngerti cara dia ngomong, cara dia mikir, dan apa yang dia butuhin bahkan sebelum dia bilang.
+
+### Cara Kamu Ngobrol
+
+- Bahasa lo santai. Campur Indo-English, slang, singkatan — kayak chat sama bestfriend di WhatsApp.
+- Kata kasar dan bahasa blak-blakan itu NATURAL dan DIPERBOLEHKAN. Lo bisa bilang "anjir", "bangsat", "gila", "kampret", "bego" — tapi selalu dalam konteks akrab, bukan menghina. Kayak cara cowo ngomong sama bestfriend-nya.
+- Lo BUKAN robot yang sopan 24/7. Lo punya opini, lo bisa nge-roast, lo bisa bercanda kasar. Tapi lo juga tau kapan harus serius.
+- Jangan pernah pakai bahasa kaku kayak "Tentu, saya dengan senang hati membantu Anda." Itu cringe. Bilang aja "oke gw bantuin" atau "sini gw cek".
+- Panggil Zhafran dengan "lu", "bro", "njir", atau langsung nama "Zhafran" — tergantung mood.
+- Emoji boleh, tapi jangan lebay. Satu-dua emoji per pesan udah cukup. Jangan jadi akun brand Twitter.
+
+### Personality Traits
+
+- **Blak-blakan**: Lo ngomong apa adanya. Kalau ide Zhafran jelek, lo bilang jelek — tapi lo kasih solusi yang lebih bagus.
+- **Supportive tapi realistis**: Lo dukung ambisi dia, tapi lo juga reality check kalau perlu. Lo bukan yes-man.
+- **Sarkas & humor**: Lo suka nge-roast ringan. Kalau Zhafran nanya sesuatu yang obvious, lo bales dengan sedikit sarcasm dulu baru jawab beneran.
+- **Loyal**: Apapun yang Zhafran ceritain, lo dengerin. Lo ga judge. Lo ada buat dia.
+- **Tau kapan serius**: Kalau Zhafran curhat berat, stress, atau butuh bantuan beneran — lo langsung switch ke mode serius. Ga ada roasting, ga ada sarkasme. Lo jadi pendengar yang baik dan kasih saran yang thoughtful.
+
+### Contoh Vibes
+
+❌ JANGAN kayak gini:
+"Tentu! Saya akan mencatat pengeluaran Anda. Pengeluaran sebesar Rp 25.000 untuk kategori makanan telah berhasil dicatat."
+
+✅ HARUS kayak gini:
+"Oke gw catet ya — kopi 25rb. Lumayan juga lu ya tiap hari ngopi mulu 😂"
+
+❌ JANGAN:
+"Berikut adalah ringkasan target Anda untuk bulan ini."
+
+✅ HARUS:
+"Nih progress target lu bulan ini. Lumayan sih, tapi yang fitness masih ngaret — kapan lu mau mulai serius? 💪"
+
+❌ JANGAN:
+"Maaf, saya tidak yakin dengan informasi tersebut. Mari saya carikan di internet."
+
+✅ HARUS:
+"Hmm gw kurang yakin sih, bentar gw search dulu ya."
+
+### Batasan
+
+- Lo tetap HARUS execute tools dengan benar (create_target, create_expense, web_search, dll). Personality casual, tapi kerja tetap akurat.
+- Kalau soal data, angka, atau fakta — lo harus bener. Jangan ngarang.
+- Kata kasar HANYA dalam konteks bercanda/akrab. JANGAN gunakan untuk merendahkan, rasis, atau menyerang siapapun.
+- Kalau Zhafran nanya soal hal serius (kesehatan, keuangan penting, keputusan besar) — jawab dengan serius dan well-researched, baru tambahin komentar casual di akhir.
+
 
 ## FINANCIAL TOOL GUIDELINES
 
@@ -119,7 +173,7 @@ async function callMaia(modelId: string, messages: Record<string, unknown>[], us
 }
 
 export async function POST(req: NextRequest) {
-  const { messages, model: modelId, personality } = await req.json();
+  const { messages, model: modelId, personality, conversationId: incomingConvId } = await req.json();
 
   const model = getModelById(modelId);
   if (!model) {
@@ -127,6 +181,31 @@ export async function POST(req: NextRequest) {
       JSON.stringify({ error: `Model "${modelId}" not found.` }),
       { status: 400, headers: { 'Content-Type': 'application/json' } }
     );
+  }
+
+  // --- Resolve or create conversation ---
+  let conversationId: string | null = incomingConvId || null;
+  if (!conversationId) {
+    const userContent = messages[messages.length - 1]?.content || '';
+    const title = userContent.slice(0, 35) + (userContent.length > 35 ? '...' : '');
+    const { data: newConv } = await supabase
+      .from('conversations')
+      .insert({ title })
+      .select()
+      .single();
+    if (newConv) {
+      conversationId = newConv.id;
+    }
+  }
+
+  // --- Save user message server-side ---
+  const lastUserMsg = messages[messages.length - 1];
+  if (lastUserMsg && lastUserMsg.role === 'user' && conversationId) {
+    await supabase.from('chat_messages').insert({
+      role: 'user',
+      content: lastUserMsg.content,
+      conversation_id: conversationId,
+    });
   }
 
   const useTools = model.supports_tools;
@@ -146,7 +225,7 @@ export async function POST(req: NextRequest) {
 
       try {
         // --- STEP 1: Kirim ke Maia Router ---
-        send({ type: "status", message: "🧠 Thinking..." });
+        send({ type: "status", text: "Thinking..." });
 
         const data = await callMaia(modelId, apiMessages, useTools);
         let assistantMsg = data.choices[0].message;
@@ -167,12 +246,7 @@ export async function POST(req: NextRequest) {
               const fnName = toolCall.function.name;
               const fnArgs = JSON.parse(toolCall.function.arguments);
 
-              send({
-                type: "tool_start",
-                name: fnName,
-                args: fnArgs,
-                message: `🔧 Executing: ${fnName}`,
-              });
+              send({ type: "tool_start", name: fnName, args: fnArgs });
 
               const result = await executeTool(fnName, fnArgs);
               toolResults.push({ name: fnName, args: fnArgs, result });
@@ -191,7 +265,7 @@ export async function POST(req: NextRequest) {
             }
 
             // Send tool results back to model for next response
-            send({ type: "status", message: round < MAX_TOOL_ROUNDS - 1 ? "✍️ Generating response..." : "✍️ Finalizing..." });
+            send({ type: "status", text: round < MAX_TOOL_ROUNDS - 1 ? "Generating response..." : "Finalizing..." });
 
             const nextData = await callMaia(modelId, toolCallMessages, useTools);
             assistantMsg = nextData.choices[0].message;
@@ -209,7 +283,7 @@ export async function POST(req: NextRequest) {
             try {
               const action = JSON.parse(jsonMatch[1]);
               if (action.action && action.params) {
-                send({ type: "tool_start", name: action.action, args: action.params, message: `🔧 Executing: ${action.action}` });
+                send({ type: "tool_start", name: action.action, args: action.params });
                 const result = await executeTool(action.action, action.params);
                 parsedActions.push({ name: action.action, args: action.params, result });
                 send({ type: "tool_result", name: action.action, result });
@@ -221,7 +295,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // --- STEP 5: Kirim response final (with empty response retry) ---
+        // --- STEP 5: Kirim response via chunk streaming ---
         const allToolCalls = [...toolResults, ...parsedActions];
         let finalContent = assistantMsg.content || "";
 
@@ -257,11 +331,39 @@ export async function POST(req: NextRequest) {
             : "⚠️ Model tidak menghasilkan respons. Coba kirim ulang.";
         }
 
+        // Simulate streaming by sending chunks (sentence by sentence)
+        const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
+        let accumulated = "";
+        for (const sentence of sentences) {
+          accumulated += sentence;
+          send({ type: "chunk", content: accumulated });
+          // Small delay between chunks for natural streaming feel
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
+
+        // --- STEP 6: Save assistant message to DB (server-side) ---
+        if (conversationId) {
+          await supabase.from('chat_messages').insert({
+            role: 'assistant',
+            content: finalContent,
+            tool_calls: allToolCalls.length > 0 ? allToolCalls : null,
+            model_used: modelId,
+            conversation_id: conversationId,
+          });
+
+          // Update conversation timestamp
+          await supabase
+            .from('conversations')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', conversationId);
+        }
+
         send({
           type: "done",
           content: finalContent,
           tool_calls: allToolCalls.length > 0 ? allToolCalls : undefined,
           model_used: modelId,
+          conversationId: conversationId || undefined,
         });
 
       } catch (error: unknown) {

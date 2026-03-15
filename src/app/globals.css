@@ -145,6 +145,20 @@ body {
   background: hsl(0 0% 100% / 0.16);
 }
 
+/* ── Perplexity-style Spinner ── */
+@keyframes spin-smooth {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spinner-perplexity {
+  width: 16px;
+  height: 16px;
+  border: 2px solid hsl(0 0% 100% / 0.1);
+  border-top-color: hsl(217 91% 60%);
+  border-radius: 50%;
+  animation: spin-smooth 0.8s linear infinite;
+}
+
 /* ── Progress bar animation ── */
 .progress-fill {
   transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
