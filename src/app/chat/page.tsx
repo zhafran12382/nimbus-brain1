@@ -130,11 +130,13 @@ export default function ChatPage() {
 
       // Only add assistant message if there's actual content or tool calls
       if (finalContent.trim() || finalToolCalls.length > 0) {
+        const fallbackContent = finalToolCalls.length > 0 ? "(Aksi selesai)" : "(Tidak ada respons)";
+        const messageContent = finalContent || fallbackContent;
         const assistantMessage: ChatMessage = {
           id: crypto.randomUUID(),
           conversation_id: conversationId || undefined,
           role: "assistant",
-          content: finalContent || "(No response)",
+          content: messageContent,
           tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
           model_used: finalModelUsed,
           created_at: new Date().toISOString(),
@@ -144,7 +146,7 @@ export default function ChatPage() {
         // Save to Supabase
         await supabase.from("chat_messages").insert({
           role: "assistant",
-          content: finalContent || "(No response)",
+          content: messageContent,
           tool_calls: finalToolCalls.length > 0 ? finalToolCalls : null,
           model_used: finalModelUsed,
           conversation_id: conversationId,

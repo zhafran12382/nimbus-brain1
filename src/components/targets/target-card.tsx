@@ -48,6 +48,7 @@ export function TargetCard({ target, onEdit, onDelete }: TargetCardProps) {
     "from-red-500 to-red-400";
 
   // Deadline logic
+  const NEAR_DEADLINE_MS = 7 * 24 * 60 * 60 * 1000;
   let deadlineClass = "text-[hsl(0_0%_30%)]";
   let isOverdue = false;
   let isNearDeadline = false;
@@ -56,7 +57,7 @@ export function TargetCard({ target, onEdit, onDelete }: TargetCardProps) {
     if (diff < 0 && target.status === "active") {
       deadlineClass = "text-red-400";
       isOverdue = true;
-    } else if (diff > 0 && diff < 7 * 24 * 60 * 60 * 1000) {
+    } else if (diff > 0 && diff < NEAR_DEADLINE_MS) {
       deadlineClass = "text-amber-400";
       isNearDeadline = true;
     }
