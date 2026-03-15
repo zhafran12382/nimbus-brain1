@@ -289,6 +289,7 @@ export async function POST(req: NextRequest) {
         // --- STEP 2: Handle tool calls (agentic loop, max 5 rounds) ---
         if (assistantMsg.tool_calls && useTools) {
           const toolCallMessages: Record<string, unknown>[] = [...apiMessages];
+          // Max 5 rounds to support multi-action prompts (model may need 2-3 tool rounds + continuation check)
           const MAX_TOOL_ROUNDS = 5;
           let continuationChecked = false;
 
@@ -344,7 +345,7 @@ export async function POST(req: NextRequest) {
                 toolCallMessages.push({
                   role: "tool",
                   tool_call_id: toolCall.id,
-                  content: `Error: Invalid tool arguments — ${parseErr}`,
+                  content: `Error: Invalid arguments for ${fnName} — ${parseErr}`,
                 });
                 continue;
               }
