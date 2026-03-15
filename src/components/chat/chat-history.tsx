@@ -98,18 +98,22 @@ export function ChatHistory({
   const handleRename = async (id: string) => {
     const trimmed = editTitle.trim();
     if (trimmed) {
-      await supabase.from("conversations").update({ title: trimmed }).eq("id", id);
-      fetchConversations();
+      const { error } = await supabase.from("conversations").update({ title: trimmed }).eq("id", id);
+      if (!error) {
+        fetchConversations();
+      }
     }
     setEditingId(null);
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("conversations").delete().eq("id", id);
-    if (activeConversationId === id) {
-      onSelectConversation(null);
+    const { error } = await supabase.from("conversations").delete().eq("id", id);
+    if (!error) {
+      if (activeConversationId === id) {
+        onSelectConversation(null);
+      }
+      fetchConversations();
     }
-    fetchConversations();
   };
 
   return (
