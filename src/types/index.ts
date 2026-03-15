@@ -35,6 +35,24 @@ export interface ToolCallResult {
   result: string;
 }
 
+export interface Expense {
+  id: string;
+  title: string;
+  amount: number;
+  category: 'food' | 'transport' | 'shopping' | 'entertainment' | 'health' | 'education' | 'bills' | 'other';
+  date: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface PersonalitySettings {
+  preset: 'friendly' | 'professional' | 'minimal' | 'custom';
+  language: 'id' | 'en' | 'mixed';
+  responseStyle: 'detailed' | 'balanced' | 'concise';
+  userName: string;
+  customInstructions: string;
+}
+
 export interface AIModel {
   id: string;
   name: string;

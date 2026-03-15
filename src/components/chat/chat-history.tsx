@@ -59,6 +59,7 @@ export function ChatHistory({
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [isLoadingConvs, setIsLoadingConvs] = useState(true);
   const editRef = useRef<HTMLInputElement>(null);
 
   const fetchConversations = useCallback(async () => {
@@ -67,15 +68,18 @@ export function ChatHistory({
       .select("*")
       .order("updated_at", { ascending: false });
     if (data) setConversations(data as Conversation[]);
+    setIsLoadingConvs(false);
   }, []);
 
   useEffect(() => {
     const load = async () => {
+      setIsLoadingConvs(true);
       const { data } = await supabase
         .from("conversations")
         .select("*")
         .order("updated_at", { ascending: false });
       if (data) setConversations(data as Conversation[]);
+      setIsLoadingConvs(false);
     };
     load();
   }, [refreshKey]);
@@ -111,6 +115,7 @@ export function ChatHistory({
     if (!error) {
       if (activeConversationId === id) {
         onSelectConversation(null);
+        try { localStorage.removeItem("nimbus-active-conv"); } catch { /* localStorage may be unavailable */ }
       }
       fetchConversations();
     }
@@ -179,7 +184,18 @@ export function ChatHistory({
 
             {/* Conversation List */}
             <div className="flex-1 overflow-y-auto px-2 pb-2">
-              {grouped.length === 0 && (
+              {isLoadingConvs && (
+                <div className="space-y-2 px-2 py-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg px-2 py-2 animate-pulse">
+                      <div className="h-4 w-4 rounded bg-[hsl(0_0%_15%)]" />
+                      <div className="flex-1 h-3 rounded bg-[hsl(0_0%_15%)]" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!isLoadingConvs && grouped.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <MessageCircle className="h-8 w-8 text-text-muted mb-2" />
                   <p className="text-xs text-text-muted">No conversations yet</p>

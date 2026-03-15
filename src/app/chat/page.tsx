@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ChatMessage } from "@/types";
+import { PersonalitySettings } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { DEFAULT_MODEL_ID } from "@/lib/models";
 import { sendChatStream } from "@/lib/chat-stream";
@@ -11,6 +12,24 @@ import { ChatHistory } from "@/components/chat/chat-history";
 import { ModelSelector } from "@/components/chat/model-selector";
 import { History } from "lucide-react";
 
+const ACTIVE_CONV_KEY = "nimbus-active-conv";
+const PERSONALITY_KEY = "nimbus-brain-personality";
+
+function getStoredConvId(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ACTIVE_CONV_KEY);
+}
+
+function getPersonality(): PersonalitySettings | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(PERSONALITY_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +38,26 @@ export default function ChatPage() {
   const [pendingToolCalls, setPendingToolCalls] = useState<{ name?: string; result?: string }[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [initialized, setInitialized] = useState(false);
+
+  // Restore activeConversationId from localStorage on mount
+  useEffect(() => {
+    const stored = getStoredConvId();
+    if (stored) {
+      setActiveConversationId(stored);
+    }
+    setInitialized(true);
+  }, []);
+
+  // Persist activeConversationId to localStorage
+  useEffect(() => {
+    if (!initialized) return;
+    if (activeConversationId) {
+      localStorage.setItem(ACTIVE_CONV_KEY, activeConversationId);
+    } else {
+      localStorage.removeItem(ACTIVE_CONV_KEY);
+    }
+  }, [activeConversationId, initialized]);
 
   // Load messages for the active conversation
   useEffect(() => {
@@ -33,7 +72,7 @@ export default function ChatPage() {
         .eq("conversation_id", activeConversationId)
         .order("created_at", { ascending: true })
         .limit(50);
-      if (data) setMessages(data as ChatMessage[]);
+      if (data) setMessages((data as ChatMessage[]).filter(m => m.content && m.content.trim() !== ''));
     };
     loadMessages();
   }, [activeConversationId]);
@@ -96,6 +135,8 @@ export default function ChatPage() {
       }[] = [];
       let finalModelUsed = "";
 
+      const personality = getPersonality();
+
       await sendChatStream(chatHistory, DEFAULT_MODEL_ID, (event) => {
         switch (event.type) {
           case "status":
@@ -126,12 +167,13 @@ export default function ChatPage() {
           case "error":
             throw new Error(event.message);
         }
-      });
+      }, personality ? (personality as unknown as Record<string, string>) : undefined);
 
       // Only add assistant message if there's actual content or tool calls
       if (finalContent.trim() || finalToolCalls.length > 0) {
-        const fallbackContent = finalToolCalls.length > 0 ? "(Aksi selesai)" : "(Tidak ada respons)";
-        const messageContent = finalContent || fallbackContent;
+        const messageContent = finalContent.trim()
+          ? finalContent
+          : (finalToolCalls.length > 0 ? "(Aksi selesai)" : "⚠️ Model tidak menghasilkan respons. Coba kirim ulang.");
         const assistantMessage: ChatMessage = {
           id: crypto.randomUUID(),
           conversation_id: conversationId || undefined,
