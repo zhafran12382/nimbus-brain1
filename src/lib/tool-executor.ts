@@ -8,14 +8,14 @@ interface SearchResult {
   snippet?: string;
 }
 
-function truncateSearchResults(results: SearchResult[], maxTotalChars = 2500): { title: string; url: string; snippet: string }[] {
+function truncateSearchResults(results: SearchResult[], maxTotalChars = 2500, maxSnippetChars = 300): { title: string; url: string; snippet: string }[] {
   let totalChars = 0;
   const truncated: { title: string; url: string; snippet: string }[] = [];
 
   for (const r of results) {
     if (totalChars >= maxTotalChars) break;
-    const snippet = (r.snippet || r.content || '').slice(0, 300);
-    totalChars += snippet.length + (r.title?.length || 0);
+    const snippet = (r.snippet || r.content || '').slice(0, maxSnippetChars);
+    totalChars += snippet.length + (r.title?.length || 0) + (r.url?.length || 0);
     truncated.push({
       title: r.title || 'Untitled',
       url: r.url || '',
