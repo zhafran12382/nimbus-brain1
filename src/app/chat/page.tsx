@@ -280,10 +280,12 @@ export default function ChatPage() {
       }
       const message =
         error instanceof Error ? error.message : "Terjadi kesalahan.";
+      // Provider errors already formatted with ⚠️ prefix — show as warning
+      const isProviderWarning = message.startsWith('⚠️');
       const errorMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: `❌ Error: ${message}`,
+        content: isProviderWarning ? message : `❌ Error: ${message}`,
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);

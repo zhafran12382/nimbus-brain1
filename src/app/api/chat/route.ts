@@ -185,6 +185,19 @@ HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
 
 const maxTokensMap: Record<string, number> = { flash: 256, search: 1024, think: 1500 };
 
+function formatProviderError(message: string): string {
+  if (message.includes('is not a valid model ID') || message.includes('not a valid model')) {
+    return '⚠️ Model tidak tersedia. Silakan pilih model lain.';
+  }
+  if (message.includes('Provider returned error')) {
+    return '⚠️ Provider sedang bermasalah. Coba lagi atau pilih model lain.';
+  }
+  if (message.includes('rate limit') || message.includes('429') || message.toLowerCase().includes('rate_limit')) {
+    return '⚠️ Batas penggunaan tercapai. Coba lagi nanti.';
+  }
+  return `⚠️ Terjadi kesalahan: ${message}`;
+}
+
 async function callProvider(providerId: ProviderId, modelId: string, messages: Record<string, unknown>[], useTools: boolean, maxTokens = 1024, signal?: AbortSignal) {
   const provider = getProviderConfig(providerId);
   if (!provider) throw new Error(`Provider "${providerId}" not found.`);
@@ -209,10 +222,19 @@ async function callProvider(providerId: ProviderId, modelId: string, messages: R
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `${provider.name} API error: ${response.status}`);
+    const rawMessage = err.error?.message || `${provider.name} API error: ${response.status}`;
+    throw new Error(formatProviderError(rawMessage));
   }
 
-  return response.json();
+  const data = await response.json();
+
+  // Check for error in response body (some providers return 200 with error payload)
+  if (data.type === 'error' || data.error) {
+    const rawMessage = data.message || data.error?.message || data.error || 'Unknown provider error';
+    throw new Error(formatProviderError(String(rawMessage)));
+  }
+
+  return data;
 }
 
 async function callProviderStream(
@@ -243,7 +265,8 @@ async function callProviderStream(
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `${provider.name} API error: ${response.status}`);
+    const rawMessage = err.error?.message || `${provider.name} API error: ${response.status}`;
+    throw new Error(formatProviderError(rawMessage));
   }
 
   if (!response.body) {
@@ -275,12 +298,23 @@ async function callProviderStream(
 
       try {
         const parsed = JSON.parse(data);
+
+        // Check for error in SSE chunk
+        if (parsed.type === 'error' || parsed.error) {
+          const rawMessage = parsed.message || parsed.error?.message || parsed.error || 'Unknown provider error';
+          throw new Error(formatProviderError(String(rawMessage)));
+        }
+
         const content = parsed.choices?.[0]?.delta?.content;
         if (content) {
           accumulated += content;
           onChunk(accumulated);
         }
       } catch (e) {
+        // Re-throw formatted provider errors
+        if (e instanceof Error && e.message.startsWith('⚠️')) {
+          throw e;
+        }
         console.log('[SSE Parse Error]', data, e);
       }
     }
