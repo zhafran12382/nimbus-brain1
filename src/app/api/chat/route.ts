@@ -267,20 +267,21 @@ async function callProviderStream(
 
     for (const line of lines) {
       const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      if (!trimmed || trimmed.startsWith(':')) continue;
+      if (!trimmed.startsWith('data:')) continue;
 
-      const data = trimmed.slice(6);
+      const data = trimmed.slice(5).trim();
       if (data === '[DONE]') continue;
 
       try {
         const parsed = JSON.parse(data);
-        const delta = parsed.choices?.[0]?.delta?.content;
-        if (delta) {
-          accumulated += delta;
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) {
+          accumulated += content;
           onChunk(accumulated);
         }
-      } catch {
-        // Skip unparseable chunks
+      } catch (e) {
+        console.log('[SSE Parse Error]', e);
       }
     }
   }
