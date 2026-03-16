@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { tools } from '@/lib/tools';
 import { executeTool } from '@/lib/tool-executor';
-import { getModelById } from '@/lib/models';
+import { getModelById, getProviderConfig, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
+import type { ProviderId } from '@/types';
 
 // Vercel Serverless: max 180 detik
 export const maxDuration = 180;
@@ -128,7 +129,7 @@ async function fetchMemoriesContext(): Promise<string> {
   }
 }
 
-async function extractMemories(recentMessages: Record<string, unknown>[], modelId: string) {
+async function extractMemories(recentMessages: Record<string, unknown>[], modelId: string, pId: ProviderId) {
   const extractPrompt = [
     {
       role: "system",
@@ -147,7 +148,7 @@ HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
     ...recentMessages
   ];
 
-  const data = await callMaia(modelId, extractPrompt, false);
+  const data = await callProvider(pId, modelId, extractPrompt, false);
   const result = data.choices[0]?.message?.content?.trim();
 
   if (!result || result === "NO_MEMORY") return;
@@ -184,7 +185,10 @@ HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
 
 const maxTokensMap: Record<string, number> = { flash: 256, search: 1024, think: 1500 };
 
-async function callMaia(modelId: string, messages: Record<string, unknown>[], useTools: boolean, maxTokens = 1024, signal?: AbortSignal) {
+async function callProvider(providerId: ProviderId, modelId: string, messages: Record<string, unknown>[], useTools: boolean, maxTokens = 1024, signal?: AbortSignal) {
+  const provider = getProviderConfig(providerId);
+  if (!provider) throw new Error(`Provider "${providerId}" not found.`);
+
   const body: Record<string, unknown> = {
     model: modelId,
     messages,
@@ -196,31 +200,32 @@ async function callMaia(modelId: string, messages: Record<string, unknown>[], us
     body.tool_choice = "auto";
   }
 
-  const response = await fetch(`${process.env.MAIA_BASE_URL}/chat/completions`, {
+  const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.MAIA_API_KEY}`,
-    },
+    headers: provider.getHeaders(),
     body: JSON.stringify(body),
     signal,
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Maia API error: ${response.status}`);
+    throw new Error(err.error?.message || `${provider.name} API error: ${response.status}`);
   }
 
   return response.json();
 }
 
-async function callMaiaStream(
+async function callProviderStream(
+  providerId: ProviderId,
   modelId: string,
   messages: Record<string, unknown>[],
   onChunk: (accumulated: string) => void,
   maxTokens = 1024,
   signal?: AbortSignal,
 ): Promise<string> {
+  const provider = getProviderConfig(providerId);
+  if (!provider) throw new Error(`Provider "${providerId}" not found.`);
+
   const body = {
     model: modelId,
     messages,
@@ -229,19 +234,16 @@ async function callMaiaStream(
     stream: true,
   };
 
-  const response = await fetch(`${process.env.MAIA_BASE_URL}/chat/completions`, {
+  const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.MAIA_API_KEY}`,
-    },
+    headers: provider.getHeaders(),
     body: JSON.stringify(body),
     signal,
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Maia API error: ${response.status}`);
+    throw new Error(err.error?.message || `${provider.name} API error: ${response.status}`);
   }
 
   if (!response.body) {
@@ -287,12 +289,15 @@ async function callMaiaStream(
 }
 
 export async function POST(req: NextRequest) {
-  const { messages, model: modelId, personality, conversationId: incomingConvId, mode = 'flash' } = await req.json();
+  const { messages, model: modelId = DEFAULT_MODEL_ID, personality, conversationId: incomingConvId, mode = 'flash', provider: incomingProvider } = await req.json();
   const signal = req.signal;
 
-  log('REQUEST', `model=${modelId}, messages=${messages.length}, convId=${incomingConvId || 'new'}, personality=${personality?.preset || 'none'}, mode=${mode}`);
-
+  // Resolve provider from request or model config
   const model = getModelById(modelId);
+  const providerId: ProviderId = incomingProvider || model?.providerId || DEFAULT_PROVIDER_ID;
+
+  log('REQUEST', `provider=${providerId}, model=${modelId}, messages=${messages.length}, convId=${incomingConvId || 'new'}, personality=${personality?.preset || 'none'}, mode=${mode}`);
+
   if (!model) {
     return new Response(
       JSON.stringify({ error: `Model "${modelId}" not found.` }),
@@ -354,13 +359,13 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        // --- STEP 1: Kirim ke Maia Router ---
+        // --- STEP 1: Kirim ke Provider ---
         send({ type: "status", text: "Thinking..." });
 
-        log('MAIA CALL', `Sending ${apiMessages.length} messages, useTools=${useTools}`);
-        const data = await callMaia(modelId, apiMessages, useTools, maxTokens, signal);
+        log('API CALL', `provider=${providerId}, Sending ${apiMessages.length} messages, useTools=${useTools}`);
+        const data = await callProvider(providerId, modelId, apiMessages, useTools, maxTokens, signal);
         let assistantMsg = data.choices[0].message;
-        log('MAIA RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
+        log('API RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
 
         const toolResults: { name: string; args: Record<string, unknown>; result: string }[] = [];
 
@@ -394,8 +399,8 @@ export async function POST(req: NextRequest) {
                   content: "Periksa kembali pesan user sebelumnya. Apakah ada permintaan atau aksi lain yang BELUM kamu jalankan? Jika ya, jalankan tool-nya sekarang. Jika semua sudah selesai, berikan respons final."
                 });
 
-                log('MAIA CALL', `Continuation check with ${toolCallMessages.length} messages`);
-                const checkData = await callMaia(modelId, toolCallMessages, useTools, maxTokens, signal);
+                log('API CALL', `Continuation check with ${toolCallMessages.length} messages`);
+                const checkData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, signal);
                 assistantMsg = checkData.choices[0].message;
 
                 log('TOOL LOOP', `Continuation check result: ${assistantMsg.tool_calls ? 'More tools needed' : 'All done'}`);
@@ -472,14 +477,14 @@ export async function POST(req: NextRequest) {
             const statusText = round < MAX_TOOL_ROUNDS - 1 ? "Generating response..." : "Finalizing...";
             send({ type: "status", text: statusText });
 
-            log('MAIA CALL', `Sending ${toolCallMessages.length} messages back to model...`);
+            log('API CALL', `Sending ${toolCallMessages.length} messages back to model...`);
 
             try {
-              const nextData = await callMaia(modelId, toolCallMessages, useTools, maxTokens, signal);
+              const nextData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, signal);
               assistantMsg = nextData.choices[0].message;
-              log('MAIA RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
-            } catch (maiaErr) {
-              logError('MAIA ERROR', `Failed to get response after tool round ${round}:`, maiaErr);
+              log('API RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
+            } catch (apiErr) {
+              logError('API ERROR', `Failed to get response after tool round ${round}:`, apiErr);
               break;
             }
           }
@@ -530,7 +535,7 @@ export async function POST(req: NextRequest) {
               }
             ];
 
-            finalContent = await callMaiaStream(modelId, retryMessages, (accumulated) => {
+            finalContent = await callProviderStream(providerId, modelId, retryMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
             }, maxTokens, signal);
             streamed = true;
@@ -552,7 +557,7 @@ export async function POST(req: NextRequest) {
                 content: `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan respons natural. JANGAN panggil tool.`
               });
             }
-            const streamedContent = await callMaiaStream(modelId, streamMessages, (accumulated) => {
+            const streamedContent = await callProviderStream(providerId, modelId, streamMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
             }, maxTokens, signal);
             if (streamedContent.trim()) {
@@ -570,7 +575,7 @@ export async function POST(req: NextRequest) {
         if (!streamed && !finalContent.trim() && allToolCalls.length === 0) {
           log('EMPTY RESP', 'Content empty, no tools. Streaming directly...');
           try {
-            finalContent = await callMaiaStream(modelId, apiMessages, (accumulated) => {
+            finalContent = await callProviderStream(providerId, modelId, apiMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
             }, maxTokens, signal);
             log('EMPTY RESP', `Direct stream result: "${finalContent.substring(0, 100)}..."`);
@@ -584,7 +589,7 @@ export async function POST(req: NextRequest) {
         if (!streamed && finalContent.trim() && allToolCalls.length === 0) {
           send({ type: "status", text: "Generating response..." });
           try {
-            const streamedContent = await callMaiaStream(modelId, apiMessages, (accumulated) => {
+            const streamedContent = await callProviderStream(providerId, modelId, apiMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
             }, maxTokens, signal);
             if (streamedContent.trim()) {
@@ -653,13 +658,14 @@ export async function POST(req: NextRequest) {
           content: finalContent,
           tool_calls: allToolCalls.length > 0 ? allToolCalls : undefined,
           model_used: modelId,
+          provider_used: providerId,
           conversationId: conversationId || undefined,
         });
 
         // --- STEP 7: Auto-extract memories (background, non-blocking) ---
         // Use last 6 messages for context (3 user + 3 assistant turns)
         const MEMORY_EXTRACTION_CONTEXT_SIZE = 6;
-        extractMemories(messages.slice(-MEMORY_EXTRACTION_CONTEXT_SIZE), modelId).catch(err =>
+        extractMemories(messages.slice(-MEMORY_EXTRACTION_CONTEXT_SIZE), modelId, providerId).catch(err =>
           logError('MEMORY', 'Auto-extract failed:', err)
         );
 

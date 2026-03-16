@@ -26,6 +26,7 @@ export interface ChatMessage {
   content: string;
   tool_calls?: ToolCallResult[];
   model_used?: string;
+  provider_used?: ProviderId;
   created_at: string;
 }
 
@@ -63,14 +64,27 @@ export interface PersonalitySettings {
   customInstructions: string;
 }
 
+export type ProviderId = 'maia' | 'openrouter';
+
+export interface ProviderConfig {
+  id: ProviderId;
+  name: string;
+  icon: string;
+  baseUrl: string;
+  getHeaders: () => Record<string, string>;
+}
+
 export interface AIModel {
   id: string;
   name: string;
   provider: string;
+  providerId: ProviderId;
   capabilities: ('chat' | 'vision' | 'functions' | 'reasoning')[];
   context_length: number | null;
   supports_tools: boolean;
   description: string;
+  category?: 'fast' | 'think' | 'code' | 'search';
+  badge?: string;
 }
 
 export interface Memory {

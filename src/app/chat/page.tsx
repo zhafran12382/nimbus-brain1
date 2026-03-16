@@ -5,7 +5,6 @@ import { ChatMessage } from "@/types";
 import { ChatMode } from "@/types";
 import { PersonalitySettings } from "@/types";
 import { supabase } from "@/lib/supabase";
-import { DEFAULT_MODEL_ID } from "@/lib/models";
 import { sendChatStream } from "@/lib/chat-stream";
 import { Header } from "@/components/layout/header";
 import { ChatContainer } from "@/components/chat/chat-container";
@@ -13,6 +12,7 @@ import { ChatHistory } from "@/components/chat/chat-history";
 import { ModelSelector } from "@/components/chat/model-selector";
 import { AssistantMessageState, getToolDisplay } from "@/components/chat/assistant-message";
 import { History } from "lucide-react";
+import { useModelSelection } from "@/hooks/useModelSelection";
 
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
 const PERSONALITY_KEY = "nimbus-brain-personality";
@@ -50,6 +50,7 @@ export default function ChatPage() {
   const [initialized, setInitialized] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>("flash");
   const abortControllerRef = useRef<AbortController | null>(null);
+  const { providerId, modelId, switchProvider, switchModel, availableModels, providers } = useModelSelection();
 
   // Restore activeConversationId and chatMode from localStorage on mount
   useEffect(() => {
@@ -158,13 +159,14 @@ export default function ChatPage() {
         result: string;
       }[] = [];
       let finalModelUsed = "";
+      let finalProviderUsed = providerId;
       let returnedConvId = conversationId;
 
       const personality = getPersonality();
 
       await sendChatStream(
         chatHistory,
-        DEFAULT_MODEL_ID,
+        modelId,
         (event) => {
           switch (event.type) {
             case "status":
@@ -220,7 +222,8 @@ export default function ChatPage() {
             case "done":
               finalContent = event.content || "";
               finalToolCalls = event.tool_calls || [];
-              finalModelUsed = event.model_used || DEFAULT_MODEL_ID;
+              finalModelUsed = event.model_used || modelId;
+              if (event.provider_used) finalProviderUsed = event.provider_used as typeof providerId;
               if (event.conversationId) {
                 returnedConvId = event.conversationId;
               }
@@ -234,6 +237,7 @@ export default function ChatPage() {
         conversationId,
         controller.signal,
         chatMode,
+        providerId,
       );
 
       // Skip adding assistant message if this request was aborted by a newer one
@@ -259,6 +263,7 @@ export default function ChatPage() {
           content: messageContent,
           tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
           model_used: finalModelUsed,
+          provider_used: finalProviderUsed,
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMessage]);
@@ -287,7 +292,7 @@ export default function ChatPage() {
       setStreamingState(null);
       abortControllerRef.current = null;
     }
-  }, [messages, activeConversationId, chatMode]);
+  }, [messages, activeConversationId, chatMode, modelId, providerId]);
 
   return (
     <div className="flex h-[100dvh] sm:h-screen">
@@ -314,7 +319,12 @@ export default function ChatPage() {
           >
             <History className="h-4 w-4" />
           </button>
-          <ModelSelector />
+          <ModelSelector
+            providerId={providerId}
+            modelId={modelId}
+            onProviderChange={switchProvider}
+            onModelChange={switchModel}
+          />
         </Header>
         <ChatContainer
           messages={messages}
