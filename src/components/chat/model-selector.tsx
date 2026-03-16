@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { AIModel, ProviderId } from "@/types";
-import { CLIENT_PROVIDERS, getModelsByProvider } from "@/lib/models";
+import { getModelsByProvider } from "@/lib/models";
 
 interface ModelSelectorProps {
   providerId: ProviderId;
   modelId: string;
-  onProviderChange: (id: ProviderId) => void;
   onModelChange: (id: string) => void;
+  /** Open the dropdown upward (for placement at bottom of screen) */
+  dropUp?: boolean;
 }
 
 function formatContext(ctx: number | null): string {
@@ -19,13 +20,12 @@ function formatContext(ctx: number | null): string {
   return `${ctx}`;
 }
 
-export function ModelSelector({ providerId, modelId, onProviderChange, onModelChange }: ModelSelectorProps) {
+export function ModelSelector({ providerId, modelId, onModelChange, dropUp = false }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const models = getModelsByProvider(providerId);
   const currentModel = models.find(m => m.id === modelId) || models[0];
-  const currentProvider = CLIENT_PROVIDERS.find(p => p.id === providerId);
 
   // Close on outside click
   useEffect(() => {
@@ -43,33 +43,20 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
       {/* Trigger */}
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-white/60 hover:bg-white/8 hover:text-white/80 transition-colors"
+        type="button"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-white/60 hover:bg-white/8 hover:text-white/80 transition-colors"
       >
-        <span>{currentProvider?.icon}</span>
-        <span className="max-w-[120px] truncate text-white/80 font-medium">{currentModel?.name || "Select model"}</span>
+        <span className="max-w-[100px] sm:max-w-[140px] truncate text-white/80 font-medium text-xs">{currentModel?.name || "Model"}</span>
         <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[320px] rounded-2xl border border-white/10 bg-[#1a1a2e] shadow-2xl z-50 overflow-hidden">
-          {/* Provider Tabs */}
-          <div className="flex border-b border-white/10">
-            {CLIENT_PROVIDERS.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => onProviderChange(p.id)}
-                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors ${
-                  providerId === p.id
-                    ? "text-white bg-white/10 border-b-2 border-blue-500"
-                    : "text-white/50 hover:text-white/70 hover:bg-white/5"
-                }`}
-              >
-                {p.icon} {p.name}
-              </button>
-            ))}
-          </div>
-
+        <div
+          className={`absolute right-0 w-[300px] rounded-2xl border border-white/10 bg-[#1a1a2e] shadow-2xl z-50 overflow-hidden ${
+            dropUp ? "bottom-full mb-2" : "top-full mt-2"
+          }`}
+        >
           {/* Model List */}
           <div className="max-h-[320px] overflow-y-auto p-1.5">
             {models.map((m) => (
