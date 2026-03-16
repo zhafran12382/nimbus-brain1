@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Plus, ChevronRight, Check, X, Sparkles, RotateCcw } from "lucide-react";
 import { Quiz, QuizAttempt } from "@/types";
 import { supabase } from "@/lib/supabase";
-
+import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -265,14 +265,14 @@ export default function StudyPage() {
 
   return (
     <div className="flex flex-col min-h-[100dvh]">
-      <div className="flex h-14 items-center gap-3 px-4 lg:px-6 border-b border-[hsl(0_0%_100%_/_0.04)]">
+      <Header title="">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-400">
             <BookOpen className="h-4 w-4 text-white" />
           </div>
-          <h1 className="font-semibold text-text-primary">Study</h1>
+          <span className="font-semibold text-text-primary">Study</span>
         </div>
-      </div>
+      </Header>
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto max-w-4xl space-y-6">
