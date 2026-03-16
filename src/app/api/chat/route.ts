@@ -179,6 +179,18 @@ HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
 }
 
 const maxTokensMap: Record<string, number> = { flash: 256, search: 1024, think: 1500 };
+const SIMULATED_STREAM_DELAY_MS = 20;
+const SENTENCE_SPLIT_REGEX = /[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g;
+
+async function simulateStream(content: string, send: (event: Record<string, unknown>) => void) {
+  const sentences = content.match(SENTENCE_SPLIT_REGEX) || [content];
+  let accumulated = "";
+  for (const sentence of sentences) {
+    accumulated += sentence;
+    send({ type: "chunk", content: accumulated });
+    await new Promise(resolve => setTimeout(resolve, SIMULATED_STREAM_DELAY_MS));
+  }
+}
 
 async function callMaia(modelId: string, messages: Record<string, unknown>[], useTools: boolean, maxTokens = 1024) {
   const body: Record<string, unknown> = {
@@ -237,7 +249,11 @@ async function callMaiaStream(
     throw new Error(err.error?.message || `Maia API error: ${response.status}`);
   }
 
-  const reader = response.body!.getReader();
+  if (!response.body) {
+    throw new Error('Response body is null');
+  }
+
+  const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let accumulated = '';
   let buffer = '';
@@ -546,24 +562,10 @@ export async function POST(req: NextRequest) {
             if (streamedContent.trim()) {
               finalContent = streamedContent;
             } else {
-              // Fallback: simulate stream from existing content
-              const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
-              let accumulated = "";
-              for (const sentence of sentences) {
-                accumulated += sentence;
-                send({ type: "chunk", content: accumulated });
-                await new Promise(resolve => setTimeout(resolve, 20));
-              }
+              await simulateStream(finalContent, send);
             }
           } catch {
-            // Fallback: simulate stream from existing content
-            const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
-            let accumulated = "";
-            for (const sentence of sentences) {
-              accumulated += sentence;
-              send({ type: "chunk", content: accumulated });
-              await new Promise(resolve => setTimeout(resolve, 20));
-            }
+            await simulateStream(finalContent, send);
           }
           streamed = true;
         }
@@ -592,24 +594,10 @@ export async function POST(req: NextRequest) {
             if (streamedContent.trim()) {
               finalContent = streamedContent;
             } else {
-              // Fallback: simulate stream from existing content
-              const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
-              let accumulated = "";
-              for (const sentence of sentences) {
-                accumulated += sentence;
-                send({ type: "chunk", content: accumulated });
-                await new Promise(resolve => setTimeout(resolve, 20));
-              }
+              await simulateStream(finalContent, send);
             }
           } catch {
-            // Fallback: simulate stream from existing content
-            const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
-            let accumulated = "";
-            for (const sentence of sentences) {
-              accumulated += sentence;
-              send({ type: "chunk", content: accumulated });
-              await new Promise(resolve => setTimeout(resolve, 20));
-            }
+            await simulateStream(finalContent, send);
           }
           streamed = true;
         }
