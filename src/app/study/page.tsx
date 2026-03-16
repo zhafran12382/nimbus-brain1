@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Plus, ChevronRight, Check, X, Sparkles, RotateCcw } from "lucide-react";
 import { Quiz, QuizAttempt } from "@/types";
 import { supabase } from "@/lib/supabase";
-import { QUIZ_DATA_REGEX } from "@/lib/constants";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -170,53 +169,19 @@ export default function StudyPage() {
 
     setIsGenerating(true);
     try {
-      // Generate quiz using the API (via chat endpoint with a direct tool call)
-      const response = await fetch("/api/chat", {
+      const response = await fetch("/api/quiz/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [
-            { role: "user", content: `Buat quiz tentang ${topic} ${numQuestions} soal difficulty ${difficulty}` }
-          ],
-          model: "gpt-4o-mini",
-          mode: "flash",
+          topic,
+          numQuestions,
+          difficulty,
         }),
       });
 
       if (!response.ok) throw new Error("Failed to generate quiz");
 
-      // Parse SSE response to get quiz data
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let quizData: Quiz | null = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith("data: ")) continue;
-
-          try {
-            const event = JSON.parse(trimmed.slice(6));
-            if (event.type === "done" && event.content) {
-              // Check for QUIZ_DATA in content
-              const match = event.content.match(QUIZ_DATA_REGEX);
-              if (match) {
-                quizData = JSON.parse(match[2]) as Quiz;
-              }
-            }
-          } catch {
-            // Skip malformed events
-          }
-        }
-      }
+      const quizData: Quiz = await response.json();
 
       if (quizData) {
         setGeneratedQuiz(quizData);
