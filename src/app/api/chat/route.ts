@@ -230,8 +230,8 @@ async function callProvider(providerId: ProviderId, modelId: string, messages: R
 
   // Check for error in response body (some providers return 200 with error payload)
   if (data.type === 'error' || data.error) {
-    const rawMessage = data.message || data.error?.message || data.error || 'Unknown provider error';
-    throw new Error(formatProviderError(String(rawMessage)));
+    const rawMessage = data.message || data.error?.message || (typeof data.error === 'string' ? data.error : JSON.stringify(data.error)) || 'Unknown provider error';
+    throw new Error(formatProviderError(rawMessage));
   }
 
   return data;
@@ -301,8 +301,8 @@ async function callProviderStream(
 
         // Check for error in SSE chunk
         if (parsed.type === 'error' || parsed.error) {
-          const rawMessage = parsed.message || parsed.error?.message || parsed.error || 'Unknown provider error';
-          throw new Error(formatProviderError(String(rawMessage)));
+          const rawMessage = parsed.message || parsed.error?.message || (typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error)) || 'Unknown provider error';
+          throw new Error(formatProviderError(rawMessage));
         }
 
         const content = parsed.choices?.[0]?.delta?.content;
