@@ -4,10 +4,26 @@ import { motion } from "framer-motion";
 import { ChatMessage as ChatMessageType } from "@/types";
 import { ActionBadge } from "./action-badge";
 import { messageBubble } from "@/lib/animations";
+import { QuizCard } from "./quiz-card";
 import Markdown from "react-markdown";
 
 interface ChatMessageProps {
   message: ChatMessageType;
+}
+
+// Parse QUIZ_DATA:: prefix from message content
+function parseQuizData(content: string): { quizData: unknown; remainingContent: string } | null {
+  const quizMatch = content.match(/QUIZ_DATA::([^:]+)::({[\s\S]*})/);
+  if (quizMatch) {
+    try {
+      const quizData = JSON.parse(quizMatch[2]);
+      const remainingContent = content.replace(/QUIZ_DATA::[^:]+::{[\s\S]*}/, "").trim();
+      return { quizData, remainingContent };
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
@@ -17,6 +33,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  // Check if this is a quiz message
+  const quizParsed = !isUser ? parseQuizData(message.content) : null;
 
   return (
     <motion.div
@@ -42,22 +61,35 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         )}
 
-        {/* Message bubble */}
-        <div
-          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-            isUser
-              ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm"
-              : "glass-card text-[hsl(0_0%_93%)] rounded-bl-sm"
-          }`}
-        >
-          {isUser ? (
-            <p className="whitespace-pre-wrap">{message.content}</p>
-          ) : (
-            <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
-              <Markdown>{message.content}</Markdown>
-            </div>
-          )}
-        </div>
+        {/* Quiz Card or Message bubble */}
+        {quizParsed ? (
+          <div className="w-full max-w-md">
+            <QuizCard quizData={quizParsed.quizData as { id: string; topic: string; difficulty: "easy" | "medium" | "hard"; total_questions: number; questions: { id: number; question: string; options: string[] }[] }} />
+            {quizParsed.remainingContent && (
+              <div className="glass-card text-[hsl(0_0%_93%)] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed mt-2">
+                <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                  <Markdown>{quizParsed.remainingContent}</Markdown>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+              isUser
+                ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm"
+                : "glass-card text-[hsl(0_0%_93%)] rounded-bl-sm"
+            }`}
+          >
+            {isUser ? (
+              <p className="whitespace-pre-wrap">{message.content}</p>
+            ) : (
+              <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
+                <Markdown>{message.content}</Markdown>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Timestamp & model info */}
         <div className="flex items-center gap-2 px-1">

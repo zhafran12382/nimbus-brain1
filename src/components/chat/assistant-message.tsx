@@ -45,6 +45,9 @@ function getToolDisplay(name: string, phase: "start" | "result"): { icon: string
     save_memory: { icon: "🧠", startText: "Remembering...", resultText: "Remembered" },
     get_memories: { icon: "🧠", startText: "Recalling memories...", resultText: "Memories loaded" },
     delete_memory: { icon: "🧠", startText: "Forgetting...", resultText: "Memory deleted" },
+    create_quiz: { icon: "📝", startText: "Generating quiz...", resultText: "Quiz ready!" },
+    get_quiz_history: { icon: "📚", startText: "Fetching quiz history...", resultText: "History loaded" },
+    get_quiz_stats: { icon: "📊", startText: "Analyzing study stats...", resultText: "Stats loaded" },
   };
   const config = map[name] || { icon: "⚡", startText: `Executing ${name}...`, resultText: `${name} complete` };
   return {

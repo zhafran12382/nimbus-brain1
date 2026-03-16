@@ -301,5 +301,49 @@ export const tools = [
         required: ["id"]
       }
     }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_quiz",
+      description: "Generate an interactive quiz from any topic. Use when user asks to create a quiz, practice questions, study test, atau latihan soal. AI generates multiple choice questions with correct answers and explanations.",
+      parameters: {
+        type: "object",
+        properties: {
+          topic: { type: "string", description: "Topik quiz yang ingin digenerate" },
+          num_questions: { type: "number", description: "Jumlah soal (default 5, min 3, max 20)" },
+          difficulty: {
+            type: "string",
+            enum: ["easy", "medium", "hard"],
+            description: "Tingkat kesulitan quiz (default: medium)"
+          }
+        },
+        required: ["topic"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_quiz_history",
+      description: "Get user's quiz history and stats. Use when user asks about past quizzes, scores, or study progress.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Jumlah maksimal quiz yang ditampilkan (default 10)" }
+        }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_quiz_stats",
+      description: "Get study statistics: average score, total quizzes taken, strongest/weakest topics. Use when user asks about study performance or progress.",
+      parameters: {
+        type: "object",
+        properties: {}
+      }
+    }
   }
 ];

@@ -70,6 +70,26 @@ CREATE TABLE IF NOT EXISTS memories (
   last_used_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 7. Quizzes table (Quiz Generator)
+CREATE TABLE IF NOT EXISTS quizzes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  topic TEXT NOT NULL,
+  difficulty TEXT NOT NULL DEFAULT 'medium' CHECK (difficulty IN ('easy', 'medium', 'hard')),
+  questions JSONB NOT NULL,
+  total_questions INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 8. Quiz Attempts table
+CREATE TABLE IF NOT EXISTS quiz_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id UUID REFERENCES quizzes(id) ON DELETE CASCADE,
+  score INTEGER NOT NULL,
+  total INTEGER NOT NULL,
+  answers JSONB NOT NULL,
+  completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ========================================
 -- Indexes
 -- ========================================
@@ -85,6 +105,10 @@ CREATE INDEX IF NOT EXISTS idx_incomes_category ON incomes(category);
 CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
 CREATE INDEX IF NOT EXISTS idx_memories_content ON memories USING gin(to_tsvector('simple', content));
+CREATE INDEX IF NOT EXISTS idx_quizzes_topic ON quizzes(topic);
+CREATE INDEX IF NOT EXISTS idx_quizzes_created ON quizzes(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz ON quiz_attempts(quiz_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_completed ON quiz_attempts(completed_at DESC);
 
 -- ========================================
 -- RLS Policies (allow all for simplicity)
@@ -96,6 +120,8 @@ DO $$ BEGIN
   ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
   ALTER TABLE incomes ENABLE ROW LEVEL SECURITY;
   ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE quiz_attempts ENABLE ROW LEVEL SECURITY;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
@@ -126,6 +152,16 @@ END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Allow all on memories" ON memories FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow all on quizzes" ON quizzes FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow all on quiz_attempts" ON quiz_attempts FOR ALL USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

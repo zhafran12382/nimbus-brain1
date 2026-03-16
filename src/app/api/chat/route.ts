@@ -38,6 +38,9 @@ const toolLabels: Record<string, string> = {
   save_memory: "🧠 Remembering...",
   get_memories: "🧠 Recalling memories...",
   delete_memory: "🧠 Forgetting...",
+  create_quiz: "📝 Generating quiz...",
+  get_quiz_history: "📚 Fetching quiz history...",
+  get_quiz_stats: "📊 Analyzing study stats...",
 };
 
 const BASE_SYSTEM_INSTRUCTION = `Kamu Nimbus — sahabat karib Zhafran. Bukan asisten formal, bukan robot.
