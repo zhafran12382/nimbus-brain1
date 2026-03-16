@@ -10,6 +10,21 @@ interface GenerateBody {
   difficulty?: 'easy' | 'medium' | 'hard';
 }
 
+interface RawQuestion {
+  question?: string;
+  options?: string[];
+  correct?: number;
+  explanation?: string;
+}
+
+interface ValidatedQuestion {
+  id: number;
+  question: string;
+  options: string[];
+  correct: number;
+  explanation: string;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: GenerateBody = await req.json();
@@ -23,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     const numQuestions = Math.min(20, Math.max(3, Number(rawNum) || 5));
-    const difficulty = (['easy', 'medium', 'hard'].includes(rawDiff || '') ? rawDiff : 'medium') as string;
+    const difficulty: 'easy' | 'medium' | 'hard' = (['easy', 'medium', 'hard'] as const).includes(rawDiff as 'easy' | 'medium' | 'hard') ? rawDiff! : 'medium';
 
     // Generate quiz questions using AI
     const quizPrompt = `Generate ${numQuestions} multiple choice questions tentang "${topic.trim()}", difficulty: ${difficulty}.
@@ -102,7 +117,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
     }
 
     // Validate and number questions
-    const validatedQuestions = questions.map((q: { question?: string; options?: string[]; correct?: number; explanation?: string }, idx: number) => {
+    const validatedQuestions: ValidatedQuestion[] = questions.map((q: RawQuestion, idx: number) => {
       if (!q.question || !Array.isArray(q.options) || q.options.length !== 4 ||
           typeof q.correct !== 'number' || q.correct < 0 || q.correct > 3 || !q.explanation) {
         throw new Error(`Invalid question format at index ${idx}`);
@@ -137,7 +152,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
     }
 
     // Return quiz data without correct answers/explanations for client
-    const clientQuestions = validatedQuestions.map((q: { id: number; question: string; options: string[] }) => ({
+    const clientQuestions = validatedQuestions.map((q: ValidatedQuestion) => ({
       id: q.id,
       question: q.question,
       options: q.options,
