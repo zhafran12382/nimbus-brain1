@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Wallet, Plus, Trash2 } from "lucide-react";
 import { Expense, Income } from "@/types";
 import { supabase } from "@/lib/supabase";
-import { Header } from "@/components/layout/header";
+
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -127,22 +127,25 @@ export default function FinancesPage() {
 
   return (
     <div className="flex flex-col min-h-[100dvh]">
-      <Header title="">
+      <div className="flex h-14 items-center gap-3 px-4 lg:px-6 border-b border-[hsl(0_0%_100%_/_0.04)]">
+        <h1 className="text-base font-semibold text-[hsl(0_0%_93%)]" />
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-400">
             <Wallet className="h-4 w-4 text-white" />
           </div>
           <span className="font-semibold text-text-primary">Finances</span>
         </div>
-        <Button
-          size="sm"
-          onClick={() => setFormOpen(true)}
-          className="gap-1.5"
-        >
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Add Transaction</span>
-        </Button>
-      </Header>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => setFormOpen(true)}
+            className="gap-1.5"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add Transaction</span>
+          </Button>
+        </div>
+      </div>
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto max-w-4xl space-y-6">

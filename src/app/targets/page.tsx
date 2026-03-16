@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Target } from "@/types";
 import { supabase } from "@/lib/supabase";
-import { Header } from "@/components/layout/header";
+
 import { TargetList } from "@/components/targets/target-list";
 import { TargetForm } from "@/components/targets/target-form";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,6 @@ export default function TargetsPage() {
   const [editTarget, setEditTarget] = useState<Target | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const fetchTargets = useCallback(async () => {
     let query = supabase
@@ -74,12 +73,15 @@ export default function TargetsPage() {
 
   return (
     <>
-      <Header title="🎯 Target Manager" onMenuClick={() => setSidebarOpen(!sidebarOpen)}>
-        <Button size="sm" onClick={() => { setEditTarget(null); setFormOpen(true); }}>
-          <Plus className="h-4 w-4 mr-1" />
-          Tambah Target
-        </Button>
-      </Header>
+      <div className="flex h-14 items-center gap-3 px-4 lg:px-6 border-b border-[hsl(0_0%_100%_/_0.04)]">
+        <h1 className="text-base font-semibold text-[hsl(0_0%_93%)]">🎯 Target Manager</h1>
+        <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" onClick={() => { setEditTarget(null); setFormOpen(true); }}>
+            <Plus className="h-4 w-4 mr-1" />
+            Tambah Target
+          </Button>
+        </div>
+      </div>
 
       <div className="p-4 lg:p-6 space-y-4">
         {/* Filters */}
