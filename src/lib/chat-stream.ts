@@ -8,6 +8,7 @@ export interface StreamEvent {
   result?: string;
   tool_calls?: { name: string; args: Record<string, unknown>; result: string }[];
   model_used?: string;
+  provider_used?: string;
   conversationId?: string;
 }
 
@@ -19,11 +20,13 @@ export async function sendChatStream(
   conversationId?: string | null,
   signal?: AbortSignal,
   mode?: string,
+  provider?: string,
 ): Promise<void> {
   const body: Record<string, unknown> = { messages, model };
   if (personality) body.personality = personality;
   if (conversationId) body.conversationId = conversationId;
   if (mode) body.mode = mode;
+  if (provider) body.provider = provider;
 
   const response = await fetch('/api/chat', {
     method: 'POST',

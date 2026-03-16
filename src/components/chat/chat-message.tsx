@@ -96,7 +96,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
         <div className="flex items-center gap-2 px-1">
           <span className="text-[10px] text-[hsl(0_0%_93%_/_0.4)]">{timestamp}</span>
           {!isUser && message.model_used && (
-            <span className="hidden sm:inline text-[10px] text-[hsl(0_0%_93%_/_0.3)]">{message.model_used}</span>
+            <span className="hidden sm:inline text-[10px] text-[hsl(0_0%_93%_/_0.3)]">
+              {message.provider_used === 'openrouter' ? '🔵' : '🟢'} {message.model_used}
+            </span>
           )}
         </div>
       </div>
