@@ -128,12 +128,11 @@ export default function FinancesPage() {
   return (
     <div className="flex flex-col min-h-[100dvh]">
       <div className="flex h-14 items-center gap-3 px-4 lg:px-6 border-b border-[hsl(0_0%_100%_/_0.04)]">
-        <h1 className="text-base font-semibold text-[hsl(0_0%_93%)]" />
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-400">
             <Wallet className="h-4 w-4 text-white" />
           </div>
-          <span className="font-semibold text-text-primary">Finances</span>
+          <h1 className="font-semibold text-text-primary">Finances</h1>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <Button

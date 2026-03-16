@@ -21,6 +21,9 @@ import { Conversation } from "@/types";
 import { supabase } from "@/lib/supabase";
 import type { ProviderId } from "@/types";
 
+/* ── Layout constants ── */
+const HEADER_HEIGHT = 49; // px
+
 /* ── Nav sections ── */
 const personalItems = [
   { href: "/expenses", label: "Keuangan", emoji: "💰" },
@@ -268,10 +271,10 @@ function Sidebar({
       {/* Sidebar panel */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-[70] flex w-[260px] flex-col bg-surface border-r border-border-subtle transition-transform duration-200 md:relative md:z-auto md:translate-x-0",
-          "top-[49px] md:top-0",
+          "fixed left-0 bottom-0 z-[70] flex w-[260px] flex-col bg-surface border-r border-border-subtle transition-transform duration-200 md:relative md:top-0 md:bottom-auto md:z-auto md:translate-x-0 md:h-auto",
           open ? "translate-x-0" : "-translate-x-full"
         )}
+        style={{ top: HEADER_HEIGHT }}
       >
         {/* New Chat button */}
         <div className="p-3">
@@ -368,7 +371,10 @@ function Sidebar({
 /* ── Header bar ── */
 function HeaderBar({ onMenuToggle }: { onMenuToggle: () => void }) {
   return (
-    <header className="sticky top-0 z-50 flex h-[49px] items-center gap-2 px-3 sm:px-4 glass border-b border-border-subtle">
+    <header
+      style={{ height: HEADER_HEIGHT }}
+      className="sticky top-0 z-50 flex items-center gap-2 px-3 sm:px-4 glass border-b border-border-subtle"
+    >
       {/* Mobile hamburger */}
       <button
         onClick={onMenuToggle}
