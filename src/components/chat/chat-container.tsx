@@ -6,7 +6,7 @@ import { ChatMessage as ChatMessageType } from "@/types";
 import { ChatMode } from "@/types";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
-import { ModeSelector } from "./mode-selector";
+import { ModeToggle } from "./mode-toggle";
 import { AssistantMessage, AssistantMessageState } from "./assistant-message";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { messageBubble } from "@/lib/animations";
@@ -92,7 +92,7 @@ export function ChatContainer({ messages, onSend, isLoading, streamingState, mod
       </ScrollArea>
       <div className="flex flex-col">
         <div className="mx-auto w-full max-w-3xl px-3 pt-2 sm:px-4">
-          <ModeSelector mode={mode} onModeChange={onModeChange} />
+          <ModeToggle value={mode} onChange={onModeChange} />
         </div>
         <ChatInput onSend={onSend} isLoading={isLoading} />
       </div>
