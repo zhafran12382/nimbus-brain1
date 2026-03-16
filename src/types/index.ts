@@ -72,3 +72,15 @@ export interface AIModel {
   supports_tools: boolean;
   description: string;
 }
+
+export interface Memory {
+  id: string;
+  content: string;
+  category: 'preference' | 'fact' | 'goal' | 'routine' | 'relationship' | 'general';
+  importance: number;
+  source: 'auto' | 'manual';
+  created_at: string;
+  last_used_at: string;
+}
+
+export type ChatMode = 'search' | 'think' | 'flash';

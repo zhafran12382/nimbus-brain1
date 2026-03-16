@@ -388,6 +388,63 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       return output;
     }
 
+    case 'save_memory': {
+      const content = String(args.content);
+      const category = String(args.category || 'general');
+      const importance = Math.min(10, Math.max(1, Number(args.importance) || 5));
+
+      const { error } = await supabase
+        .from('memories')
+        .insert({
+          content,
+          category,
+          importance,
+          source: 'manual',
+        });
+      if (error) return `Error: ${error.message}`;
+      return `🧠 Diingat: ${content}`;
+    }
+
+    case 'get_memories': {
+      const limit = Number(args.limit) || 10;
+      let query = supabase
+        .from('memories')
+        .select('*')
+        .order('importance', { ascending: false })
+        .order('last_used_at', { ascending: false })
+        .limit(limit);
+
+      if (args.query) {
+        query = query.ilike('content', `%${String(args.query)}%`);
+      }
+      if (args.category) {
+        query = query.eq('category', args.category as string);
+      }
+
+      const { data, error } = await query;
+      if (error) return `Error: ${error.message}`;
+      if (!data?.length) return '🧠 Belum ada memory tersimpan.';
+
+      // Update last_used_at for retrieved memories
+      const ids = data.map(m => m.id);
+      await supabase
+        .from('memories')
+        .update({ last_used_at: new Date().toISOString() })
+        .in('id', ids);
+
+      let output = `🧠 Memories (${data.length} found):\n`;
+      data.forEach((m, i) => {
+        output += `${i + 1}. ${m.content} (${m.category}, importance: ${m.importance}/10)\n`;
+      });
+      return output.trim();
+    }
+
+    case 'delete_memory': {
+      const { error } = await supabase.from('memories').delete().eq('id', args.id as string);
+      if (error) return `Error: ${error.message}`;
+      return '🧠 Memory dihapus.';
+    }
+
     default:
       return `Unknown tool: ${name}`;
   }
