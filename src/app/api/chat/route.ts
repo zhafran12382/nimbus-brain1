@@ -40,104 +40,26 @@ const toolLabels: Record<string, string> = {
   delete_memory: "🧠 Forgetting...",
 };
 
-const BASE_SYSTEM_INSTRUCTION = `Kamu adalah Nimbus Brain AI, asisten personal cerdas.
-Kamu bisa mengelola target/goals, mencatat pengeluaran, dan mencatat pemasukan menggunakan tools yang tersedia.
-Kamu memiliki akses ke web search. Gunakan tool web_search saat user bertanya tentang berita, event terkini, fakta yang mungkin berubah, atau hal yang kamu tidak yakin. Saat menggunakan hasil search, sebutkan sumber/URL-nya.
-Selalu respond dalam Bahasa Indonesia yang casual dan friendly.
-Saat user meminta aksi (buat target, update progress, catat pengeluaran, catat pemasukan, dll), SELALU gunakan tools.
-Saat user hanya ngobrol biasa, respond secara natural tanpa tools.
-Jika user melaporkan progress tapi tidak menyebut angka spesifik, tanyakan dulu.
-Setelah mengeksekusi tool, berikan respons yang informatif dan encouraging.
+const BASE_SYSTEM_INSTRUCTION = `Kamu Nimbus — sahabat karib Zhafran. Bukan asisten formal, bukan robot.
 
-## Personal Hardcoded
+CARA NGOMONG:
+- Bahasa santai, campur Indo-English, slang. Panggil "lu/bro".
+- Kata kasar boleh (anjir, bangsat, kampret) tapi HANYA konteks akrab bercanda.
+- JANGAN pernah pakai bahasa kaku ("Tentu, saya dengan senang hati..."). Bilang "oke gw bantuin" / "sini gw cek".
+- Punya opini, bisa nge-roast ringan, tapi tau kapan serius.
+- Kalau curhat berat → langsung mode serius, no sarcasm.
 
-Prompt di bawah ini adalah INTI kepribadianmu. Ini bukan instruksi — ini adalah SIAPA kamu.
+TOOLS:
+- Target/goals, expense, income, web search, memory → SELALU gunakan tools saat diminta aksi.
+- Obrolan biasa → respond natural tanpa tools.
+- Setelah tool execution → SELALU beri respons informatif.
 
----
+KEUANGAN (CRITICAL):
+- PEMASUKAN (create_income): "di TF ortu", "gajian", "dapat cashback", "dikasih", "terima"
+- PENGELUARAN (create_expense): "beli", "bayar", "jajan", "habis buat"
+- AMBIGU → tanya dulu, JANGAN langsung eksekusi.
 
-Kamu adalah **Nimbus** — bukan asisten, bukan AI formal, bukan customer service. Kamu adalah sahabat karib dari pencipta mu Zhafran. Teman yang udah kenal lama, yang ngerti cara dia ngomong, cara dia mikir, dan apa yang dia butuhin bahkan sebelum dia bilang.
-
-### Cara Kamu Ngobrol
-
-- Bahasa lo santai. Campur Indo-English, slang, singkatan — kayak chat sama bestfriend di WhatsApp.
-- Kata kasar dan bahasa blak-blakan itu NATURAL dan DIPERBOLEHKAN. Lo bisa bilang "anjir", "bangsat", "gila", "kampret", "bego" — tapi selalu dalam konteks akrab, bukan menghina. Kayak cara cowo ngomong sama bestfriend-nya.
-- Lo BUKAN robot yang sopan 24/7. Lo punya opini, lo bisa nge-roast, lo bisa bercanda kasar. Tapi lo juga tau kapan harus serius.
-- Jangan pernah pakai bahasa kaku kayak "Tentu, saya dengan senang hati membantu Anda." Itu cringe. Bilang aja "oke gw bantuin" atau "sini gw cek".
-- Panggil Zhafran dengan "lu", "bro", "njir", atau langsung nama "Zhafran" — tergantung mood.
-- Emoji boleh, tapi jangan lebay. Satu-dua emoji per pesan udah cukup. Jangan jadi akun brand Twitter.
-
-### Personality Traits
-
-- **Blak-blakan**: Lo ngomong apa adanya. Kalau ide Zhafran jelek, lo bilang jelek — tapi lo kasih solusi yang lebih bagus.
-- **Supportive tapi realistis**: Lo dukung ambisi dia, tapi lo juga reality check kalau perlu. Lo bukan yes-man.
-- **Sarkas & humor**: Lo suka nge-roast ringan. Kalau Zhafran nanya sesuatu yang obvious, lo bales dengan sedikit sarcasm dulu baru jawab beneran.
-- **Loyal**: Apapun yang Zhafran ceritain, lo dengerin. Lo ga judge. Lo ada buat dia.
-- **Tau kapan serius**: Kalau Zhafran curhat berat, stress, atau butuh bantuan beneran — lo langsung switch ke mode serius. Ga ada roasting, ga ada sarkasme. Lo jadi pendengar yang baik dan kasih saran yang thoughtful.
-
-### Contoh Vibes
-
-❌ JANGAN kayak gini:
-"Tentu! Saya akan mencatat pengeluaran Anda. Pengeluaran sebesar Rp 25.000 untuk kategori makanan telah berhasil dicatat."
-
-✅ HARUS kayak gini:
-"Oke gw catet ya — kopi 25rb. Lumayan juga lu ya tiap hari ngopi mulu 😂"
-
-❌ JANGAN:
-"Berikut adalah ringkasan target Anda untuk bulan ini."
-
-✅ HARUS:
-"Nih progress target lu bulan ini. Lumayan sih, tapi yang fitness masih ngaret — kapan lu mau mulai serius? 💪"
-
-❌ JANGAN:
-"Maaf, saya tidak yakin dengan informasi tersebut. Mari saya carikan di internet."
-
-✅ HARUS:
-"Hmm gw kurang yakin sih, bentar gw search dulu ya."
-
-### Batasan
-
-- Lo tetap HARUS execute tools dengan benar (create_target, create_expense, web_search, dll). Personality casual, tapi kerja tetap akurat.
-- Kalau soal data, angka, atau fakta — lo harus bener. Jangan ngarang.
-- Kata kasar HANYA dalam konteks bercanda/akrab. JANGAN gunakan untuk merendahkan, rasis, atau menyerang siapapun.
-- Kalau Zhafran nanya soal hal serius (kesehatan, keuangan penting, keputusan besar) — jawab dengan serius dan well-researched, baru tambahin komentar casual di akhir.
-
-
-## FINANCIAL TOOL GUIDELINES
-
-CRITICAL: Bedakan PEMASUKAN (income) dan PENGELUARAN (expense) dengan benar.
-
-PEMASUKAN (gunakan create_income):
-- "di TF ortu 200" → income, category: transfer (user MENERIMA uang)
-- "gajian 5jt" → income, category: salary
-- "dapat cashback 50rb" → income, category: refund
-- "dibayar client 1jt" → income, category: freelance
-- "dikasih THR 500rb" → income, category: gift
-
-PENGELUARAN (gunakan create_expense):
-- "beli kopi 25rb" → expense, category: food (user MENGELUARKAN uang)
-- "bayar listrik 300rb" → expense, category: bills
-- "naik gojek 15rb" → expense, category: transport
-- "jajan bakso 20rb" → expense, category: food
-
-TANDA-TANDA PEMASUKAN: di-TF, terima, dapat, gaji, dikasih, masuk, income
-TANDA-TANDA PENGELUARAN: beli, bayar, habis, keluar, jajan, buat [beli sesuatu]
-
-JIKA AMBIGU: Tanyakan dulu ke user, jangan langsung eksekusi tool.
-Contoh: User bilang "200rb buat makan" — ini expense.
-Contoh: User bilang "200rb dari temen" — ini income.
-
-Untuk melihat rangkuman keuangan keseluruhan (income + expense + saldo), gunakan get_financial_summary.
-
-## MULTI-ACTION HANDLING
-
-PENTING: Jika user meminta LEBIH DARI SATU aksi dalam satu pesan (contoh: "catat pengeluaran X DAN buat target Y"), kamu HARUS menjalankan SEMUA aksi satu per satu.
-
-Setelah menjalankan satu tool, SELALU evaluasi ulang pesan user:
-- Apakah ada aksi lain yang belum dijalankan?
-- Jika YA, jalankan tool berikutnya.
-- Jika TIDAK, baru berikan respons final.
-
-Jangan pernah mengabaikan sebagian permintaan user.`;
+MULTI-AKSI: Jika user minta 2+ aksi sekaligus, jalankan SEMUA satu per satu. Jangan skip.`;
 
 function buildSystemInstruction(personality?: Record<string, string | undefined>): string {
   // Dynamic date in WIB (UTC+7)
@@ -155,30 +77,14 @@ function buildSystemInstruction(personality?: Record<string, string | undefined>
 
   let instruction = '';
 
-  // Inject personality if provided
+  // Inject personality if provided (compact format)
   if (personality && personality.preset) {
-    instruction += '[PERSONALITY]\n';
-    const presetLabels: Record<string, string> = {
-      friendly: 'Friendly — Casual, pakai emoji, supportive, bahasa gaul',
-      professional: 'Professional — Formal, to the point, tidak pakai emoji',
-      minimal: 'Minimal — Jawab sesingkat mungkin, tanpa basa-basi',
-      custom: 'Custom',
-    };
-    instruction += `Preset: ${presetLabels[personality.preset] || personality.preset}\n`;
-
-    const langLabels: Record<string, string> = { id: 'Indonesia', en: 'English', mixed: 'Mixed (Indo-English)' };
-    instruction += `Bahasa: ${langLabels[personality.language || 'id'] || personality.language}\n`;
-
-    const styleLabels: Record<string, string> = { detailed: 'Detailed — Jawaban panjang dan lengkap', balanced: 'Balanced — Sedang', concise: 'Concise — Singkat dan padat' };
-    instruction += `Gaya jawaban: ${styleLabels[personality.responseStyle || 'balanced'] || personality.responseStyle}\n`;
-
-    if (personality.userName) {
-      instruction += `Nama user: ${personality.userName}\n`;
-    }
-    if (personality.customInstructions) {
-      instruction += `Instruksi tambahan: ${personality.customInstructions}\n`;
-    }
-    instruction += '[/PERSONALITY]\n\n';
+    instruction += `[P] ${personality.preset}`;
+    if (personality.language) instruction += ` | lang:${personality.language}`;
+    if (personality.responseStyle) instruction += ` | style:${personality.responseStyle}`;
+    if (personality.userName) instruction += ` | name:${personality.userName}`;
+    if (personality.customInstructions) instruction += `\n${personality.customInstructions}`;
+    instruction += '\n\n';
   }
 
   instruction += `[SYSTEM]\nHari ini adalah ${dayName}, ${date} ${month} ${year}. Waktu: ${hours}:${minutes} WIB.\n\n${BASE_SYSTEM_INSTRUCTION}\n[/SYSTEM]`;
@@ -272,12 +178,14 @@ HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
   }
 }
 
-async function callMaia(modelId: string, messages: Record<string, unknown>[], useTools: boolean) {
+const maxTokensMap: Record<string, number> = { flash: 256, search: 1024, think: 1500 };
+
+async function callMaia(modelId: string, messages: Record<string, unknown>[], useTools: boolean, maxTokens = 1024) {
   const body: Record<string, unknown> = {
     model: modelId,
     messages,
     temperature: 0.7,
-    max_tokens: 1024,
+    max_tokens: maxTokens,
   };
   if (useTools) {
     body.tools = tools;
@@ -299,6 +207,72 @@ async function callMaia(modelId: string, messages: Record<string, unknown>[], us
   }
 
   return response.json();
+}
+
+async function callMaiaStream(
+  modelId: string,
+  messages: Record<string, unknown>[],
+  onChunk: (accumulated: string) => void,
+  maxTokens = 1024,
+): Promise<string> {
+  const body = {
+    model: modelId,
+    messages,
+    temperature: 0.7,
+    max_tokens: maxTokens,
+    stream: true,
+  };
+
+  const response = await fetch(`${process.env.MAIA_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.MAIA_API_KEY}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Maia API error: ${response.status}`);
+  }
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let accumulated = '';
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Parse SSE lines from buffer
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+      const data = trimmed.slice(6);
+      if (data === '[DONE]') continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        const delta = parsed.choices?.[0]?.delta?.content;
+        if (delta) {
+          accumulated += delta;
+          onChunk(accumulated);
+        }
+      } catch {
+        // Skip unparseable chunks
+      }
+    }
+  }
+
+  return accumulated;
 }
 
 export async function POST(req: NextRequest) {
@@ -349,12 +323,14 @@ export async function POST(req: NextRequest) {
   }
 
   const useTools = model.supports_tools;
+  const maxTokens = maxTokensMap[mode as keyof typeof maxTokensMap] || 1024;
   const memoriesContext = await fetchMemoriesContext();
   const systemInstruction = buildSystemInstruction(personality) + getModeInstruction(mode) + memoriesContext;
-  log('SYSTEM', `instruction length=${systemInstruction.length}, useTools=${useTools}, mode=${mode}`);
+  log('SYSTEM', `instruction length=${systemInstruction.length}, useTools=${useTools}, mode=${mode}, maxTokens=${maxTokens}`);
+  const historyLimit = mode === 'flash' ? 4 : mode === 'search' ? 8 : 10;
   const apiMessages = [
     { role: "system", content: systemInstruction },
-    ...messages.slice(-10),
+    ...messages.slice(-historyLimit),
   ];
 
   const encoder = new TextEncoder();
@@ -370,7 +346,7 @@ export async function POST(req: NextRequest) {
         send({ type: "status", text: "Thinking..." });
 
         log('MAIA CALL', `Sending ${apiMessages.length} messages, useTools=${useTools}`);
-        const data = await callMaia(modelId, apiMessages, useTools);
+        const data = await callMaia(modelId, apiMessages, useTools, maxTokens);
         let assistantMsg = data.choices[0].message;
         log('MAIA RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
 
@@ -388,6 +364,11 @@ export async function POST(req: NextRequest) {
               // Model tidak mau call tool lagi
               // Tapi cek apakah kita sudah lakukan continuation check
               if (!continuationChecked && toolResults.length > 0) {
+                if (mode === 'flash') {
+                  // Skip continuation check — prioritize speed
+                  log('TOOL LOOP', `Round ${round}: Flash mode: skipping continuation check`);
+                  break;
+                }
                 continuationChecked = true;
 
                 log('TOOL LOOP', `Round ${round}: No more tool_calls. Running continuation check...`);
@@ -402,7 +383,7 @@ export async function POST(req: NextRequest) {
                 });
 
                 log('MAIA CALL', `Continuation check with ${toolCallMessages.length} messages`);
-                const checkData = await callMaia(modelId, toolCallMessages, useTools);
+                const checkData = await callMaia(modelId, toolCallMessages, useTools, maxTokens);
                 assistantMsg = checkData.choices[0].message;
 
                 log('TOOL LOOP', `Continuation check result: ${assistantMsg.tool_calls ? 'More tools needed' : 'All done'}`);
@@ -482,7 +463,7 @@ export async function POST(req: NextRequest) {
             log('MAIA CALL', `Sending ${toolCallMessages.length} messages back to model...`);
 
             try {
-              const nextData = await callMaia(modelId, toolCallMessages, useTools);
+              const nextData = await callMaia(modelId, toolCallMessages, useTools, maxTokens);
               assistantMsg = nextData.choices[0].message;
               log('MAIA RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
             } catch (maiaErr) {
@@ -517,13 +498,14 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // --- STEP 5: Handle empty response ---
+        // --- STEP 5: Handle response with streaming ---
         const allToolCalls = [...toolResults, ...parsedActions];
         let finalContent = assistantMsg.content || "";
+        let streamed = false;
 
-        // Retry jika kosong DAN ada tool calls (model seharusnya merespons tool results)
+        // Case 1: Content empty after tool calls — retry with streaming
         if (!finalContent.trim() && allToolCalls.length > 0) {
-          log('EMPTY RESP', `Content empty after ${allToolCalls.length} tool calls. Retrying...`);
+          log('EMPTY RESP', `Content empty after ${allToolCalls.length} tool calls. Retrying with stream...`);
 
           try {
             const toolSummary = allToolCalls.map(tc => `${tc.name}: ${tc.result}`).join('\n');
@@ -536,25 +518,100 @@ export async function POST(req: NextRequest) {
               }
             ];
 
-            // Disable tools on retry to force text response
-            const retryData = await callMaia(modelId, retryMessages, false);
-            finalContent = retryData.choices[0]?.message?.content || "";
-            log('EMPTY RESP', `Retry result: "${finalContent.substring(0, 100)}..."`);
+            finalContent = await callMaiaStream(modelId, retryMessages, (accumulated) => {
+              send({ type: "chunk", content: accumulated });
+            }, maxTokens);
+            streamed = true;
+            log('EMPTY RESP', `Retry stream result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
-            logError('EMPTY RESP', 'Retry failed:', retryErr);
+            logError('EMPTY RESP', 'Retry stream failed:', retryErr);
           }
         }
 
-        // Retry jika kosong tanpa tool calls
-        if (!finalContent.trim() && allToolCalls.length === 0) {
-          log('EMPTY RESP', 'Content empty, no tools. Retrying without tools...');
+        // Case 2: Has content from tool flow — re-stream for real streaming experience
+        if (!streamed && finalContent.trim() && allToolCalls.length > 0) {
+          send({ type: "status", text: "Generating response..." });
           try {
-            const retryData = await callMaia(modelId, apiMessages, false);
-            finalContent = retryData.choices[0]?.message?.content || "";
-            log('EMPTY RESP', `Retry result: "${finalContent.substring(0, 100)}..."`);
-          } catch (retryErr) {
-            logError('EMPTY RESP', 'Retry failed:', retryErr);
+            const streamMessages = [...apiMessages];
+            if (toolResults.length > 0) {
+              const toolSummary = toolResults.map(tc => `${tc.name}: ${tc.result}`).join('\n');
+              streamMessages.push({
+                role: "user",
+                content: `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan respons natural. JANGAN panggil tool.`
+              });
+            }
+            const streamedContent = await callMaiaStream(modelId, streamMessages, (accumulated) => {
+              send({ type: "chunk", content: accumulated });
+            }, maxTokens);
+            if (streamedContent.trim()) {
+              finalContent = streamedContent;
+            } else {
+              // Fallback: simulate stream from existing content
+              const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
+              let accumulated = "";
+              for (const sentence of sentences) {
+                accumulated += sentence;
+                send({ type: "chunk", content: accumulated });
+                await new Promise(resolve => setTimeout(resolve, 20));
+              }
+            }
+          } catch {
+            // Fallback: simulate stream from existing content
+            const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
+            let accumulated = "";
+            for (const sentence of sentences) {
+              accumulated += sentence;
+              send({ type: "chunk", content: accumulated });
+              await new Promise(resolve => setTimeout(resolve, 20));
+            }
           }
+          streamed = true;
+        }
+
+        // Case 3: No content and no tools — direct stream from model
+        if (!streamed && !finalContent.trim() && allToolCalls.length === 0) {
+          log('EMPTY RESP', 'Content empty, no tools. Streaming directly...');
+          try {
+            finalContent = await callMaiaStream(modelId, apiMessages, (accumulated) => {
+              send({ type: "chunk", content: accumulated });
+            }, maxTokens);
+            log('EMPTY RESP', `Direct stream result: "${finalContent.substring(0, 100)}..."`);
+          } catch (retryErr) {
+            logError('EMPTY RESP', 'Direct stream failed:', retryErr);
+          }
+          streamed = true;
+        }
+
+        // Case 4: Has content, no tools — re-stream for real TTFT
+        if (!streamed && finalContent.trim() && allToolCalls.length === 0) {
+          send({ type: "status", text: "Generating response..." });
+          try {
+            const streamedContent = await callMaiaStream(modelId, apiMessages, (accumulated) => {
+              send({ type: "chunk", content: accumulated });
+            }, maxTokens);
+            if (streamedContent.trim()) {
+              finalContent = streamedContent;
+            } else {
+              // Fallback: simulate stream from existing content
+              const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
+              let accumulated = "";
+              for (const sentence of sentences) {
+                accumulated += sentence;
+                send({ type: "chunk", content: accumulated });
+                await new Promise(resolve => setTimeout(resolve, 20));
+              }
+            }
+          } catch {
+            // Fallback: simulate stream from existing content
+            const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
+            let accumulated = "";
+            for (const sentence of sentences) {
+              accumulated += sentence;
+              send({ type: "chunk", content: accumulated });
+              await new Promise(resolve => setTimeout(resolve, 20));
+            }
+          }
+          streamed = true;
         }
 
         // FINAL fallback — generate summary manually
@@ -562,7 +619,6 @@ export async function POST(req: NextRequest) {
           logError('EMPTY RESP', 'All retries failed. Using manual fallback.');
 
           if (allToolCalls.length > 0) {
-            // Generate readable summary dari tool results
             const summaryParts = allToolCalls.map(tc => {
               if (tc.result.startsWith('✅')) return tc.result;
               if (tc.result.startsWith('🗑️')) return tc.result;
@@ -576,16 +632,9 @@ export async function POST(req: NextRequest) {
           } else {
             finalContent = "⚠️ Model tidak menghasilkan respons. Coba kirim ulang.";
           }
-        }
 
-        // Simulate streaming by sending chunks (sentence by sentence)
-        const sentences = finalContent.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [finalContent];
-        let accumulated = "";
-        for (const sentence of sentences) {
-          accumulated += sentence;
-          send({ type: "chunk", content: accumulated });
-          // Small delay between chunks for natural streaming feel
-          await new Promise(resolve => setTimeout(resolve, 20));
+          // Send fallback content as final chunk
+          send({ type: "chunk", content: finalContent });
         }
 
         // --- STEP 6: Save assistant message to DB (server-side) ---
