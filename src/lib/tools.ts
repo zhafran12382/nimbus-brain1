@@ -273,7 +273,7 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "get_memories",
-      description: "HANYA panggil tool ini jika user SECARA EKSPLISIT bertanya tentang memory. Contoh trigger: 'apa yang lu inget tentang gw?', 'coba inget', 'lu tau gak gw suka apa?', 'apa aja yang lu simpan?'. JANGAN panggil untuk: chat biasa, sapaan, pertanyaan umum, buat target/expense/income, web search. Memory sudah otomatis tersedia di context — TIDAK PERLU fetch ulang kecuali user explicitly minta.",
+      description: "HANYA panggil jika user EKSPLISIT minta recall memory, contoh: 'apa yang lu inget?', 'lu tau gak gw suka apa?', 'apa aja yang lu simpan?'. JANGAN panggil untuk chat biasa/sapaan/pertanyaan umum — memory sudah otomatis di-inject ke context.",
       parameters: {
         type: "object",
         properties: {
