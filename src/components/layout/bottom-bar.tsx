@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, Target, Wallet } from "lucide-react";
+import { MessageSquare, Target, Wallet, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
+  { href: "/study", label: "Study", icon: BookOpen },
   { href: "/expenses", label: "Finances", icon: Wallet },
   { href: "/targets", label: "Targets", icon: Target },
 ];

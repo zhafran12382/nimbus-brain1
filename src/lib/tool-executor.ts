@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { QUIZ_DATA_PREFIX } from './constants';
 
 function getPeriodDateRange(period: string): { startDate: string | null; endDate: string | null; periodLabel: string } {
   const now = new Date();
@@ -444,6 +445,243 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       const { error } = await supabase.from('memories').delete().eq('id', args.id as string);
       if (error) return `Error: ${error.message}`;
       return '🧠 Memory dihapus.';
+    }
+
+    case 'create_quiz': {
+      const topic = String(args.topic);
+      const numQuestions = Math.min(20, Math.max(3, Number(args.num_questions) || 5));
+      const difficulty = (args.difficulty as string) || 'medium';
+
+      // Generate quiz questions using AI
+      const quizPrompt = `Generate ${numQuestions} multiple choice questions tentang "${topic}", difficulty: ${difficulty}.
+
+IMPORTANT: Output HARUS berupa valid JSON array ONLY, tanpa teks lain. Setiap question object harus punya:
+- question (string): pertanyaan dalam Bahasa Indonesia
+- options (array of 4 strings): 4 pilihan jawaban dalam Bahasa Indonesia
+- correct (number 0-3): index jawaban benar
+- explanation (string): penjelasan singkat kenapa jawaban itu benar dalam Bahasa Indonesia
+
+Format EXACT yang diharapkan:
+[
+  {
+    "question": "Pertanyaan di sini?",
+    "options": ["Opsi A", "Opsi B", "Opsi C", "Opsi D"],
+    "correct": 1,
+    "explanation": "Penjelasan jawaban benar."
+  }
+]
+
+JSON ARRAY ONLY. NO other text before or after.`;
+
+      try {
+        const response = await fetch(`${process.env.MAIA_BASE_URL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.MAIA_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'You are a quiz generator. Output valid JSON only. No markdown, no explanation, just pure JSON array.' },
+              { role: 'user', content: quizPrompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000,
+          }),
+        });
+
+        if (!response.ok) {
+          return `Error: Gagal generate quiz (${response.status})`;
+        }
+
+        const data = await response.json();
+        let content = data.choices[0]?.message?.content?.trim() || '';
+
+        // Clean up potential markdown code blocks
+        content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+        // Parse JSON
+        let questions;
+        try {
+          questions = JSON.parse(content);
+        } catch {
+          // Try to extract JSON array from content
+          const jsonMatch = content.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            questions = JSON.parse(jsonMatch[0]);
+          } else {
+            return 'Error: Gagal parse quiz questions dari AI response.';
+          }
+        }
+
+        if (!Array.isArray(questions) || questions.length === 0) {
+          return 'Error: AI tidak menghasilkan questions yang valid.';
+        }
+
+        // Validate and number questions
+        const validatedQuestions = questions.map((q: { question?: string; options?: string[]; correct?: number; explanation?: string }, idx: number) => {
+          if (!q.question || !Array.isArray(q.options) || q.options.length !== 4 ||
+              typeof q.correct !== 'number' || q.correct < 0 || q.correct > 3 || !q.explanation) {
+            throw new Error(`Invalid question format at index ${idx}`);
+          }
+          return {
+            id: idx + 1,
+            question: q.question,
+            options: q.options,
+            correct: q.correct,
+            explanation: q.explanation,
+          };
+        });
+
+        // Save to database
+        const { data: quiz, error } = await supabase
+          .from('quizzes')
+          .insert({
+            topic,
+            difficulty,
+            questions: validatedQuestions,
+            total_questions: validatedQuestions.length,
+          })
+          .select()
+          .single();
+
+        if (error) return `Error: ${error.message}`;
+
+        // Return quiz data in special format for frontend to render as interactive UI
+        // We remove correct answers and explanations from client-side data
+        const clientQuestions = validatedQuestions.map((q: { id: number; question: string; options: string[] }) => ({
+          id: q.id,
+          question: q.question,
+          options: q.options,
+        }));
+
+        return `${QUIZ_DATA_PREFIX}${quiz.id}::${JSON.stringify({
+          id: quiz.id,
+          topic,
+          difficulty,
+          total_questions: validatedQuestions.length,
+          questions: clientQuestions,
+        })}`;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        return `Error generate quiz: ${msg}`;
+      }
+    }
+
+    case 'get_quiz_history': {
+      const limit = Number(args.limit) || 10;
+
+      // Get quizzes with their attempts
+      const { data: quizzes, error } = await supabase
+        .from('quizzes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) return `Error: ${error.message}`;
+      if (!quizzes?.length) return '📚 Belum ada riwayat quiz.';
+
+      // Get attempts for these quizzes
+      const quizIds = quizzes.map(q => q.id);
+      const { data: attempts } = await supabase
+        .from('quiz_attempts')
+        .select('*')
+        .in('quiz_id', quizIds)
+        .order('completed_at', { ascending: false });
+
+      const attemptsMap: Record<string, { score: number; total: number; completed_at: string }[]> = {};
+      for (const att of (attempts || [])) {
+        if (!attemptsMap[att.quiz_id]) attemptsMap[att.quiz_id] = [];
+        attemptsMap[att.quiz_id].push(att);
+      }
+
+      let output = `📚 Riwayat Quiz (${quizzes.length} quiz):\n\n`;
+      for (const quiz of quizzes) {
+        const quizAttempts = attemptsMap[quiz.id] || [];
+        const bestAttempt = quizAttempts.length > 0
+          ? quizAttempts.reduce((best, curr) => (curr.score / curr.total) > (best.score / best.total) ? curr : best)
+          : null;
+
+        const difficultyEmoji = quiz.difficulty === 'easy' ? '🟢' : quiz.difficulty === 'medium' ? '🟡' : '🔴';
+        output += `• ${quiz.topic} ${difficultyEmoji} (${quiz.total_questions} soal)\n`;
+        if (bestAttempt) {
+          const pct = Math.round((bestAttempt.score / bestAttempt.total) * 100);
+          output += `  Skor terbaik: ${bestAttempt.score}/${bestAttempt.total} (${pct}%)\n`;
+        } else {
+          output += `  Belum dikerjakan\n`;
+        }
+        output += `  Dibuat: ${new Date(quiz.created_at).toLocaleDateString('id-ID')}\n\n`;
+      }
+
+      return output.trim();
+    }
+
+    case 'get_quiz_stats': {
+      // Get all attempts
+      const { data: attempts, error: attError } = await supabase
+        .from('quiz_attempts')
+        .select('*');
+
+      if (attError) return `Error: ${attError.message}`;
+
+      // Get all quizzes
+      const { data: quizzes, error: quizError } = await supabase
+        .from('quizzes')
+        .select('*');
+
+      if (quizError) return `Error: ${quizError.message}`;
+
+      if (!attempts?.length) {
+        return '📊 Belum ada statistik belajar. Kerjakan quiz pertama untuk mulai tracking!';
+      }
+
+      const totalAttempts = attempts.length;
+      const totalScore = attempts.reduce((sum, a) => sum + a.score, 0);
+      const totalQuestions = attempts.reduce((sum, a) => sum + a.total, 0);
+      const avgScore = totalQuestions > 0 ? Math.round((totalScore / totalQuestions) * 100) : 0;
+
+      // Topic analysis
+      const quizMap: Record<string, { topic: string; difficulty: string }> = {};
+      for (const q of (quizzes || [])) {
+        quizMap[q.id] = { topic: q.topic, difficulty: q.difficulty };
+      }
+
+      const topicStats: Record<string, { correct: number; total: number; count: number }> = {};
+      for (const att of attempts) {
+        const quiz = quizMap[att.quiz_id];
+        if (!quiz) continue;
+        const topic = quiz.topic;
+        if (!topicStats[topic]) topicStats[topic] = { correct: 0, total: 0, count: 0 };
+        topicStats[topic].correct += att.score;
+        topicStats[topic].total += att.total;
+        topicStats[topic].count += 1;
+      }
+
+      const topicScores = Object.entries(topicStats)
+        .map(([topic, stats]) => ({
+          topic,
+          score: (stats.correct / stats.total) * 100,
+          count: stats.count,
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      const strongest = topicScores[0];
+      const weakest = topicScores[topicScores.length - 1];
+
+      let output = `📊 Statistik Belajar:\n\n`;
+      output += `📝 Total quiz dikerjakan: ${totalAttempts}\n`;
+      output += `📈 Rata-rata skor: ${avgScore}%\n`;
+      output += `✅ Total soal dijawab benar: ${totalScore}/${totalQuestions}\n\n`;
+
+      if (strongest && topicScores.length > 0) {
+        output += `🏆 Topik terkuat: ${strongest.topic} (${Math.round(strongest.score)}%)\n`;
+      }
+      if (weakest && topicScores.length > 1 && weakest.topic !== strongest?.topic) {
+        output += `📚 Perlu ditingkatkan: ${weakest.topic} (${Math.round(weakest.score)}%)\n`;
+      }
+
+      return output.trim();
     }
 
     default:

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { MessageSquare, Target, Settings, Wallet } from "lucide-react";
+import { MessageSquare, Target, Settings, Wallet, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hoverScale, tapShrink, SPRING_SNAPPY, TWEEN_FAST } from "@/lib/animations";
 
@@ -13,6 +13,7 @@ interface NavRailProps {
 
 const navItems = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
+  { href: "/study", label: "Study", icon: BookOpen },
   { href: "/expenses", label: "Finances", icon: Wallet },
   { href: "/targets", label: "Targets", icon: Target },
 ];

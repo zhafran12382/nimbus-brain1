@@ -83,4 +83,34 @@ export interface Memory {
   last_used_at: string;
 }
 
+export interface QuizQuestion {
+  id: number;
+  question: string;
+  options: string[];
+  correct: number;
+  explanation: string;
+}
+
+export interface Quiz {
+  id: string;
+  topic: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  questions: QuizQuestion[];
+  total_questions: number;
+  created_at: string;
+}
+
+export interface QuizAttempt {
+  id: string;
+  quiz_id: string;
+  score: number;
+  total: number;
+  answers: number[];
+  completed_at: string;
+}
+
+export interface QuizWithAttempt extends Quiz {
+  attempts?: QuizAttempt[];
+}
+
 export type ChatMode = 'search' | 'think' | 'flash';
