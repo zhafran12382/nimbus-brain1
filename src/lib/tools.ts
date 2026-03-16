@@ -273,7 +273,7 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "get_memories",
-      description: "Retrieve saved memories about the user. Use when you need context about user preferences, facts, or history to give better answers.",
+      description: "HANYA panggil jika user EKSPLISIT minta recall memory, contoh: 'apa yang lu inget?', 'lu tau gak gw suka apa?', 'apa aja yang lu simpan?'. JANGAN panggil untuk chat biasa/sapaan/pertanyaan umum — memory sudah otomatis di-inject ke context.",
       parameters: {
         type: "object",
         properties: {
