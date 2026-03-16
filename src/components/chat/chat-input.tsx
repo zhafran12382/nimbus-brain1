@@ -7,11 +7,9 @@ import { ArrowUp, Loader2 } from "lucide-react";
 interface ChatInputProps {
   onSend: (message: string) => void;
   isLoading: boolean;
-  /** Rendered to the right of the text input (e.g. model selector) */
-  trailing?: React.ReactNode;
 }
 
-export function ChatInput({ onSend, isLoading, trailing }: ChatInputProps) {
+export function ChatInput({ onSend, isLoading }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -27,7 +25,7 @@ export function ChatInput({ onSend, isLoading, trailing }: ChatInputProps) {
   const hasText = input.trim().length > 0;
 
   return (
-    <div className="border-t border-[hsl(0_0%_100%_/_0.04)] bg-surface/50" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+    <div className="glass border-t border-[hsl(0_0%_100%_/_0.04)]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       <form onSubmit={handleSubmit} className="mx-auto flex max-w-3xl items-center gap-2 p-3 sm:p-4">
         <div className={`flex flex-1 items-center rounded-xl border transition-all duration-200 ${
           focused
@@ -40,12 +38,11 @@ export function ChatInput({ onSend, isLoading, trailing }: ChatInputProps) {
             onChange={(e) => setInput(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            placeholder="Ketik pesan..."
+            placeholder="Tanya Nimbus Brain..."
             disabled={isLoading}
             className="flex-1 bg-transparent px-4 py-2.5 text-sm text-[hsl(0_0%_93%)] placeholder:text-[hsl(0_0%_30%)] focus:outline-none disabled:opacity-50"
           />
         </div>
-        {trailing}
         <motion.button
           type="submit"
           disabled={!hasText || isLoading}

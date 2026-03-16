@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-
+import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,9 +67,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col min-h-[100dvh]">
-      <div className="flex h-14 items-center gap-3 px-4 lg:px-6 border-b border-[hsl(0_0%_100%_/_0.04)]">
-        <h1 className="text-base font-semibold text-[hsl(0_0%_93%)]">⚙️ Settings</h1>
-      </div>
+      <Header title="⚙️ Settings" />
 
       <div className="flex-1 overflow-y-auto p-4">
         <motion.div
