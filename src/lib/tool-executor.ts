@@ -391,7 +391,8 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     case 'save_memory': {
       const content = String(args.content);
       const category = String(args.category || 'general');
-      const importance = Math.min(10, Math.max(1, Number(args.importance) || 5));
+      const rawImportance = Number(args.importance);
+      const importance = isNaN(rawImportance) ? 5 : Math.min(10, Math.max(1, rawImportance));
 
       const { error } = await supabase
         .from('memories')

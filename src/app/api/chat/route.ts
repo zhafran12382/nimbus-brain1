@@ -624,7 +624,9 @@ export async function POST(req: NextRequest) {
         });
 
         // --- STEP 7: Auto-extract memories (background, non-blocking) ---
-        extractMemories(messages.slice(-6), modelId).catch(err =>
+        // Use last 6 messages for context (3 user + 3 assistant turns)
+        const MEMORY_EXTRACTION_CONTEXT_SIZE = 6;
+        extractMemories(messages.slice(-MEMORY_EXTRACTION_CONTEXT_SIZE), modelId).catch(err =>
           logError('MEMORY', 'Auto-extract failed:', err)
         );
 
