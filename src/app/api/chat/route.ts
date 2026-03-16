@@ -281,7 +281,7 @@ async function callProviderStream(
           onChunk(accumulated);
         }
       } catch (e) {
-        console.log('[SSE Parse Error]', e);
+        console.log('[SSE Parse Error]', data, e);
       }
     }
   }
