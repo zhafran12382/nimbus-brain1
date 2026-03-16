@@ -455,6 +455,9 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
           {isContentVisible && displayContent && (
             <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
               <Markdown>{displayContent}</Markdown>
+              {phase === "streaming" && (
+                <span className="streaming-cursor" />
+              )}
             </div>
           )}
 

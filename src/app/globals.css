@@ -118,6 +118,22 @@ body {
 .dot-2 { animation: pulse-dot 1.2s ease-in-out 0.15s infinite; }
 .dot-3 { animation: pulse-dot 1.2s ease-in-out 0.3s infinite; }
 
+/* ── Streaming Cursor (ChatGPT-style blinking caret) ── */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: hsl(0 0% 45%);
+  border-radius: 1px;
+  animation: cursor-blink 0.8s ease-in-out infinite;
+}
+
 /* ── Logo Pulse ── */
 @keyframes logo-pulse {
   0%, 100% { transform: scale(1); }
