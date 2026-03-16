@@ -247,7 +247,7 @@ async function callProviderStream(
   }
 
   if (!response.body) {
-    throw new Error('Response body is null');
+    throw new Error('Model tidak merespon. Coba model lain.');
   }
 
   const reader = response.body.getReader();
@@ -267,22 +267,68 @@ async function callProviderStream(
 
     for (const line of lines) {
       const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('data: ')) continue;
 
-      const data = trimmed.slice(6);
-      if (data === '[DONE]') continue;
+      // Skip empty lines
+      if (!trimmed) continue;
+
+      // Skip SSE comments (e.g. ": OPENROUTER PROCESSING")
+      if (trimmed.startsWith(':')) continue;
+
+      // Only process lines starting with "data:" (with or without space)
+      if (!trimmed.startsWith('data:')) continue;
+
+      // Extract data payload: handle "data: ..." and "data:..." (with or without space)
+      const payload = trimmed.startsWith('data: ') ? trimmed.slice(6) : trimmed.slice(5);
+      const payloadTrimmed = payload.trim();
+
+      // Check for stream end signal
+      if (payloadTrimmed === '[DONE]') break;
+
+      // Skip empty payloads
+      if (!payloadTrimmed) continue;
 
       try {
-        const parsed = JSON.parse(data);
-        const delta = parsed.choices?.[0]?.delta?.content;
-        if (delta) {
-          accumulated += delta;
+        const parsed = JSON.parse(payloadTrimmed);
+        const choice = parsed.choices?.[0];
+        if (!choice) continue;
+
+        // Extract content from multiple possible locations (universal)
+        const content =
+          choice.delta?.content ??
+          choice.delta?.reasoning_content ??
+          choice.message?.content ??
+          choice.text ??
+          null;
+
+        // Skip chunks with null/undefined/empty content (e.g. role-only first chunk)
+        if (content != null && content !== '') {
+          accumulated += content;
           onChunk(accumulated);
         }
-      } catch {
-        // Skip unparseable chunks
+
+        // Handle tool calls in streaming mode (accumulate arguments)
+        const toolCalls = choice.delta?.tool_calls;
+        if (toolCalls && Array.isArray(toolCalls)) {
+          for (const tc of toolCalls) {
+            if (tc.function?.arguments) {
+              // Tool call arguments are streamed incrementally — accumulate them
+              // Store in a property on the parsed object for potential downstream use
+              log('STREAM TOOL', `Streaming tool call chunk: ${tc.function?.name || '(continuing)'}`);
+            }
+          }
+        }
+
+        // If finish_reason is "stop", stream is complete after this chunk
+        if (choice.finish_reason === 'stop') break;
+      } catch (parseErr) {
+        // Log parse error but continue streaming — don't stop on one bad chunk
+        log('PARSE WARN', `Skipping unparseable SSE chunk: ${payloadTrimmed.substring(0, 100)}`, parseErr);
       }
     }
+  }
+
+  if (!accumulated.trim()) {
+    log('STREAM EMPTY', `Stream completed with no content extracted for model=${modelId}`);
   }
 
   return accumulated;
