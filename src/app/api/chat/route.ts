@@ -184,7 +184,7 @@ HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
 
 const maxTokensMap: Record<string, number> = { flash: 256, search: 1024, think: 1500 };
 
-async function callMaia(modelId: string, messages: Record<string, unknown>[], useTools: boolean, maxTokens = 1024) {
+async function callMaia(modelId: string, messages: Record<string, unknown>[], useTools: boolean, maxTokens = 1024, signal?: AbortSignal) {
   const body: Record<string, unknown> = {
     model: modelId,
     messages,
@@ -203,6 +203,7 @@ async function callMaia(modelId: string, messages: Record<string, unknown>[], us
       'Authorization': `Bearer ${process.env.MAIA_API_KEY}`,
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!response.ok) {
@@ -218,6 +219,7 @@ async function callMaiaStream(
   messages: Record<string, unknown>[],
   onChunk: (accumulated: string) => void,
   maxTokens = 1024,
+  signal?: AbortSignal,
 ): Promise<string> {
   const body = {
     model: modelId,
@@ -234,6 +236,7 @@ async function callMaiaStream(
       'Authorization': `Bearer ${process.env.MAIA_API_KEY}`,
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!response.ok) {
@@ -285,6 +288,7 @@ async function callMaiaStream(
 
 export async function POST(req: NextRequest) {
   const { messages, model: modelId, personality, conversationId: incomingConvId, mode = 'flash' } = await req.json();
+  const signal = req.signal;
 
   log('REQUEST', `model=${modelId}, messages=${messages.length}, convId=${incomingConvId || 'new'}, personality=${personality?.preset || 'none'}, mode=${mode}`);
 
@@ -354,7 +358,7 @@ export async function POST(req: NextRequest) {
         send({ type: "status", text: "Thinking..." });
 
         log('MAIA CALL', `Sending ${apiMessages.length} messages, useTools=${useTools}`);
-        const data = await callMaia(modelId, apiMessages, useTools, maxTokens);
+        const data = await callMaia(modelId, apiMessages, useTools, maxTokens, signal);
         let assistantMsg = data.choices[0].message;
         log('MAIA RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
 
@@ -391,7 +395,7 @@ export async function POST(req: NextRequest) {
                 });
 
                 log('MAIA CALL', `Continuation check with ${toolCallMessages.length} messages`);
-                const checkData = await callMaia(modelId, toolCallMessages, useTools, maxTokens);
+                const checkData = await callMaia(modelId, toolCallMessages, useTools, maxTokens, signal);
                 assistantMsg = checkData.choices[0].message;
 
                 log('TOOL LOOP', `Continuation check result: ${assistantMsg.tool_calls ? 'More tools needed' : 'All done'}`);
@@ -471,7 +475,7 @@ export async function POST(req: NextRequest) {
             log('MAIA CALL', `Sending ${toolCallMessages.length} messages back to model...`);
 
             try {
-              const nextData = await callMaia(modelId, toolCallMessages, useTools, maxTokens);
+              const nextData = await callMaia(modelId, toolCallMessages, useTools, maxTokens, signal);
               assistantMsg = nextData.choices[0].message;
               log('MAIA RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
             } catch (maiaErr) {
@@ -528,7 +532,7 @@ export async function POST(req: NextRequest) {
 
             finalContent = await callMaiaStream(modelId, retryMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
-            }, maxTokens);
+            }, maxTokens, signal);
             streamed = true;
             log('EMPTY RESP', `Retry stream result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
@@ -550,7 +554,7 @@ export async function POST(req: NextRequest) {
             }
             const streamedContent = await callMaiaStream(modelId, streamMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
-            }, maxTokens);
+            }, maxTokens, signal);
             if (streamedContent.trim()) {
               finalContent = streamedContent;
             } else {
@@ -568,7 +572,7 @@ export async function POST(req: NextRequest) {
           try {
             finalContent = await callMaiaStream(modelId, apiMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
-            }, maxTokens);
+            }, maxTokens, signal);
             log('EMPTY RESP', `Direct stream result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
             logError('EMPTY RESP', 'Direct stream failed:', retryErr);
@@ -582,7 +586,7 @@ export async function POST(req: NextRequest) {
           try {
             const streamedContent = await callMaiaStream(modelId, apiMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
-            }, maxTokens);
+            }, maxTokens, signal);
             if (streamedContent.trim()) {
               finalContent = streamedContent;
             } else {

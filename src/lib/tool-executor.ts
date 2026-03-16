@@ -1,6 +1,31 @@
 import { supabase } from './supabase';
 import { QUIZ_DATA_PREFIX } from './constants';
 
+interface SearchResult {
+  title?: string;
+  url?: string;
+  content?: string;
+  snippet?: string;
+}
+
+function truncateSearchResults(results: SearchResult[], maxTotalChars = 2500, maxSnippetChars = 300): { title: string; url: string; snippet: string }[] {
+  let totalChars = 0;
+  const truncated: { title: string; url: string; snippet: string }[] = [];
+
+  for (const r of results) {
+    if (totalChars >= maxTotalChars) break;
+    const snippet = (r.snippet || r.content || '').slice(0, maxSnippetChars);
+    totalChars += snippet.length + (r.title?.length || 0) + (r.url?.length || 0);
+    truncated.push({
+      title: r.title || 'Untitled',
+      url: r.url || '',
+      snippet,
+    });
+  }
+
+  return truncated;
+}
+
 function getPeriodDateRange(period: string): { startDate: string | null; endDate: string | null; periodLabel: string } {
   const now = new Date();
   let startDate: string | null = null;
@@ -159,12 +184,12 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         const data = await tavilyRes.json();
         let output = `Web Search Results for "${query}":\n\n`;
         if (data.answer) {
-          output += `Answer: ${data.answer}\n\n`;
+          output += `Answer: ${data.answer.slice(0, 500)}\n\n`;
         }
         if (data.results && Array.isArray(data.results)) {
-          data.results.forEach((r: { title?: string; url?: string; content?: string }, i: number) => {
-            const snippet = r.content ? r.content.slice(0, 200) : '';
-            output += `${i + 1}. ${r.title || 'Untitled'} — ${r.url || ''}\n   ${snippet}\n\n`;
+          const truncated = truncateSearchResults(data.results);
+          truncated.forEach((r: { title: string; url: string; snippet: string }, i: number) => {
+            output += `${i + 1}. ${r.title} — ${r.url}\n   ${r.snippet}\n\n`;
           });
         }
         if (output === `Web Search Results for "${query}":\n\n`) {

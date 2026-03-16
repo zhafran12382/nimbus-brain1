@@ -109,6 +109,15 @@ export default function ChatPage() {
   const handleSend = useCallback(async (content: string) => {
     const conversationId = activeConversationId;
 
+    // 1. Abort any in-flight request from a previous send
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // 2. Reset streaming state before starting new request
+    setStreamingState(null);
+
     // Create optimistic user message (display immediately)
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -227,6 +236,9 @@ export default function ChatPage() {
         chatMode,
       );
 
+      // Skip adding assistant message if this request was aborted by a newer one
+      if (controller.signal.aborted) return;
+
       // Update conversationId if server created one
       if (returnedConvId && returnedConvId !== activeConversationId) {
         setActiveConversationId(returnedConvId);
@@ -258,7 +270,7 @@ export default function ChatPage() {
       }
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        // Aborted by navigation — server handles saving
+        // Aborted because user sent a new message or navigated away — not an error
         return;
       }
       const message =
