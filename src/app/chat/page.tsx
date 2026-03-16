@@ -2,26 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ChatMessage } from "@/types";
-import { ChatMode } from "@/types";
 import { PersonalitySettings } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { sendChatStream } from "@/lib/chat-stream";
-import { Header } from "@/components/layout/header";
 import { ChatContainer } from "@/components/chat/chat-container";
-import { ChatHistory } from "@/components/chat/chat-history";
-import { ModelSelector } from "@/components/chat/model-selector";
 import { AssistantMessageState, getToolDisplay } from "@/components/chat/assistant-message";
-import { History } from "lucide-react";
-import { useModelSelection } from "@/hooks/useModelSelection";
+import { useAppContext } from "@/contexts/app-context";
 
-const ACTIVE_CONV_KEY = "nimbus-active-conv";
 const PERSONALITY_KEY = "nimbus-brain-personality";
-const MODE_KEY = "nimbus-brain-chat-mode";
-
-function getStoredConvId(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(ACTIVE_CONV_KEY);
-}
 
 function getPersonality(): PersonalitySettings | null {
   if (typeof window === "undefined") return null;
@@ -33,34 +21,22 @@ function getPersonality(): PersonalitySettings | null {
   }
 }
 
-function getStoredMode(): ChatMode {
-  if (typeof window === "undefined") return "flash";
-  const stored = localStorage.getItem(MODE_KEY);
-  if (stored === "search" || stored === "think" || stored === "flash") return stored;
-  return "flash";
-}
-
 export default function ChatPage() {
+  const {
+    providerId,
+    modelId,
+    switchModel,
+    activeConversationId,
+    setActiveConversationId,
+    triggerRefresh,
+    chatMode,
+    handleModeChange,
+  } = useAppContext();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [streamingState, setStreamingState] = useState<AssistantMessageState | null>(null);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [initialized, setInitialized] = useState(false);
-  const [chatMode, setChatMode] = useState<ChatMode>("flash");
   const abortControllerRef = useRef<AbortController | null>(null);
-  const { providerId, modelId, switchProvider, switchModel, availableModels, providers } = useModelSelection();
-
-  // Restore activeConversationId and chatMode from localStorage on mount
-  useEffect(() => {
-    const stored = getStoredConvId();
-    if (stored) {
-      setActiveConversationId(stored);
-    }
-    setChatMode(getStoredMode());
-    setInitialized(true);
-  }, []);
 
   // Abort any in-flight request on unmount
   useEffect(() => {
@@ -68,16 +44,6 @@ export default function ChatPage() {
       abortControllerRef.current?.abort();
     };
   }, []);
-
-  // Persist activeConversationId to localStorage
-  useEffect(() => {
-    if (!initialized) return;
-    if (activeConversationId) {
-      localStorage.setItem(ACTIVE_CONV_KEY, activeConversationId);
-    } else {
-      localStorage.removeItem(ACTIVE_CONV_KEY);
-    }
-  }, [activeConversationId, initialized]);
 
   // Load messages for the active conversation
   useEffect(() => {
@@ -96,16 +62,6 @@ export default function ChatPage() {
     };
     loadMessages();
   }, [activeConversationId]);
-
-  const handleNewChat = useCallback(() => {
-    setActiveConversationId(null);
-    setMessages([]);
-  }, []);
-
-  const handleModeChange = useCallback((mode: ChatMode) => {
-    setChatMode(mode);
-    localStorage.setItem(MODE_KEY, mode);
-  }, []);
 
   const handleSend = useCallback(async (content: string) => {
     const conversationId = activeConversationId;
@@ -246,7 +202,7 @@ export default function ChatPage() {
       // Update conversationId if server created one
       if (returnedConvId && returnedConvId !== activeConversationId) {
         setActiveConversationId(returnedConvId);
-        setRefreshKey((k) => k + 1);
+        triggerRefresh();
       }
 
       // Add assistant message to local messages (already saved server-side)
@@ -271,7 +227,7 @@ export default function ChatPage() {
 
       // Refresh sidebar
       if (returnedConvId) {
-        setRefreshKey((k) => k + 1);
+        triggerRefresh();
       }
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -294,49 +250,19 @@ export default function ChatPage() {
       setStreamingState(null);
       abortControllerRef.current = null;
     }
-  }, [messages, activeConversationId, chatMode, modelId, providerId]);
+  }, [messages, activeConversationId, chatMode, modelId, providerId, setActiveConversationId, triggerRefresh]);
 
   return (
-    <div className="flex h-[100dvh] sm:h-screen">
-      {/* Chat History Sidebar */}
-      <ChatHistory
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        activeConversationId={activeConversationId}
-        onSelectConversation={setActiveConversationId}
-        onNewChat={handleNewChat}
-        refreshKey={refreshKey}
-      />
-
-      {/* Main Chat Area */}
-      <div className="flex flex-1 flex-col min-w-0">
-        <Header
-          title="💬 Chat"
-          onMenuClick={() => setHistoryOpen(!historyOpen)}
-        >
-          <button
-            onClick={() => setHistoryOpen(!historyOpen)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
-            title="Chat History"
-          >
-            <History className="h-4 w-4" />
-          </button>
-          <ModelSelector
-            providerId={providerId}
-            modelId={modelId}
-            onProviderChange={switchProvider}
-            onModelChange={switchModel}
-          />
-        </Header>
-        <ChatContainer
-          messages={messages}
-          onSend={handleSend}
-          isLoading={isLoading}
-          streamingState={streamingState}
-          mode={chatMode}
-          onModeChange={handleModeChange}
-        />
-      </div>
-    </div>
+    <ChatContainer
+      messages={messages}
+      onSend={handleSend}
+      isLoading={isLoading}
+      streamingState={streamingState}
+      mode={chatMode}
+      onModeChange={handleModeChange}
+      providerId={providerId}
+      modelId={modelId}
+      onModelChange={switchModel}
+    />
   );
 }
