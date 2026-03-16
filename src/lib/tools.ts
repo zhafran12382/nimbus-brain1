@@ -248,5 +248,58 @@ export const tools = [
         required: ["period"]
       }
     }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "save_memory",
+      description: "Save important information about the user to long-term memory. Use this when: 1) User explicitly asks to remember something ('inget ini', 'remember this', 'catat ya'), 2) User shares a significant personal fact (allergy, birthday, school, preference), 3) User states a strong preference or dislike. Do NOT save trivial conversation, greetings, or temporary information.",
+      parameters: {
+        type: "object",
+        properties: {
+          content: { type: "string", description: "Informasi yang disimpan, tulis sebagai fakta ringkas" },
+          category: {
+            type: "string",
+            enum: ["preference", "fact", "goal", "routine", "relationship", "general"],
+            description: "Kategori memory"
+          },
+          importance: { type: "number", description: "Seberapa penting info ini (1-10, default 5)" }
+        },
+        required: ["content", "category"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_memories",
+      description: "Retrieve saved memories about the user. Use when you need context about user preferences, facts, or history to give better answers.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Keyword filter untuk search memory" },
+          category: {
+            type: "string",
+            enum: ["preference", "fact", "goal", "routine", "relationship", "general"],
+            description: "Filter by category"
+          },
+          limit: { type: "number", description: "Jumlah maksimal hasil, default 10" }
+        }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "delete_memory",
+      description: "Delete a specific memory by ID. Use when user asks to forget something.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "ID memory yang akan dihapus" }
+        },
+        required: ["id"]
+      }
+    }
   }
 ];

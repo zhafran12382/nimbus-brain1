@@ -58,6 +58,18 @@ CREATE TABLE IF NOT EXISTS incomes (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 6. Memories table (AI Memory)
+CREATE TABLE IF NOT EXISTS memories (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  content TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'general'
+    CHECK (category IN ('preference', 'fact', 'goal', 'routine', 'relationship', 'general')),
+  importance INTEGER DEFAULT 5 CHECK (importance >= 1 AND importance <= 10),
+  source TEXT DEFAULT 'auto' CHECK (source IN ('auto', 'manual')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_used_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ========================================
 -- Indexes
 -- ========================================
@@ -70,6 +82,9 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date DESC);
 CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
 CREATE INDEX IF NOT EXISTS idx_incomes_date ON incomes(date DESC);
 CREATE INDEX IF NOT EXISTS idx_incomes_category ON incomes(category);
+CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance DESC);
+CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
+CREATE INDEX IF NOT EXISTS idx_memories_content ON memories USING gin(to_tsvector('simple', content));
 
 -- ========================================
 -- RLS Policies (allow all for simplicity)
@@ -80,6 +95,7 @@ DO $$ BEGIN
   ALTER TABLE targets ENABLE ROW LEVEL SECURITY;
   ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
   ALTER TABLE incomes ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
@@ -105,6 +121,11 @@ END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Allow all on incomes" ON incomes FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow all on memories" ON memories FOR ALL USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

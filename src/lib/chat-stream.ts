@@ -18,10 +18,12 @@ export async function sendChatStream(
   personality?: Record<string, string>,
   conversationId?: string | null,
   signal?: AbortSignal,
+  mode?: string,
 ): Promise<void> {
   const body: Record<string, unknown> = { messages, model };
   if (personality) body.personality = personality;
   if (conversationId) body.conversationId = conversationId;
+  if (mode) body.mode = mode;
 
   const response = await fetch('/api/chat', {
     method: 'POST',

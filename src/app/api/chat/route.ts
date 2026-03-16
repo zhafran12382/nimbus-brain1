@@ -4,8 +4,8 @@ import { executeTool } from '@/lib/tool-executor';
 import { getModelById } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
 
-// Vercel Serverless: max 60 detik
-export const maxDuration = 60;
+// Vercel Serverless: max 180 detik
+export const maxDuration = 180;
 export const dynamic = 'force-dynamic';
 
 function log(tag: string, ...args: unknown[]) {
@@ -35,6 +35,9 @@ const toolLabels: Record<string, string> = {
   get_income_summary: "📊 Analyzing income...",
   delete_income: "🗑️ Deleting income...",
   get_financial_summary: "📊 Analyzing finances...",
+  save_memory: "🧠 Remembering...",
+  get_memories: "🧠 Recalling memories...",
+  delete_memory: "🧠 Forgetting...",
 };
 
 const BASE_SYSTEM_INSTRUCTION = `Kamu adalah Nimbus Brain AI, asisten personal cerdas.
@@ -183,6 +186,92 @@ function buildSystemInstruction(personality?: Record<string, string | undefined>
   return instruction;
 }
 
+function getModeInstruction(mode: string): string {
+  switch (mode) {
+    case 'search':
+      return '\n\n[MODE: SEARCH]\nDalam mode ini, SELALU gunakan web_search terlebih dahulu sebelum menjawab pertanyaan faktual. Skip search HANYA untuk sapaan ringan atau perintah tool (buat target, catat expense, dll).\n[/MODE]';
+    case 'think':
+      return '\n\n[MODE: THINK]\nDalam mode ini, SELALU tunjukkan proses berpikirmu. Tulis reasoning di dalam tag <think>...</think> SEBELUM jawaban final. Berpikirlah step-by-step, analisis dari berbagai sudut, lalu simpulkan.\n[/MODE]';
+    case 'flash':
+      return '\n\n[MODE: FLASH]\nDalam mode ini, jawab CEPAT dan SINGKAT. Langsung ke inti. Maksimal 2-3 kalimat kecuali diminta lebih. Tidak perlu intro atau outro.\n[/MODE]';
+    default:
+      return '';
+  }
+}
+
+async function fetchMemoriesContext(): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from('memories')
+      .select('*')
+      .order('importance', { ascending: false })
+      .order('last_used_at', { ascending: false })
+      .limit(10);
+
+    if (!data || data.length === 0) return '';
+
+    const lines = data.map(m => `- ${m.content} (${m.category}, importance: ${m.importance})`);
+    return `\n\n[MEMORY]\nBerikut hal-hal yang kamu ingat tentang user:\n${lines.join('\n')}\n[/MEMORY]`;
+  } catch (err) {
+    logError('MEMORY', 'Failed to fetch memories:', err);
+    return '';
+  }
+}
+
+async function extractMemories(recentMessages: Record<string, unknown>[], modelId: string) {
+  const extractPrompt = [
+    {
+      role: "system",
+      content: `Analisis percakapan berikut. Apakah ada FAKTA PENTING tentang user yang perlu diingat untuk percakapan di masa depan?
+
+Rules:
+- Hanya extract fakta yang SIGNIFIKAN dan PERMANEN (bukan hal sementara)
+- Contoh SIMPAN: preferensi, alergi, birthday, sekolah, hobi, goals jangka panjang, kebiasaan
+- Contoh JANGAN SIMPAN: "hari ini capek", "lagi bosen", percakapan biasa, pertanyaan umum
+- Jika TIDAK ADA fakta penting, respond dengan tepat: "NO_MEMORY"
+- Jika ADA, respond HANYA dalam format JSON array:
+[{"content": "fakta ringkas", "category": "fact|preference|goal|routine|relationship|general", "importance": 1-10}]
+
+HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
+    },
+    ...recentMessages
+  ];
+
+  const data = await callMaia(modelId, extractPrompt, false);
+  const result = data.choices[0]?.message?.content?.trim();
+
+  if (!result || result === "NO_MEMORY") return;
+
+  try {
+    const memories = JSON.parse(result);
+    if (!Array.isArray(memories)) return;
+
+    for (const mem of memories) {
+      if (!mem.content || typeof mem.content !== 'string') continue;
+
+      // Check for duplicates
+      const { data: existing } = await supabase
+        .from('memories')
+        .select('id')
+        .ilike('content', `%${mem.content.substring(0, 30)}%`)
+        .limit(1);
+
+      if (existing && existing.length > 0) continue;
+
+      await supabase.from('memories').insert({
+        content: mem.content,
+        category: mem.category || 'general',
+        importance: Math.min(10, Math.max(1, mem.importance || 5)),
+        source: 'auto',
+      });
+
+      log('MEMORY', `Auto-saved: "${mem.content}"`);
+    }
+  } catch {
+    log('MEMORY', 'No extractable memories from this conversation');
+  }
+}
+
 async function callMaia(modelId: string, messages: Record<string, unknown>[], useTools: boolean) {
   const body: Record<string, unknown> = {
     model: modelId,
@@ -213,9 +302,9 @@ async function callMaia(modelId: string, messages: Record<string, unknown>[], us
 }
 
 export async function POST(req: NextRequest) {
-  const { messages, model: modelId, personality, conversationId: incomingConvId } = await req.json();
+  const { messages, model: modelId, personality, conversationId: incomingConvId, mode = 'flash' } = await req.json();
 
-  log('REQUEST', `model=${modelId}, messages=${messages.length}, convId=${incomingConvId || 'new'}, personality=${personality?.preset || 'none'}`);
+  log('REQUEST', `model=${modelId}, messages=${messages.length}, convId=${incomingConvId || 'new'}, personality=${personality?.preset || 'none'}, mode=${mode}`);
 
   const model = getModelById(modelId);
   if (!model) {
@@ -260,8 +349,9 @@ export async function POST(req: NextRequest) {
   }
 
   const useTools = model.supports_tools;
-  const systemInstruction = buildSystemInstruction(personality);
-  log('SYSTEM', `instruction length=${systemInstruction.length}, useTools=${useTools}`);
+  const memoriesContext = await fetchMemoriesContext();
+  const systemInstruction = buildSystemInstruction(personality) + getModeInstruction(mode) + memoriesContext;
+  log('SYSTEM', `instruction length=${systemInstruction.length}, useTools=${useTools}, mode=${mode}`);
   const apiMessages = [
     { role: "system", content: systemInstruction },
     ...messages.slice(-10),
@@ -532,6 +622,13 @@ export async function POST(req: NextRequest) {
           model_used: modelId,
           conversationId: conversationId || undefined,
         });
+
+        // --- STEP 7: Auto-extract memories (background, non-blocking) ---
+        // Use last 6 messages for context (3 user + 3 assistant turns)
+        const MEMORY_EXTRACTION_CONTEXT_SIZE = 6;
+        extractMemories(messages.slice(-MEMORY_EXTRACTION_CONTEXT_SIZE), modelId).catch(err =>
+          logError('MEMORY', 'Auto-extract failed:', err)
+        );
 
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Terjadi kesalahan.";

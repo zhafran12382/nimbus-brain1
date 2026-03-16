@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ChatMessage } from "@/types";
+import { ChatMode } from "@/types";
 import { PersonalitySettings } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { DEFAULT_MODEL_ID } from "@/lib/models";
@@ -15,6 +16,7 @@ import { History } from "lucide-react";
 
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
 const PERSONALITY_KEY = "nimbus-brain-personality";
+const MODE_KEY = "nimbus-brain-chat-mode";
 
 function getStoredConvId(): string | null {
   if (typeof window === "undefined") return null;
@@ -31,6 +33,13 @@ function getPersonality(): PersonalitySettings | null {
   }
 }
 
+function getStoredMode(): ChatMode {
+  if (typeof window === "undefined") return "flash";
+  const stored = localStorage.getItem(MODE_KEY);
+  if (stored === "search" || stored === "think" || stored === "flash") return stored;
+  return "flash";
+}
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,14 +48,16 @@ export default function ChatPage() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [initialized, setInitialized] = useState(false);
+  const [chatMode, setChatMode] = useState<ChatMode>("flash");
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Restore activeConversationId from localStorage on mount
+  // Restore activeConversationId and chatMode from localStorage on mount
   useEffect(() => {
     const stored = getStoredConvId();
     if (stored) {
       setActiveConversationId(stored);
     }
+    setChatMode(getStoredMode());
     setInitialized(true);
   }, []);
 
@@ -88,6 +99,11 @@ export default function ChatPage() {
   const handleNewChat = useCallback(() => {
     setActiveConversationId(null);
     setMessages([]);
+  }, []);
+
+  const handleModeChange = useCallback((mode: ChatMode) => {
+    setChatMode(mode);
+    localStorage.setItem(MODE_KEY, mode);
   }, []);
 
   const handleSend = useCallback(async (content: string) => {
@@ -208,6 +224,7 @@ export default function ChatPage() {
         personality ? (personality as unknown as Record<string, string>) : undefined,
         conversationId,
         controller.signal,
+        chatMode,
       );
 
       // Update conversationId if server created one
@@ -258,7 +275,7 @@ export default function ChatPage() {
       setStreamingState(null);
       abortControllerRef.current = null;
     }
-  }, [messages, activeConversationId]);
+  }, [messages, activeConversationId, chatMode]);
 
   return (
     <div className="flex h-[100dvh] sm:h-screen">
@@ -292,6 +309,8 @@ export default function ChatPage() {
           onSend={handleSend}
           isLoading={isLoading}
           streamingState={streamingState}
+          mode={chatMode}
+          onModeChange={handleModeChange}
         />
       </div>
     </div>
