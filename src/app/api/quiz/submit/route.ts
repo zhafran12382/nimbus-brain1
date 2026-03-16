@@ -79,13 +79,15 @@ export async function POST(req: NextRequest) {
 
     if (attemptError) {
       console.error('Failed to save quiz attempt:', attemptError);
-      // Don't fail the request, just log
+      // Include warning in response but don't fail the request
+      // User experience is prioritized over data consistency
     }
 
     return NextResponse.json({
       score,
       total: questions.length,
       results,
+      attemptSaved: !attemptError,
     });
   } catch (error) {
     console.error('Error submitting quiz:', error);

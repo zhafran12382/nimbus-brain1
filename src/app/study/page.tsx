@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Plus, ChevronRight, Check, X, Sparkles, RotateCcw } from "lucide-react";
 import { Quiz, QuizAttempt } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { QUIZ_DATA_REGEX } from "@/lib/constants";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { staggerItem } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
@@ -207,7 +207,7 @@ export default function StudyPage() {
             const event = JSON.parse(trimmed.slice(6));
             if (event.type === "done" && event.content) {
               // Check for QUIZ_DATA in content
-              const match = event.content.match(/QUIZ_DATA::([^:]+)::({[\s\S]*})/);
+              const match = event.content.match(QUIZ_DATA_REGEX);
               if (match) {
                 quizData = JSON.parse(match[2]) as Quiz;
               }

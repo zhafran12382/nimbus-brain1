@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { QUIZ_DATA_PREFIX } from './constants';
 
 function getPeriodDateRange(period: string): { startDate: string | null; endDate: string | null; periodLabel: string } {
   const now = new Date();
@@ -555,7 +556,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
           options: q.options,
         }));
 
-        return `QUIZ_DATA::${quiz.id}::${JSON.stringify({
+        return `${QUIZ_DATA_PREFIX}${quiz.id}::${JSON.stringify({
           id: quiz.id,
           topic,
           difficulty,

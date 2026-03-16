@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ChatMessage as ChatMessageType } from "@/types";
 import { ActionBadge } from "./action-badge";
 import { messageBubble } from "@/lib/animations";
+import { QUIZ_DATA_REGEX } from "@/lib/constants";
 import { QuizCard } from "./quiz-card";
 import Markdown from "react-markdown";
 
@@ -13,11 +14,11 @@ interface ChatMessageProps {
 
 // Parse QUIZ_DATA:: prefix from message content
 function parseQuizData(content: string): { quizData: unknown; remainingContent: string } | null {
-  const quizMatch = content.match(/QUIZ_DATA::([^:]+)::({[\s\S]*})/);
+  const quizMatch = content.match(QUIZ_DATA_REGEX);
   if (quizMatch) {
     try {
       const quizData = JSON.parse(quizMatch[2]);
-      const remainingContent = content.replace(/QUIZ_DATA::[^:]+::{[\s\S]*}/, "").trim();
+      const remainingContent = content.replace(QUIZ_DATA_REGEX, "").trim();
       return { quizData, remainingContent };
     } catch {
       return null;
