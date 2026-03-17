@@ -9,10 +9,10 @@ import { sendChatStream } from "@/lib/chat-stream";
 import { Header } from "@/components/layout/header";
 import { ChatContainer } from "@/components/chat/chat-container";
 import { ChatHistory } from "@/components/chat/chat-history";
-import { ModelSelector } from "@/components/chat/model-selector";
 import { AssistantMessageState, getToolDisplay } from "@/components/chat/assistant-message";
 import { History } from "lucide-react";
 import { useModelSelection } from "@/hooks/useModelSelection";
+import { CLIENT_PROVIDERS } from "@/lib/models";
 
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
 const PERSONALITY_KEY = "nimbus-brain-personality";
@@ -50,7 +50,7 @@ export default function ChatPage() {
   const [initialized, setInitialized] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>("flash");
   const abortControllerRef = useRef<AbortController | null>(null);
-  const { providerId, modelId, switchProvider, switchModel, availableModels, providers } = useModelSelection();
+  const { providerId, modelId, switchProvider, switchModel } = useModelSelection();
 
   // Restore activeConversationId and chatMode from localStorage on mount
   useEffect(() => {
@@ -306,6 +306,7 @@ export default function ChatPage() {
         onSelectConversation={setActiveConversationId}
         onNewChat={handleNewChat}
         refreshKey={refreshKey}
+        desktopVisible
       />
 
       {/* Main Chat Area */}
@@ -314,19 +315,27 @@ export default function ChatPage() {
           title="💬 Chat"
           onMenuClick={() => setHistoryOpen(!historyOpen)}
         >
+          <div className="hidden sm:flex items-center gap-2">
+            <span className="text-[11px] text-[hsl(0_0%_45%)]">Router</span>
+            <select
+              value={providerId}
+              onChange={(e) => switchProvider(e.target.value as typeof providerId)}
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 focus:outline-none"
+            >
+              {CLIENT_PROVIDERS.map((provider) => (
+                <option key={provider.id} value={provider.id} className="bg-[#1a1a2e]">
+                  {provider.icon} {provider.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={() => setHistoryOpen(!historyOpen)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors lg:hidden"
             title="Chat History"
           >
             <History className="h-4 w-4" />
           </button>
-          <ModelSelector
-            providerId={providerId}
-            modelId={modelId}
-            onProviderChange={switchProvider}
-            onModelChange={switchModel}
-          />
         </Header>
         <ChatContainer
           messages={messages}
@@ -335,6 +344,9 @@ export default function ChatPage() {
           streamingState={streamingState}
           mode={chatMode}
           onModeChange={handleModeChange}
+          providerId={providerId}
+          modelId={modelId}
+          onModelChange={switchModel}
         />
       </div>
     </div>
