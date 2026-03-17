@@ -42,6 +42,7 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
     <div className="relative" ref={ref}>
       {/* Trigger */}
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-white/60 hover:bg-white/8 hover:text-white/80 transition-colors"
       >
@@ -83,6 +84,7 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
 function ModelItem({ model, selected, onClick }: { model: AIModel; selected: boolean; onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`w-full text-left rounded-xl px-3 py-2 transition-colors ${
         selected
