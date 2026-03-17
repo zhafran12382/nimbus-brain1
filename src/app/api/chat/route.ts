@@ -102,7 +102,7 @@ function getModeInstruction(mode: string): string {
     case 'search':
       return '\n\n[MODE: SEARCH]\nDalam mode ini, SELALU gunakan web_search terlebih dahulu sebelum menjawab pertanyaan faktual. Skip search HANYA untuk sapaan ringan atau perintah tool (buat target, catat expense, dll).\n[/MODE]';
     case 'think':
-      return '\n\n[MODE: THINK]\nDalam mode ini, SELALU tunjukkan proses berpikirmu. Tulis reasoning di dalam tag <think>...</think> SEBELUM jawaban final. Berpikirlah step-by-step, analisis dari berbagai sudut, lalu simpulkan.\n[/MODE]';
+      return '\n\n[MODE: THINK]\nDalam mode ini, lakukan penalaran mendalam SECARA INTERNAL. JANGAN tampilkan proses berpikir atau chain-of-thought ke user, dan JANGAN gunakan tag <think> sama sekali. Berikan hanya jawaban final yang jelas, terstruktur, dan lengkap.\n[/MODE]';
     case 'flash':
       return '\n\n[MODE: FLASH]\nDalam mode ini, jawab CEPAT dan SINGKAT. Langsung ke inti. Maksimal 2-3 kalimat kecuali diminta lebih. Tidak perlu intro atau outro.\n[/MODE]';
     default:

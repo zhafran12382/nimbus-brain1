@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
-import { ChevronRight } from "lucide-react";
 
 // Phase state machine
 export type AssistantPhase = "thinking" | "tool_executing" | "streaming" | "complete";
@@ -174,100 +173,9 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
   );
 }
 
-// Thinking block for Think mode (DeepSeek/Qwen style)
-function ThinkingBlock({
-  thinkingContent,
-  isStreaming,
-  thinkingDuration,
-}: {
-  thinkingContent: string;
-  isStreaming: boolean;
-  thinkingDuration?: number;
-}) {
-  const [expanded, setExpanded] = useState(isStreaming);
-
-  useEffect(() => {
-    if (!isStreaming) {
-      // Collapse after thinking is done
-      const timer = setTimeout(() => setExpanded(false), 200);
-      return () => clearTimeout(timer);
-    } else {
-      setExpanded(true);
-    }
-  }, [isStreaming]);
-
-  return (
-    <div className="mb-3">
-      {/* Header */}
-      <button
-        onClick={() => !isStreaming && setExpanded(!expanded)}
-        className={`flex items-center gap-2 text-[13px] mb-1 ${isStreaming ? "cursor-default" : "cursor-pointer hover:opacity-80"}`}
-      >
-        {!isStreaming && (
-          <motion.div
-            animate={{ rotate: expanded ? 90 : 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <ChevronRight className="h-3 w-3 text-[hsl(190_80%_50%)]" />
-          </motion.div>
-        )}
-        <motion.span
-          animate={
-            isStreaming
-              ? { opacity: [0.5, 1, 0.5], scale: [0.95, 1.05, 0.95] }
-              : {}
-          }
-          transition={
-            isStreaming
-              ? { duration: 2, repeat: Infinity }
-              : {}
-          }
-        >
-          🧠
-        </motion.span>
-        <span className="text-[hsl(190_80%_50%)] font-medium">
-          {isStreaming
-            ? "Thinking..."
-            : `Thought for ${thinkingDuration ? `${thinkingDuration}s` : "a moment"}`}
-        </span>
-      </button>
-
-      {/* Content */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="overflow-hidden"
-          >
-            <div
-              className="border-l-2 border-[hsl(190_80%_50%)] pl-3 overflow-y-auto"
-              style={{
-                maxHeight: isStreaming ? 200 : 400,
-                background: "hsl(190 80% 50% / 0.03)",
-                borderRadius: "0 8px 8px 0",
-                padding: "8px 12px",
-                maskImage: isStreaming ? "linear-gradient(to bottom, black 70%, transparent 100%)" : undefined,
-                WebkitMaskImage: isStreaming ? "linear-gradient(to bottom, black 70%, transparent 100%)" : undefined,
-              }}
-            >
-              <p className="text-[13px] text-[hsl(0_0%_55%)] italic whitespace-pre-wrap">
-                {thinkingContent}
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 export function AssistantMessage({ state }: AssistantMessageProps) {
   const { phase, toolStatus, toolHistory, content, modelUsed, completedAt } = state;
   const [showMetadata, setShowMetadata] = useState(false);
-  const [thinkStartTime] = useState(() => Date.now());
 
   // Show metadata with delay after completion
   useEffect(() => {
@@ -294,21 +202,18 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
   const memoryTools = toolHistory.filter(t => t.name === "save_memory");
   const isMemoryStreaming = phase === "tool_executing" && toolStatus?.name === "save_memory" && !toolStatus.result;
 
-  // Parse <think> tags from content
-  const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/);
-  const thinkingContent = thinkMatch ? thinkMatch[1].trim() : null;
-  // Check if thinking is still streaming (no closing tag yet)
-  const hasOpenThink = content.includes("<think>") && !content.includes("</think>");
-  const openThinkContent = hasOpenThink ? content.split("<think>")[1]?.trim() : null;
-  const displayThinking = thinkingContent || openThinkContent;
-  const isThinkingStreaming = hasOpenThink;
-
-  // Response content without think tags
-  const responseContent = content.replace(/<think>[\s\S]*?<\/think>/, "").trim();
-  // If still thinking (no closing tag), don't show response yet
-  const displayContent = hasOpenThink ? "" : responseContent;
-
-  const thinkingDuration = thinkingContent ? Math.round((Date.now() - thinkStartTime) / 1000) : undefined;
+  // Strip any leaked <think> blocks before rendering response to user
+  const responseContent = (() => {
+    let sanitized = content;
+    if (sanitized.includes("</think>")) {
+      sanitized = sanitized.replace(/<think>[\s\S]*?<\/think>/g, "");
+    }
+    if (/^\s*<think>/.test(sanitized)) {
+      sanitized = sanitized.replace(/^\s*<think>[\s\S]*$/, "");
+    }
+    return sanitized.trim();
+  })();
+  const displayContent = responseContent;
 
   const isStatusVisible = phase === "thinking" || phase === "tool_executing";
   const isContentVisible = phase === "streaming" || phase === "complete";
@@ -443,15 +348,6 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
           ))}
           {isMemoryStreaming && toolStatus && (
             <MemoryCard tool={toolStatus} isStreaming={true} />
-          )}
-
-          {/* Thinking Block (Think mode) */}
-          {isContentVisible && displayThinking && (
-            <ThinkingBlock
-              thinkingContent={displayThinking}
-              isStreaming={isThinkingStreaming}
-              thinkingDuration={thinkingDuration}
-            />
           )}
 
           {/* Response Content (phases 4-5) */}
