@@ -37,32 +37,37 @@ function writeStorage(sel: StoredSelection) {
 export function useModelSelection() {
   const [providerId, setProviderId] = useState<ProviderId>(DEFAULT_PROVIDER_ID);
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
-  const [initialized, setInitialized] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Restore from localStorage on mount
+  // Restore from localStorage on mount ONLY (fixes hydration mismatch)
   useEffect(() => {
+    setIsMounted(true);
     const stored = readStorage();
     if (stored) {
-      // Validate stored provider exists
       const providerExists = CLIENT_PROVIDERS.some(p => p.id === stored.providerId);
       if (providerExists) {
+        setProviderId(stored.providerId);
+        
         const models = getModelsByProvider(stored.providerId);
         const modelExists = models.some(m => m.id === stored.modelId);
-        setProviderId(stored.providerId);
-        setModelId(modelExists ? stored.modelId : models[0]?.id || DEFAULT_MODEL_ID);
+        if (modelExists) {
+          setModelId(stored.modelId);
+        } else if (models.length > 0) {
+          setModelId(models[0].id);
+        }
       }
     }
-    setInitialized(true);
   }, []);
 
-  // Persist to localStorage when selection changes
+  // Persist to localStorage when selection changes, but only after mount
   useEffect(() => {
-    if (!initialized) return;
+    if (!isMounted) return;
     writeStorage({ providerId, modelId });
-  }, [providerId, modelId, initialized]);
+  }, [providerId, modelId, isMounted]);
 
   const switchProvider = useCallback((id: ProviderId) => {
     setProviderId(id);
+    // Auto-select first model of new provider
     const models = getModelsByProvider(id);
     if (models.length > 0) {
       setModelId(models[0].id);

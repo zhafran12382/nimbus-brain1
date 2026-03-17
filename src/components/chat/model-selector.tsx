@@ -52,24 +52,7 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[320px] rounded-2xl border border-white/10 bg-[#1a1a2e] shadow-2xl z-50 overflow-hidden">
-          {/* Provider Tabs */}
-          <div className="flex border-b border-white/10">
-            {CLIENT_PROVIDERS.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => onProviderChange(p.id)}
-                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors ${
-                  providerId === p.id
-                    ? "text-white bg-white/10 border-b-2 border-blue-500"
-                    : "text-white/50 hover:text-white/70 hover:bg-white/5"
-                }`}
-              >
-                {p.icon} {p.name}
-              </button>
-            ))}
-          </div>
-
+        <div className="absolute right-0 bottom-full mb-2 w-[320px] rounded-2xl border border-white/10 bg-[#1a1a2e] shadow-2xl z-50 overflow-hidden">
           {/* Model List */}
           <div className="max-h-[320px] overflow-y-auto p-1.5">
             {models.map((m) => (

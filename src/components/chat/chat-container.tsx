@@ -3,10 +3,9 @@
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChatMessage as ChatMessageType } from "@/types";
-import { ChatMode } from "@/types";
+import { ChatMode, ProviderId } from "@/types";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
-import { ModeToggle } from "./mode-toggle";
 import { AssistantMessage, AssistantMessageState } from "./assistant-message";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { messageBubble } from "@/lib/animations";
@@ -18,11 +17,27 @@ interface ChatContainerProps {
   streamingState?: AssistantMessageState | null;
   streamStatus?: string | null;
   pendingToolCalls?: { name?: string; result?: string }[];
+  /* Area Z pass-through */
   mode: ChatMode;
   onModeChange: (mode: ChatMode) => void;
+  providerId: ProviderId;
+  modelId: string;
+  onProviderChange: (id: ProviderId) => void;
+  onModelChange: (id: string) => void;
 }
 
-export function ChatContainer({ messages, onSend, isLoading, streamingState, mode, onModeChange }: ChatContainerProps) {
+export function ChatContainer({
+  messages,
+  onSend,
+  isLoading,
+  streamingState,
+  mode,
+  onModeChange,
+  providerId,
+  modelId,
+  onProviderChange,
+  onModelChange,
+}: ChatContainerProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,7 +87,7 @@ export function ChatContainer({ messages, onSend, isLoading, streamingState, mod
             <ChatMessage key={msg.id} message={msg} />
           ))}
 
-          {/* Streaming assistant response (Perplexity-style) */}
+          {/* Streaming assistant response */}
           <AnimatePresence>
             {isLoading && streamingState && (
               <motion.div
@@ -90,12 +105,18 @@ export function ChatContainer({ messages, onSend, isLoading, streamingState, mod
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
-      <div className="flex flex-col">
-        <div className="mx-auto w-full max-w-3xl px-3 pt-2 sm:px-4">
-          <ModeToggle value={mode} onChange={onModeChange} />
-        </div>
-        <ChatInput onSend={onSend} isLoading={isLoading} />
-      </div>
+
+      {/* Input area with integrated model/mode selectors (Area Z) */}
+      <ChatInput
+        onSend={onSend}
+        isLoading={isLoading}
+        mode={mode}
+        onModeChange={onModeChange}
+        providerId={providerId}
+        modelId={modelId}
+        onProviderChange={onProviderChange}
+        onModelChange={onModelChange}
+      />
     </div>
   );
 }

@@ -6,12 +6,11 @@ import { ChatMode } from "@/types";
 import { PersonalitySettings } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { sendChatStream } from "@/lib/chat-stream";
-import { Header } from "@/components/layout/header";
 import { ChatContainer } from "@/components/chat/chat-container";
-import { ChatHistory } from "@/components/chat/chat-history";
-import { ModelSelector } from "@/components/chat/model-selector";
+import { ChatSidebar } from "@/components/layout/chat-sidebar";
+import { RouterSelector } from "@/components/chat/router-selector";
 import { AssistantMessageState, getToolDisplay } from "@/components/chat/assistant-message";
-import { History } from "lucide-react";
+import { Menu, Settings } from "lucide-react";
 import { useModelSelection } from "@/hooks/useModelSelection";
 
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
@@ -43,22 +42,24 @@ function getStoredMode(): ChatMode {
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [streamingState, setStreamingState] = useState<AssistantMessageState | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [initialized, setInitialized] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>("flash");
   const abortControllerRef = useRef<AbortController | null>(null);
-  const { providerId, modelId, switchProvider, switchModel, availableModels, providers } = useModelSelection();
+  const { providerId, modelId, switchProvider, switchModel } = useModelSelection();
 
-  // Restore activeConversationId and chatMode from localStorage on mount
+  // Restore state from localStorage on mount
   useEffect(() => {
     const stored = getStoredConvId();
-    if (stored) {
-      setActiveConversationId(stored);
-    }
+    if (stored) setActiveConversationId(stored);
     setChatMode(getStoredMode());
+    // On mobile, start with sidebar closed
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
     setInitialized(true);
   }, []);
 
@@ -110,16 +111,13 @@ export default function ChatPage() {
   const handleSend = useCallback(async (content: string) => {
     const conversationId = activeConversationId;
 
-    // 1. Abort any in-flight request from a previous send
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
 
-    // 2. Reset streaming state before starting new request
     setStreamingState(null);
 
-    // Create optimistic user message (display immediately)
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       conversation_id: conversationId || undefined,
@@ -132,7 +130,6 @@ export default function ChatPage() {
     setMessages(newMessages);
     setIsLoading(true);
 
-    // Initialize streaming state for Perplexity-style animation
     const initialStreamState: AssistantMessageState = {
       phase: "thinking",
       toolStatus: null,
@@ -142,7 +139,6 @@ export default function ChatPage() {
     };
     setStreamingState(initialStreamState);
 
-    // AbortController for cleanup
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -240,16 +236,13 @@ export default function ChatPage() {
         providerId,
       );
 
-      // Skip adding assistant message if this request was aborted by a newer one
       if (controller.signal.aborted) return;
 
-      // Update conversationId if server created one
       if (returnedConvId && returnedConvId !== activeConversationId) {
         setActiveConversationId(returnedConvId);
         setRefreshKey((k) => k + 1);
       }
 
-      // Add assistant message to local messages (already saved server-side)
       if (finalContent.trim() || finalToolCalls.length > 0) {
         const messageContent = finalContent.trim()
           ? finalContent
@@ -269,18 +262,13 @@ export default function ChatPage() {
         setMessages((prev) => [...prev, assistantMessage]);
       }
 
-      // Refresh sidebar
       if (returnedConvId) {
         setRefreshKey((k) => k + 1);
       }
     } catch (error: unknown) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        // Aborted because user sent a new message or navigated away — not an error
-        return;
-      }
+      if (error instanceof DOMException && error.name === "AbortError") return;
       const message =
         error instanceof Error ? error.message : "Terjadi kesalahan.";
-      // Provider errors already formatted with ⚠️ prefix — show as warning
       const isProviderWarning = message.startsWith('⚠️');
       const errorMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -298,36 +286,50 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[100dvh] sm:h-screen">
-      {/* Chat History Sidebar */}
-      <ChatHistory
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
+      {/* Left: ChatSidebar (Area X + Y) */}
+      <ChatSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         activeConversationId={activeConversationId}
         onSelectConversation={setActiveConversationId}
         onNewChat={handleNewChat}
         refreshKey={refreshKey}
       />
 
-      {/* Main Chat Area */}
+      {/* Right: Main Chat Area */}
       <div className="flex flex-1 flex-col min-w-0">
-        <Header
-          title="💬 Chat"
-          onMenuClick={() => setHistoryOpen(!historyOpen)}
-        >
+        {/* Header with Area A (Router) */}
+        <header className="flex h-14 items-center gap-3 px-3 sm:px-4 border-b border-[hsl(0_0%_100%_/_0.04)] glass">
+          {/* Hamburger (mobile + sidebar toggle) */}
           <button
-            onClick={() => setHistoryOpen(!historyOpen)}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
-            title="Chat History"
           >
-            <History className="h-4 w-4" />
+            <Menu className="h-5 w-5" />
           </button>
-          <ModelSelector
+
+          {/* Area A: Router Selector */}
+          <RouterSelector
             providerId={providerId}
-            modelId={modelId}
             onProviderChange={switchProvider}
-            onModelChange={switchModel}
           />
-        </Header>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Settings (optional) */}
+          <button
+            onClick={() => {
+              /* Could open settings panel — currently handled by AppShell */
+            }}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
+            title="Settings"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+        </header>
+
+        {/* Chat Container */}
         <ChatContainer
           messages={messages}
           onSend={handleSend}
@@ -335,6 +337,10 @@ export default function ChatPage() {
           streamingState={streamingState}
           mode={chatMode}
           onModeChange={handleModeChange}
+          providerId={providerId}
+          modelId={modelId}
+          onProviderChange={switchProvider}
+          onModelChange={switchModel}
         />
       </div>
     </div>
