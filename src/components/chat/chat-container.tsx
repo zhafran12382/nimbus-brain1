@@ -3,7 +3,7 @@
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChatMessage as ChatMessageType } from "@/types";
-import { ChatMode, ProviderId } from "@/types";
+import { ChatMode, GroqRateLimit, ProviderId } from "@/types";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 import { AssistantMessage, AssistantMessageState } from "./assistant-message";
@@ -24,6 +24,7 @@ interface ChatContainerProps {
   modelId: string;
   onProviderChange: (id: ProviderId) => void;
   onModelChange: (id: string) => void;
+  groqRateLimit: GroqRateLimit | null;
 }
 
 export function ChatContainer({
@@ -37,6 +38,7 @@ export function ChatContainer({
   modelId,
   onProviderChange,
   onModelChange,
+  groqRateLimit,
 }: ChatContainerProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -116,6 +118,7 @@ export function ChatContainer({
         modelId={modelId}
         onProviderChange={onProviderChange}
         onModelChange={onModelChange}
+        groqRateLimit={groqRateLimit}
       />
     </div>
   );

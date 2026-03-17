@@ -64,7 +64,16 @@ export interface PersonalitySettings {
   customInstructions: string;
 }
 
-export type ProviderId = 'maia' | 'openrouter';
+export type ProviderId = 'maia' | 'openrouter' | 'groq';
+
+export interface GroqRateLimit {
+  limitRequests?: number;
+  remainingRequests?: number;
+  limitTokens?: number;
+  remainingTokens?: number;
+  resetRequests?: string;
+  resetTokens?: string;
+}
 
 export interface ProviderConfig {
   id: ProviderId;

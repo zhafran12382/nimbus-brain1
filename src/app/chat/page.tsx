@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChatMessage } from "@/types";
+import { ChatMessage, GroqRateLimit, ProviderId } from "@/types";
 import { ChatMode } from "@/types";
 import { PersonalitySettings } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -48,6 +48,7 @@ export default function ChatPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [initialized, setInitialized] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>("flash");
+  const [groqRateLimit, setGroqRateLimit] = useState<GroqRateLimit | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { providerId, modelId, switchProvider, switchModel } = useModelSelection();
 
@@ -107,6 +108,13 @@ export default function ChatPage() {
     setChatMode(mode);
     localStorage.setItem(MODE_KEY, mode);
   }, []);
+
+  const handleProviderChange = useCallback((id: ProviderId) => {
+    if (id !== "groq") {
+      setGroqRateLimit(null);
+    }
+    switchProvider(id);
+  }, [switchProvider]);
 
   const handleSend = useCallback(async (content: string) => {
     const conversationId = activeConversationId;
@@ -225,6 +233,10 @@ export default function ChatPage() {
               }
               break;
 
+            case "rate_limit":
+              setGroqRateLimit(event.rate_limit || null);
+              break;
+
             case "error":
               throw new Error(event.message);
           }
@@ -311,7 +323,7 @@ export default function ChatPage() {
           {/* Area A: Router Selector */}
           <RouterSelector
             providerId={providerId}
-            onProviderChange={switchProvider}
+            onProviderChange={handleProviderChange}
           />
 
           {/* Spacer */}
@@ -339,8 +351,9 @@ export default function ChatPage() {
           onModeChange={handleModeChange}
           providerId={providerId}
           modelId={modelId}
-          onProviderChange={switchProvider}
+          onProviderChange={handleProviderChange}
           onModelChange={switchModel}
+          groqRateLimit={groqRateLimit}
         />
       </div>
     </div>

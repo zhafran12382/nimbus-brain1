@@ -20,6 +20,13 @@ export async function GET() {
   };
 
   // Check Tavily env var
+  const groqKey = process.env.GROQ_API_KEY;
+  checks.groq = {
+    status: groqKey ? 'ok' : 'missing',
+    detail: `Key: ${groqKey ? 'set' : 'missing'}`,
+  };
+
+  // Check Tavily env var
   const tavilyKey = process.env.TAVILY_API_KEY;
   checks.tavily = {
     status: tavilyKey ? 'ok' : 'not_set',
