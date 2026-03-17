@@ -24,7 +24,7 @@ function formatReset(raw?: string): string {
   const numeric = Number(raw);
   if (!Number.isNaN(numeric) && Number.isFinite(numeric)) {
     const minutes = Math.floor(numeric / 60);
-    const seconds = Math.round(numeric % 60);
+    const seconds = minutes <= 0 ? Math.round(numeric) : Math.round(numeric % 60);
     if (minutes <= 0) return `${seconds}s`;
     return `${minutes}m ${seconds}s`;
   }
