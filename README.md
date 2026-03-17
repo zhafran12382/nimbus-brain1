@@ -98,6 +98,9 @@ src/
    MAIA_BASE_URL=https://your-maia-api-url
    MAIA_API_KEY=your-api-key
 
+   # Groq API
+   GROQ_API_KEY=your-groq-api-key
+
    # Tavily Web Search (opsional — fallback ke DuckDuckGo)
    TAVILY_API_KEY=your-tavily-key
    ```
@@ -131,6 +134,7 @@ Project ini sudah dikonfigurasi untuk deploy ke Vercel dengan `vercel.json`.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `MAIA_BASE_URL`
    - `MAIA_API_KEY`
+   - `GROQ_API_KEY`
    - `TAVILY_API_KEY` (opsional, untuk web search)
 4. Vercel akan otomatis build dan deploy setiap ada push ke branch utama
 

@@ -19,6 +19,13 @@ export async function GET() {
     detail: `URL: ${maiaUrl ? 'set' : 'missing'}, Key: ${maiaKey ? 'set' : 'missing'}`,
   };
 
+  // Check Groq env var
+  const groqKey = process.env.GROQ_API_KEY;
+  checks.groq = {
+    status: groqKey ? 'ok' : 'missing',
+    detail: `Key: ${groqKey ? 'set' : 'missing'}`,
+  };
+
   // Check Tavily env var
   const tavilyKey = process.env.TAVILY_API_KEY;
   checks.tavily = {

@@ -25,6 +25,16 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
       'X-Title': 'Nimbus Brain',
     }),
   },
+  groq: {
+    id: 'groq',
+    name: 'Groq',
+    icon: '⚡',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    getHeaders: () => ({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+    }),
+  },
 };
 
 // --- Model List ---
@@ -187,6 +197,63 @@ export const AVAILABLE_MODELS: AIModel[] = [
     category: "fast",
     badge: "FREE",
   },
+
+  // --- Groq ---
+  {
+    id: "openai/gpt-oss-120b",
+    name: "GPT-OSS 120B",
+    provider: "Groq",
+    providerId: "groq",
+    capabilities: ["functions", "chat"],
+    context_length: null,
+    supports_tools: true,
+    description: "TPD 200K · RPD 1K",
+    category: "fast",
+  },
+  {
+    id: "openai/gpt-oss-20b",
+    name: "GPT-OSS 20B",
+    provider: "Groq",
+    providerId: "groq",
+    capabilities: ["functions", "chat"],
+    context_length: null,
+    supports_tools: true,
+    description: "TPD 200K · RPD 1K",
+    category: "fast",
+  },
+  {
+    id: "llama-3.3-70b-versatile",
+    name: "Llama 3.3 70B",
+    provider: "Groq",
+    providerId: "groq",
+    capabilities: ["functions", "chat"],
+    context_length: null,
+    supports_tools: true,
+    description: "TPD 100K · RPD 1K",
+    category: "think",
+  },
+  {
+    id: "qwen/qwen3-32b",
+    name: "Qwen3 32B",
+    provider: "Groq",
+    providerId: "groq",
+    capabilities: ["functions", "chat"],
+    context_length: null,
+    supports_tools: true,
+    description: "TPD 500K · RPD 1K",
+    category: "think",
+  },
+  {
+    id: "meta-llama/llama-4-scout-17b-16e-instruct",
+    name: "Llama 4 Scout 17B",
+    provider: "Groq",
+    providerId: "groq",
+    capabilities: ["functions", "chat"],
+    context_length: null,
+    supports_tools: true,
+    description: "TPD 500K · RPD 1K",
+    category: "fast",
+  },
 ];
 
 // --- Default ---
@@ -222,4 +289,5 @@ export function getToolCapableModels(): AIModel[] {
 export const CLIENT_PROVIDERS: { id: ProviderId; name: string; icon: string }[] = [
   { id: 'maia', name: 'Maia Router', icon: '🟢' },
   { id: 'openrouter', name: 'OpenRouter', icon: '🔵' },
+  { id: 'groq', name: 'Groq', icon: '⚡' },
 ];

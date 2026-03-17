@@ -3,7 +3,7 @@ import { tools } from '@/lib/tools';
 import { executeTool } from '@/lib/tool-executor';
 import { getModelById, getProviderConfig, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
-import type { ProviderId } from '@/types';
+import type { GroqRateLimit, ProviderId } from '@/types';
 
 // Vercel Serverless: max 180 detik
 export const maxDuration = 180;
@@ -198,7 +198,43 @@ function formatProviderError(message: string): string {
   return `⚠️ Terjadi kesalahan: ${message}`;
 }
 
-async function callProvider(providerId: ProviderId, modelId: string, messages: Record<string, unknown>[], useTools: boolean, maxTokens = 1024, signal?: AbortSignal) {
+function parseGroqRateLimitHeaders(headers: Headers): GroqRateLimit | null {
+  const limitRequests = headers.get('x-ratelimit-limit-requests');
+  const remainingRequests = headers.get('x-ratelimit-remaining-requests');
+  const limitTokens = headers.get('x-ratelimit-limit-tokens');
+  const remainingTokens = headers.get('x-ratelimit-remaining-tokens');
+  const resetRequests = headers.get('x-ratelimit-reset-requests');
+  const resetTokens = headers.get('x-ratelimit-reset-tokens');
+
+  if (!limitRequests && !remainingRequests && !limitTokens && !remainingTokens && !resetRequests && !resetTokens) {
+    return null;
+  }
+
+  const toNum = (value: string | null): number | undefined => {
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  return {
+    limitRequests: toNum(limitRequests),
+    remainingRequests: toNum(remainingRequests),
+    limitTokens: toNum(limitTokens),
+    remainingTokens: toNum(remainingTokens),
+    resetRequests: resetRequests || undefined,
+    resetTokens: resetTokens || undefined,
+  };
+}
+
+async function callProvider(
+  providerId: ProviderId,
+  modelId: string,
+  messages: Record<string, unknown>[],
+  useTools: boolean,
+  maxTokens = 1024,
+  signal?: AbortSignal,
+  onRateLimit?: (rateLimit: GroqRateLimit) => void,
+) {
   const provider = getProviderConfig(providerId);
   if (!provider) throw new Error(`Provider "${providerId}" not found.`);
 
@@ -219,6 +255,11 @@ async function callProvider(providerId: ProviderId, modelId: string, messages: R
     body: JSON.stringify(body),
     signal,
   });
+
+  if (providerId === 'groq' && onRateLimit) {
+    const rateLimit = parseGroqRateLimitHeaders(response.headers);
+    if (rateLimit) onRateLimit(rateLimit);
+  }
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -244,6 +285,7 @@ async function callProviderStream(
   onChunk: (accumulated: string) => void,
   maxTokens = 1024,
   signal?: AbortSignal,
+  onRateLimit?: (rateLimit: GroqRateLimit) => void,
 ): Promise<string> {
   const provider = getProviderConfig(providerId);
   if (!provider) throw new Error(`Provider "${providerId}" not found.`);
@@ -262,6 +304,11 @@ async function callProviderStream(
     body: JSON.stringify(body),
     signal,
   });
+
+  if (providerId === 'groq' && onRateLimit) {
+    const rateLimit = parseGroqRateLimitHeaders(response.headers);
+    if (rateLimit) onRateLimit(rateLimit);
+  }
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -392,13 +439,16 @@ export async function POST(req: NextRequest) {
       const send = (event: Record<string, unknown>) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       };
+      const sendRateLimit = (rateLimit: GroqRateLimit) => {
+        send({ type: "rate_limit", rate_limit: rateLimit });
+      };
 
       try {
         // --- STEP 1: Kirim ke Provider ---
         send({ type: "status", text: "Thinking..." });
 
         log('API CALL', `provider=${providerId}, Sending ${apiMessages.length} messages, useTools=${useTools}`);
-        const data = await callProvider(providerId, modelId, apiMessages, useTools, maxTokens, signal);
+        const data = await callProvider(providerId, modelId, apiMessages, useTools, maxTokens, signal, sendRateLimit);
         let assistantMsg = data.choices[0].message;
         log('API RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
 
@@ -435,7 +485,7 @@ export async function POST(req: NextRequest) {
                 });
 
                 log('API CALL', `Continuation check with ${toolCallMessages.length} messages`);
-                const checkData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, signal);
+                const checkData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, signal, sendRateLimit);
                 assistantMsg = checkData.choices[0].message;
 
                 log('TOOL LOOP', `Continuation check result: ${assistantMsg.tool_calls ? 'More tools needed' : 'All done'}`);
@@ -515,7 +565,7 @@ export async function POST(req: NextRequest) {
             log('API CALL', `Sending ${toolCallMessages.length} messages back to model...`);
 
             try {
-              const nextData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, signal);
+              const nextData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, signal, sendRateLimit);
               assistantMsg = nextData.choices[0].message;
               log('API RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
             } catch (apiErr) {
@@ -572,7 +622,7 @@ export async function POST(req: NextRequest) {
 
             finalContent = await callProviderStream(providerId, modelId, retryMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
-            }, maxTokens, signal);
+            }, maxTokens, signal, sendRateLimit);
             streamed = true;
             log('EMPTY RESP', `Retry stream result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
@@ -594,7 +644,7 @@ export async function POST(req: NextRequest) {
             }
             const streamedContent = await callProviderStream(providerId, modelId, streamMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
-            }, maxTokens, signal);
+            }, maxTokens, signal, sendRateLimit);
             if (streamedContent.trim()) {
               finalContent = streamedContent;
             } else {
@@ -612,7 +662,7 @@ export async function POST(req: NextRequest) {
           try {
             finalContent = await callProviderStream(providerId, modelId, apiMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
-            }, maxTokens, signal);
+            }, maxTokens, signal, sendRateLimit);
             log('EMPTY RESP', `Direct stream result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
             logError('EMPTY RESP', 'Direct stream failed:', retryErr);
@@ -626,7 +676,7 @@ export async function POST(req: NextRequest) {
           try {
             const streamedContent = await callProviderStream(providerId, modelId, apiMessages, (accumulated) => {
               send({ type: "chunk", content: accumulated });
-            }, maxTokens, signal);
+            }, maxTokens, signal, sendRateLimit);
             if (streamedContent.trim()) {
               finalContent = streamedContent;
             } else {
