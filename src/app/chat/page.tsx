@@ -144,6 +144,8 @@ export default function ChatPage() {
       toolHistory: [],
       content: "",
       modelUsed: "",
+      thinkingContent: "",
+      thinkingDurationMs: 0,
     };
     setStreamingState(initialStreamState);
 
@@ -223,10 +225,32 @@ export default function ChatPage() {
               );
               break;
 
+            case "thinking":
+              setStreamingState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      phase: "thinking",
+                      thinkingContent: event.thinking_content || prev.thinkingContent,
+                      thinkingDurationMs: event.thinking_duration_ms ?? prev.thinkingDurationMs,
+                    }
+                  : null
+              );
+              break;
+
             case "done":
               finalContent = event.content || "";
               finalToolCalls = event.tool_calls || [];
               finalModelUsed = event.model_used || modelId;
+              setStreamingState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      thinkingContent: event.thinking_content || prev.thinkingContent,
+                      thinkingDurationMs: event.thinking_duration_ms ?? prev.thinkingDurationMs,
+                    }
+                  : null
+              );
               if (event.provider_used) finalProviderUsed = event.provider_used as typeof providerId;
               if (event.conversationId) {
                 returnedConvId = event.conversationId;

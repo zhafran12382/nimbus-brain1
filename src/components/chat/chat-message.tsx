@@ -7,6 +7,7 @@ import { messageBubble } from "@/lib/animations";
 import { QUIZ_DATA_REGEX } from "@/lib/constants";
 import { QuizCard } from "./quiz-card";
 import Markdown from "react-markdown";
+import { sanitizeAssistantContent } from "@/lib/assistant-response";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -29,6 +30,7 @@ function parseQuizData(content: string): { quizData: unknown; remainingContent: 
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
+  const assistantContent = !isUser ? sanitizeAssistantContent(message.content) : message.content;
 
   const timestamp = new Date(message.created_at).toLocaleTimeString("id-ID", {
     hour: "2-digit",
@@ -36,7 +38,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   });
 
   // Check if this is a quiz message
-  const quizParsed = !isUser ? parseQuizData(message.content) : null;
+  const quizParsed = !isUser ? parseQuizData(assistantContent) : null;
 
   return (
     <motion.div
@@ -84,11 +86,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
           >
             {isUser ? (
               <p className="whitespace-pre-wrap">{message.content}</p>
-            ) : message.content.startsWith('⚠️') ? (
-              <p className="text-amber-400">{message.content}</p>
+            ) : assistantContent.startsWith('⚠️') ? (
+              <p className="text-amber-400">{assistantContent}</p>
             ) : (
               <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
-                <Markdown>{message.content}</Markdown>
+                <Markdown>{assistantContent}</Markdown>
               </div>
             )}
           </div>

@@ -283,6 +283,7 @@ async function callProviderStream(
   modelId: string,
   messages: Record<string, unknown>[],
   onChunk: (accumulated: string) => void,
+  onThinkingChunk?: (thinking: string) => void,
   maxTokens = 1024,
   signal?: AbortSignal,
   onRateLimit?: (rateLimit: GroqRateLimit) => void,
@@ -323,6 +324,7 @@ async function callProviderStream(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let accumulated = '';
+  let accumulatedThinking = '';
   let buffer = '';
 
   while (true) {
@@ -353,6 +355,11 @@ async function callProviderStream(
         }
 
         const content = parsed.choices?.[0]?.delta?.content;
+        const reasoning = parsed.choices?.[0]?.delta?.reasoning_content || parsed.choices?.[0]?.delta?.reasoning;
+        if (typeof reasoning === 'string' && reasoning.trim()) {
+          accumulatedThinking += reasoning;
+          onThinkingChunk?.(accumulatedThinking);
+        }
         if (content) {
           accumulated += content;
           onChunk(accumulated);
@@ -445,6 +452,8 @@ export async function POST(req: NextRequest) {
 
       try {
         // --- STEP 1: Kirim ke Provider ---
+        const thinkingStartAt = Date.now();
+        let thinkingContent = "";
         send({ type: "status", text: "Thinking..." });
 
         log('API CALL', `provider=${providerId}, Sending ${apiMessages.length} messages, useTools=${useTools}`);
@@ -620,9 +629,25 @@ export async function POST(req: NextRequest) {
               }
             ];
 
-            finalContent = await callProviderStream(providerId, modelId, retryMessages, (accumulated) => {
-              send({ type: "chunk", content: accumulated });
-            }, maxTokens, signal, sendRateLimit);
+            finalContent = await callProviderStream(
+              providerId,
+              modelId,
+              retryMessages,
+              (accumulated) => {
+                send({ type: "chunk", content: accumulated });
+              },
+              (thinking) => {
+                thinkingContent = thinking;
+                send({
+                  type: "thinking",
+                  thinking_content: thinkingContent,
+                  thinking_duration_ms: Date.now() - thinkingStartAt,
+                });
+              },
+              maxTokens,
+              signal,
+              sendRateLimit,
+            );
             streamed = true;
             log('EMPTY RESP', `Retry stream result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
@@ -642,9 +667,25 @@ export async function POST(req: NextRequest) {
                 content: `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan respons natural. JANGAN panggil tool.`
               });
             }
-            const streamedContent = await callProviderStream(providerId, modelId, streamMessages, (accumulated) => {
-              send({ type: "chunk", content: accumulated });
-            }, maxTokens, signal, sendRateLimit);
+            const streamedContent = await callProviderStream(
+              providerId,
+              modelId,
+              streamMessages,
+              (accumulated) => {
+                send({ type: "chunk", content: accumulated });
+              },
+              (thinking) => {
+                thinkingContent = thinking;
+                send({
+                  type: "thinking",
+                  thinking_content: thinkingContent,
+                  thinking_duration_ms: Date.now() - thinkingStartAt,
+                });
+              },
+              maxTokens,
+              signal,
+              sendRateLimit,
+            );
             if (streamedContent.trim()) {
               finalContent = streamedContent;
             } else {
@@ -660,9 +701,25 @@ export async function POST(req: NextRequest) {
         if (!streamed && !finalContent.trim() && allToolCalls.length === 0) {
           log('EMPTY RESP', 'Content empty, no tools. Streaming directly...');
           try {
-            finalContent = await callProviderStream(providerId, modelId, apiMessages, (accumulated) => {
-              send({ type: "chunk", content: accumulated });
-            }, maxTokens, signal, sendRateLimit);
+            finalContent = await callProviderStream(
+              providerId,
+              modelId,
+              apiMessages,
+              (accumulated) => {
+                send({ type: "chunk", content: accumulated });
+              },
+              (thinking) => {
+                thinkingContent = thinking;
+                send({
+                  type: "thinking",
+                  thinking_content: thinkingContent,
+                  thinking_duration_ms: Date.now() - thinkingStartAt,
+                });
+              },
+              maxTokens,
+              signal,
+              sendRateLimit,
+            );
             log('EMPTY RESP', `Direct stream result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
             logError('EMPTY RESP', 'Direct stream failed:', retryErr);
@@ -674,9 +731,25 @@ export async function POST(req: NextRequest) {
         if (!streamed && finalContent.trim() && allToolCalls.length === 0) {
           send({ type: "status", text: "Generating response..." });
           try {
-            const streamedContent = await callProviderStream(providerId, modelId, apiMessages, (accumulated) => {
-              send({ type: "chunk", content: accumulated });
-            }, maxTokens, signal, sendRateLimit);
+            const streamedContent = await callProviderStream(
+              providerId,
+              modelId,
+              apiMessages,
+              (accumulated) => {
+                send({ type: "chunk", content: accumulated });
+              },
+              (thinking) => {
+                thinkingContent = thinking;
+                send({
+                  type: "thinking",
+                  thinking_content: thinkingContent,
+                  thinking_duration_ms: Date.now() - thinkingStartAt,
+                });
+              },
+              maxTokens,
+              signal,
+              sendRateLimit,
+            );
             if (streamedContent.trim()) {
               finalContent = streamedContent;
             } else {
@@ -744,6 +817,8 @@ export async function POST(req: NextRequest) {
           tool_calls: allToolCalls.length > 0 ? allToolCalls : undefined,
           model_used: modelId,
           provider_used: providerId,
+          thinking_content: thinkingContent || undefined,
+          thinking_duration_ms: thinkingContent ? Date.now() - thinkingStartAt : undefined,
           conversationId: conversationId || undefined,
         });
 
