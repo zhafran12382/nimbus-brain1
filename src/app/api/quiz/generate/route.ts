@@ -2,7 +2,6 @@ export const maxDuration = 120;
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 interface GenerateBody {
@@ -44,7 +43,7 @@ export async function POST(req: NextRequest) {
     // Generate quiz questions using AI
     const quizPrompt = `Generate ${numQuestions} multiple choice questions tentang "${topic.trim()}", difficulty: ${difficulty}.
 
-IMPORTANT: Output HARUS berupa valid JSON array ONLY, tanpa teks lain. Setiap question object harus punya:
+IMPORTANT: Langsung generate valid JSON array ONLY, tanpa penjelasan atau teks tambahan apa pun. Setiap question object harus punya:
 - question (string): pertanyaan dalam Bahasa Indonesia
 - options (array of 4 strings): 4 pilihan jawaban dalam Bahasa Indonesia
 - correct (number 0-3): index jawaban benar
@@ -71,7 +70,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
       body: JSON.stringify({
         model: 'zai/glm-4.5-flash',
         messages: [
-          { role: 'system', content: 'You are a quiz generator. Output valid JSON only. No markdown, no explanation, just pure JSON array.' },
+          { role: 'system', content: 'You are a quiz generator. Langsung keluarkan valid JSON array saja. No markdown, no explanation, no additional text.' },
           { role: 'user', content: quizPrompt }
         ],
         temperature: 0.7,
