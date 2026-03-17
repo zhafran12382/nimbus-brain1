@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChatMessage, GroqRateLimit, ProviderId } from "@/types";
+import { ChatMessage, ProviderId } from "@/types";
 import { ChatMode } from "@/types";
 import { PersonalitySettings } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -48,7 +48,7 @@ export default function ChatPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [initialized, setInitialized] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>("flash");
-  const [groqRateLimit, setGroqRateLimit] = useState<GroqRateLimit | null>(null);
+  const [tpmWarning, setTpmWarning] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { providerId, modelId, switchProvider, switchModel } = useModelSelection();
 
@@ -111,7 +111,7 @@ export default function ChatPage() {
 
   const handleProviderChange = useCallback((id: ProviderId) => {
     if (id !== "groq") {
-      setGroqRateLimit(null);
+      setTpmWarning(null);
     }
     switchProvider(id);
   }, [switchProvider]);
@@ -234,7 +234,14 @@ export default function ChatPage() {
               break;
 
             case "rate_limit":
-              setGroqRateLimit(event.rate_limit || null);
+              if ((event.rate_limit?.remainingTokens ?? 1) <= 0) {
+                const resetInfo = event.rate_limit?.resetTokens || event.rate_limit?.resetRequests;
+                setTpmWarning(
+                  resetInfo
+                    ? `⚠️ TPM AI telah habis. Coba lagi setelah reset (${resetInfo}).`
+                    : "⚠️ TPM AI telah habis. Tunggu beberapa saat lalu coba lagi."
+                );
+              }
               break;
 
             case "error":
@@ -341,6 +348,19 @@ export default function ChatPage() {
           </button>
         </header>
 
+        {tpmWarning && (
+          <div className="mx-3 sm:mx-4 mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 flex items-center justify-between gap-2">
+            <span>{tpmWarning}</span>
+            <button
+              type="button"
+              onClick={() => setTpmWarning(null)}
+              className="shrink-0 rounded px-2 py-0.5 text-[11px] text-amber-100/90 hover:bg-amber-500/20"
+            >
+              Tutup
+            </button>
+          </div>
+        )}
+
         {/* Chat Container */}
         <ChatContainer
           messages={messages}
@@ -353,7 +373,6 @@ export default function ChatPage() {
           modelId={modelId}
           onProviderChange={handleProviderChange}
           onModelChange={switchModel}
-          groqRateLimit={groqRateLimit}
         />
       </div>
     </div>
