@@ -355,6 +355,7 @@ async function callProviderStream(
         }
 
         const content = parsed.choices?.[0]?.delta?.content;
+        // Some providers stream reasoning via `reasoning_content`, while others use `reasoning`.
         const reasoning = parsed.choices?.[0]?.delta?.reasoning_content || parsed.choices?.[0]?.delta?.reasoning;
         if (typeof reasoning === 'string' && reasoning.trim()) {
           accumulatedThinking += reasoning;
@@ -818,7 +819,7 @@ export async function POST(req: NextRequest) {
           model_used: modelId,
           provider_used: providerId,
           thinking_content: thinkingContent || undefined,
-          thinking_duration_ms: thinkingContent ? Date.now() - thinkingStartAt : undefined,
+          thinking_duration_ms: Date.now() - thinkingStartAt,
           conversationId: conversationId || undefined,
         });
 

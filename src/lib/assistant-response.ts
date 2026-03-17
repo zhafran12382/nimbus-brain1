@@ -9,6 +9,6 @@ export function sanitizeAssistantContent(content: string): string {
 }
 
 export function formatThinkingDuration(ms?: number): string {
-  if (!ms || ms < 0) return "0.0s";
+  if (!ms || ms <= 0) return "0.0s";
   return `${(ms / 1000).toFixed(1)}s`;
 }

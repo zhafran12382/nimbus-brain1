@@ -231,7 +231,7 @@ export default function ChatPage() {
                   ? {
                       ...prev,
                       phase: "thinking",
-                      thinkingContent: event.thinking_content || prev.thinkingContent,
+                      thinkingContent: event.thinking_content ?? prev.thinkingContent,
                       thinkingDurationMs: event.thinking_duration_ms ?? prev.thinkingDurationMs,
                     }
                   : null
@@ -246,7 +246,7 @@ export default function ChatPage() {
                 prev
                   ? {
                       ...prev,
-                      thinkingContent: event.thinking_content || prev.thinkingContent,
+                      thinkingContent: event.thinking_content ?? prev.thinkingContent,
                       thinkingDurationMs: event.thinking_duration_ms ?? prev.thinkingDurationMs,
                     }
                   : null
