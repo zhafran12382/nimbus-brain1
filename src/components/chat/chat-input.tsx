@@ -3,10 +3,9 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { ArrowUp, Loader2 } from "lucide-react";
-import { ChatMode, GroqRateLimit, ProviderId } from "@/types";
+import { ChatMode, ProviderId } from "@/types";
 import { ModeToggle } from "./mode-toggle";
 import { ModelSelector } from "./model-selector";
-import { RateLimitIndicator } from "./rate-limit-indicator";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -18,7 +17,6 @@ interface ChatInputProps {
   modelId: string;
   onProviderChange: (id: ProviderId) => void;
   onModelChange: (id: string) => void;
-  groqRateLimit: GroqRateLimit | null;
 }
 
 export function ChatInput({
@@ -30,7 +28,6 @@ export function ChatInput({
   modelId,
   onProviderChange,
   onModelChange,
-  groqRateLimit,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [focused, setFocused] = useState(false);
@@ -88,11 +85,6 @@ export function ChatInput({
                 />
               </div>
             </div>
-            {providerId === "groq" && (
-              <div className="px-2 pb-2">
-                <RateLimitIndicator rateLimit={groqRateLimit} />
-              </div>
-            )}
           </div>
 
           {/* Send button */}
