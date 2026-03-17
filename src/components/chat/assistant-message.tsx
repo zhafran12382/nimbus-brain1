@@ -267,7 +267,6 @@ function ThinkingBlock({
 export function AssistantMessage({ state }: AssistantMessageProps) {
   const { phase, toolStatus, toolHistory, content, modelUsed, completedAt } = state;
   const [showMetadata, setShowMetadata] = useState(false);
-  const [thinkStartTime] = useState(() => Date.now());
 
   // Show metadata with delay after completion
   useEffect(() => {
@@ -294,21 +293,15 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
   const memoryTools = toolHistory.filter(t => t.name === "save_memory");
   const isMemoryStreaming = phase === "tool_executing" && toolStatus?.name === "save_memory" && !toolStatus.result;
 
-  // Parse <think> tags from content
-  const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/);
-  const thinkingContent = thinkMatch ? thinkMatch[1].trim() : null;
-  // Check if thinking is still streaming (no closing tag yet)
-  const hasOpenThink = content.includes("<think>") && !content.includes("</think>");
-  const openThinkContent = hasOpenThink ? content.split("<think>")[1]?.trim() : null;
-  const displayThinking = thinkingContent || openThinkContent;
-  const isThinkingStreaming = hasOpenThink;
-
-  // Response content without think tags
-  const responseContent = content.replace(/<think>[\s\S]*?<\/think>/, "").trim();
-  // If still thinking (no closing tag), don't show response yet
-  const displayContent = hasOpenThink ? "" : responseContent;
-
-  const thinkingDuration = thinkingContent ? Math.round((Date.now() - thinkStartTime) / 1000) : undefined;
+  // Strip any leaked <think> blocks before rendering response to user
+  const responseContent = content
+    .replace(/<think>[\s\S]*?<\/think>/g, "")
+    .replace(/<think>[\s\S]*$/g, "")
+    .trim();
+  const displayContent = responseContent;
+  const displayThinking = null;
+  const isThinkingStreaming = false;
+  const thinkingDuration = undefined;
 
   const isStatusVisible = phase === "thinking" || phase === "tool_executing";
   const isContentVisible = phase === "streaming" || phase === "complete";
