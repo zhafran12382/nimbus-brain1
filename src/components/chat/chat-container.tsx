@@ -3,11 +3,10 @@
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChatMessage as ChatMessageType } from "@/types";
-import { ChatMode, ProviderId } from "@/types";
+import { ChatMode } from "@/types";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 import { ModeToggle } from "./mode-toggle";
-import { ModelSelector } from "./model-selector";
 import { AssistantMessage, AssistantMessageState } from "./assistant-message";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { messageBubble } from "@/lib/animations";
@@ -21,22 +20,9 @@ interface ChatContainerProps {
   pendingToolCalls?: { name?: string; result?: string }[];
   mode: ChatMode;
   onModeChange: (mode: ChatMode) => void;
-  providerId: ProviderId;
-  modelId: string;
-  onModelChange: (id: string) => void;
 }
 
-export function ChatContainer({
-  messages,
-  onSend,
-  isLoading,
-  streamingState,
-  mode,
-  onModeChange,
-  providerId,
-  modelId,
-  onModelChange,
-}: ChatContainerProps) {
+export function ChatContainer({ messages, onSend, isLoading, streamingState, mode, onModeChange }: ChatContainerProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -105,12 +91,7 @@ export function ChatContainer({
         </div>
       </ScrollArea>
       <div className="flex flex-col">
-        <div className="mx-auto w-full max-w-3xl px-3 pt-2 sm:px-4 flex items-center justify-between gap-3">
-          <ModelSelector
-            providerId={providerId}
-            modelId={modelId}
-            onModelChange={onModelChange}
-          />
+        <div className="mx-auto w-full max-w-3xl px-3 pt-2 sm:px-4">
           <ModeToggle value={mode} onChange={onModeChange} />
         </div>
         <ChatInput onSend={onSend} isLoading={isLoading} />
