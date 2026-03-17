@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
+import { formatThinkingDuration, sanitizeAssistantContent } from "@/lib/assistant-response";
 
 // Phase state machine
 export type AssistantPhase = "thinking" | "tool_executing" | "streaming" | "complete";
@@ -22,6 +23,8 @@ export interface AssistantMessageState {
   content: string;
   modelUsed: string;
   completedAt?: string;
+  thinkingContent?: string;
+  thinkingDurationMs?: number;
 }
 
 interface AssistantMessageProps {
@@ -174,7 +177,7 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
 }
 
 export function AssistantMessage({ state }: AssistantMessageProps) {
-  const { phase, toolStatus, toolHistory, content, modelUsed, completedAt } = state;
+  const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingContent, thinkingDurationMs } = state;
   const [showMetadata, setShowMetadata] = useState(false);
 
   // Show metadata with delay after completion
@@ -202,17 +205,8 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
   const memoryTools = toolHistory.filter(t => t.name === "save_memory");
   const isMemoryStreaming = phase === "tool_executing" && toolStatus?.name === "save_memory" && !toolStatus.result;
 
-  // Strip any leaked <think> blocks before rendering response to user
-  const responseContent = (() => {
-    let sanitized = content;
-    if (sanitized.includes("</think>")) {
-      sanitized = sanitized.replace(/<think>[\s\S]*?<\/think>/g, "");
-    }
-    if (/^\s*<think>/.test(sanitized)) {
-      sanitized = sanitized.replace(/^\s*<think>[\s\S]*$/, "");
-    }
-    return sanitized.trim();
-  })();
+  // Strip any leaked thinking blocks before rendering response to user
+  const responseContent = sanitizeAssistantContent(content);
   const displayContent = responseContent;
 
   const isStatusVisible = phase === "thinking" || phase === "tool_executing";
@@ -262,7 +256,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                       >
                         <div className="spinner-perplexity" />
                         <span className="text-[13px] text-[hsl(0_0%_45%)] opacity-70">
-                          Thinking...
+                          Thinking... {formatThinkingDuration(thinkingDurationMs)}
                         </span>
                       </motion.div>
                     )}
@@ -283,6 +277,15 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                     )}
                   </AnimatePresence>
                 </div>
+
+                {!!thinkingContent && (
+                  <div className="mt-2 rounded-lg border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_7%)] px-2.5 py-2">
+                    <p className="text-[11px] text-[hsl(0_0%_60%)]">Proses berpikir model</p>
+                    <p className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap text-[12px] text-[hsl(0_0%_70%)]">
+                      {thinkingContent}
+                    </p>
+                  </div>
+                )}
 
                 {/* Source Pills (web search) */}
                 {sources.length > 0 && (

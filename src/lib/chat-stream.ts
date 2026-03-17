@@ -1,7 +1,7 @@
 import { GroqRateLimit } from "@/types";
 
 export interface StreamEvent {
-  type: 'status' | 'tool_start' | 'tool_result' | 'chunk' | 'done' | 'error' | 'rate_limit';
+  type: 'status' | 'tool_start' | 'tool_result' | 'chunk' | 'thinking' | 'done' | 'error' | 'rate_limit';
   message?: string;
   text?: string;
   content?: string;
@@ -13,6 +13,8 @@ export interface StreamEvent {
   provider_used?: string;
   conversationId?: string;
   rate_limit?: GroqRateLimit;
+  thinking_content?: string;
+  thinking_duration_ms?: number;
 }
 
 export async function sendChatStream(
