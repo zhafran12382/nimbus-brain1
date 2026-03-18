@@ -1,10 +1,15 @@
 export function sanitizeAssistantContent(content: string): string {
   let sanitized = content;
+  // Safety cap: we only expect a handful of think blocks, but guard against malformed loops.
+  const MAX_STRIP_ITERATIONS = 100;
 
   const stripBlocks = (input: string, openTagRegex: RegExp, closeTagFactory: (tag: string) => RegExp, strayCloseRegex: RegExp): string => {
     let output = input;
+    let iterations = 0;
 
-    while (true) {
+    // Guard against malformed content that could otherwise keep matching repeatedly.
+    while (iterations < MAX_STRIP_ITERATIONS) {
+      iterations += 1;
       const openMatch = output.match(openTagRegex);
       if (!openMatch || openMatch.index === undefined) break;
 
@@ -32,7 +37,7 @@ export function sanitizeAssistantContent(content: string): string {
   );
   sanitized = stripBlocks(
     sanitized,
-    /&lt;\s*(think|thinking)\b[\s\S]*?&gt;/i,
+    /&lt;\s*(think|thinking)\b[^>]*&gt;/i,
     (tag) => new RegExp(`&lt;\\/\\s*${tag}\\s*&gt;`, "i"),
     /&lt;\/\s*(think|thinking)\s*&gt;/gi,
   );
