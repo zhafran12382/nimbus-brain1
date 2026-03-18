@@ -177,7 +177,7 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
 }
 
 export function AssistantMessage({ state }: AssistantMessageProps) {
-  const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingContent, thinkingDurationMs } = state;
+  const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs } = state;
   const [showMetadata, setShowMetadata] = useState(false);
 
   // Show metadata with delay after completion
@@ -277,15 +277,6 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                     )}
                   </AnimatePresence>
                 </div>
-
-                {!!thinkingContent && (
-                  <div className="mt-2 rounded-lg border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_7%)] px-2.5 py-2">
-                    <p className="text-[11px] text-[hsl(0_0%_60%)]">Proses berpikir model</p>
-                    <p className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap text-[12px] text-[hsl(0_0%_70%)]">
-                      {thinkingContent}
-                    </p>
-                  </div>
-                )}
 
                 {/* Source Pills (web search) */}
                 {sources.length > 0 && (

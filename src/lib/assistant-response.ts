@@ -1,9 +1,9 @@
 export function sanitizeAssistantContent(content: string): string {
   let sanitized = content;
 
-  sanitized = sanitized.replace(/<think>[\s\S]*?<\/think>/gi, "");
-  sanitized = sanitized.replace(/<thinking>[\s\S]*?<\/thinking>/gi, "");
-  sanitized = sanitized.replace(/^\s*<(think|thinking)>[\s\S]*$/gi, "");
+  // Remove any leaked reasoning blocks (including unclosed tags while streaming)
+  sanitized = sanitized.replace(/<\s*(think|thinking)\b[^>]*>[\s\S]*?(<\/\s*(think|thinking)\s*>|$)/gi, "");
+  sanitized = sanitized.replace(/&lt;\s*(think|thinking)\b[^&]*&gt;[\s\S]*?(&lt;\/\s*(think|thinking)\s*&gt;|$)/gi, "");
 
   return sanitized.trim();
 }
