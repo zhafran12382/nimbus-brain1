@@ -35,6 +35,16 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
       'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
     }),
   },
+  mistral: {
+    id: 'mistral',
+    name: 'Mistral AI',
+    icon: '🟠',
+    baseUrl: 'https://api.mistral.ai/v1',
+    getHeaders: () => ({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
+    }),
+  },
 };
 
 // --- Model List ---
@@ -254,6 +264,41 @@ export const AVAILABLE_MODELS: AIModel[] = [
     description: "TPD 500K · RPD 1K",
     category: "fast",
   },
+
+  // --- Mistral AI ---
+  {
+    id: "mistral-large-latest",
+    name: "Mistral Large 3",
+    provider: "Mistral AI",
+    providerId: "mistral",
+    capabilities: ["chat", "reasoning", "functions"],
+    context_length: 128000,
+    supports_tools: true,
+    description: "Flagship model, reasoning & complex tasks",
+    category: "think",
+  },
+  {
+    id: "mistral-medium-latest",
+    name: "Mistral Medium 3",
+    provider: "Mistral AI",
+    providerId: "mistral",
+    capabilities: ["chat", "functions"],
+    context_length: 32000,
+    supports_tools: true,
+    description: "Balanced performance & speed",
+    category: "fast",
+  },
+  {
+    id: "mistral-small-latest",
+    name: "Mistral Small 3.1",
+    provider: "Mistral AI",
+    providerId: "mistral",
+    capabilities: ["chat", "functions"],
+    context_length: 32000,
+    supports_tools: true,
+    description: "Fast, efficient, everyday tasks",
+    category: "fast",
+  },
 ];
 
 // --- Default ---
@@ -290,4 +335,5 @@ export const CLIENT_PROVIDERS: { id: ProviderId; name: string; icon: string }[] 
   { id: 'maia', name: 'Maia Router', icon: '🟢' },
   { id: 'openrouter', name: 'OpenRouter', icon: '🔵' },
   { id: 'groq', name: 'Groq', icon: '⚡' },
+  { id: 'mistral', name: 'Mistral AI', icon: '🟠' },
 ];
