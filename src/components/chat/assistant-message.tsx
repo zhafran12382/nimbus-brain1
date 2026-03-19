@@ -354,6 +354,13 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
             <MemoryCard tool={toolStatus} isStreaming={true} />
           )}
 
+          {/* Thinking Block (shown above answer) */}
+          {combinedThinking && (
+            <div className="mt-3">
+              <ThinkingBlock content={combinedThinking} durationMs={thinkingDurationMs} />
+            </div>
+          )}
+
           {/* Response Content (phases 4-5) */}
           {isContentVisible && displayContent && (
             <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
@@ -361,13 +368,6 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
               {phase === "streaming" && (
                 <span className="streaming-cursor" />
               )}
-            </div>
-          )}
-
-          {/* Thinking Block (shown after answer, Perplexity-style) */}
-          {combinedThinking && (
-            <div className="mt-3">
-              <ThinkingBlock content={combinedThinking} durationMs={thinkingDurationMs} />
             </div>
           )}
 
