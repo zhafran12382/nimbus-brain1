@@ -61,20 +61,20 @@ Format EXACT yang diharapkan:
 
 JSON ARRAY ONLY. NO other text before or after.`;
 
-    const response = await fetch(`${process.env.MAIA_BASE_URL}/chat/completions`, {
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.MAIA_API_KEY}`,
+        'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'zai/glm-4.5-flash',
+        model: 'mistral-large-latest',
         messages: [
           { role: 'system', content: 'You are a quiz generator. Langsung keluarkan valid JSON array saja. No markdown, no explanation, no additional text.' },
           { role: 'user', content: quizPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 16000,
       }),
     });
 
