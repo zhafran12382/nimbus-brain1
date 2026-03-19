@@ -7,7 +7,9 @@ import { messageBubble } from "@/lib/animations";
 import { QUIZ_DATA_REGEX } from "@/lib/constants";
 import { QuizCard } from "./quiz-card";
 import Markdown from "react-markdown";
-import { sanitizeAssistantContent } from "@/lib/assistant-response";
+import { parseAssistantContent, sanitizeAssistantContent } from "@/lib/assistant-response";
+import { ThinkingBlock } from "./thinking-block";
+import { SourcesFooter } from "./sources-footer";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -31,6 +33,7 @@ function parseQuizData(content: string): { quizData: unknown; remainingContent: 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
   const assistantContent = !isUser ? sanitizeAssistantContent(message.content) : message.content;
+  const parsedAssistant = !isUser ? parseAssistantContent(message.content) : null;
 
   const timestamp = new Date(message.created_at).toLocaleTimeString("id-ID", {
     hour: "2-digit",
@@ -89,9 +92,21 @@ export function ChatMessage({ message }: ChatMessageProps) {
             ) : assistantContent.startsWith('⚠️') ? (
               <p className="text-amber-400">{assistantContent}</p>
             ) : (
-              <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
-                <Markdown>{assistantContent}</Markdown>
-              </div>
+              <>
+                <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
+                  <Markdown>{parsedAssistant?.text || assistantContent}</Markdown>
+                </div>
+                {parsedAssistant?.thinking && (
+                  <div className="mt-3">
+                    <ThinkingBlock content={parsedAssistant.thinking} />
+                  </div>
+                )}
+                {parsedAssistant?.sources && parsedAssistant.sources.length > 0 && (
+                  <div className="mt-3">
+                    <SourcesFooter sources={parsedAssistant.sources} />
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

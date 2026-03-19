@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
-import { formatThinkingDuration, parseAssistantContent, sanitizeAssistantContent } from "@/lib/assistant-response";
+import { formatThinkingDuration, parseAssistantContent } from "@/lib/assistant-response";
 import { Copy, Download, Lock, RefreshCw } from "lucide-react";
 import { SourcesFooter } from "./sources-footer";
 import { ThinkingBlock } from "./thinking-block";
@@ -354,11 +354,6 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
             <MemoryCard tool={toolStatus} isStreaming={true} />
           )}
 
-          {/* Thinking Block */}
-          {combinedThinking && (
-            <ThinkingBlock content={combinedThinking} durationMs={thinkingDurationMs} />
-          )}
-
           {/* Response Content (phases 4-5) */}
           {isContentVisible && displayContent && (
             <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
@@ -369,8 +364,22 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
             </div>
           )}
 
-          {/* Source References (after web search, shown in complete phase) */}
-          {phase === "complete" && uniqueSources.length > 0 && (
+          {/* Thinking Block (shown after answer, Perplexity-style) */}
+          {combinedThinking && (
+            <div className="mt-3">
+              <ThinkingBlock content={combinedThinking} durationMs={thinkingDurationMs} />
+            </div>
+          )}
+
+          {/* Source references placed directly under answer content */}
+          {uniqueSources.length > 0 && (
+            <div className="mt-3">
+              <SourcesFooter sources={uniqueSources} />
+            </div>
+          )}
+
+          {/* Metadata/footer */}
+          {phase === "complete" && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -380,22 +389,19 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
               <div className="text-[12px] font-medium text-[hsl(0_0%_60%)]">
                 Prepared using {modelUsed}
               </div>
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-3 text-[hsl(0_0%_50%)]">
-                  <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
-                    <Lock className="w-4 h-4" />
-                  </button>
-                  <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
-                    <Download className="w-4 h-4" />
-                  </button>
-                  <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
-                    <Copy className="w-4 h-4" />
-                  </button>
-                  <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                </div>
-                <SourcesFooter sources={uniqueSources} />
+              <div className="flex items-center gap-3 text-[hsl(0_0%_50%)]">
+                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                  <Lock className="w-4 h-4" />
+                </button>
+                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                  <Download className="w-4 h-4" />
+                </button>
+                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                  <Copy className="w-4 h-4" />
+                </button>
+                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                  <RefreshCw className="w-4 h-4" />
+                </button>
               </div>
             </motion.div>
           )}

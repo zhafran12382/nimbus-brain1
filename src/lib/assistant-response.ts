@@ -5,7 +5,7 @@ export interface ParsedAssistantContent {
 }
 
 export function parseAssistantContent(content: string): ParsedAssistantContent {
-  let text = sanitizeAssistantContent(content);
+  let text = content;
   let thinking: string | null = null;
   let sources: { title: string; url: string; domain: string }[] = [];
 
@@ -48,6 +48,8 @@ export function parseAssistantContent(content: string): ParsedAssistantContent {
       })
       .filter((s): s is { title: string; url: string; domain: string } => s !== null);
   }
+
+  text = sanitizeAssistantContent(text);
 
   return {
     text: text.trim(),
