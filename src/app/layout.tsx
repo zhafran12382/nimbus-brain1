@@ -22,6 +22,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" className="dark">
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
       <body className="antialiased">
         <AppShell>{children}</AppShell>
       </body>

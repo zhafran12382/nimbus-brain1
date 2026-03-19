@@ -5,6 +5,10 @@ import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { SettingsPanel } from "@/components/settings-panel";
 import { slideUp } from "@/lib/animations";
+import { LockedInProvider } from "@/components/study/locked-in-context";
+import { LockedInSetup } from "@/components/study/locked-in-setup";
+import { LockedInAnimation } from "@/components/study/locked-in-animation";
+import { LockedInMode } from "@/components/study/locked-in-mode";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -14,30 +18,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isChatPage = pathname === "/chat" || pathname === "/";
 
   return (
-    <div className="min-h-[100dvh]">
-      {isChatPage ? (
-        // Chat page renders its own full layout —
-        // the sidebar, header, etc. are managed inside chat/page.tsx
-        <>{children}</>
-      ) : (
-        // Non-chat pages: simple full-screen layout (no NavRail/BottomBar)
-        <main className="min-h-[100dvh]">
-          <motion.div
-            key={pathname}
-            initial={slideUp.initial}
-            animate={slideUp.animate}
-            transition={slideUp.transition}
-            className="min-h-[100dvh]"
-          >
-            {children}
-          </motion.div>
-        </main>
-      )}
+    <LockedInProvider>
+      <div className="min-h-[100dvh]">
+        <LockedInSetup />
+        <LockedInAnimation />
+        <LockedInMode />
 
-      <SettingsPanel
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
-    </div>
+        {isChatPage ? (
+          // Chat page renders its own full layout —
+          // the sidebar, header, etc. are managed inside chat/page.tsx
+          <>{children}</>
+        ) : (
+          // Non-chat pages: simple full-screen layout (no NavRail/BottomBar)
+          <main className="min-h-[100dvh]">
+            <motion.div
+              key={pathname}
+              initial={slideUp.initial}
+              animate={slideUp.animate}
+              transition={slideUp.transition}
+              className="min-h-[100dvh]"
+            >
+              {children}
+            </motion.div>
+          </main>
+        )}
+
+        <SettingsPanel
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+        />
+      </div>
+    </LockedInProvider>
   );
 }

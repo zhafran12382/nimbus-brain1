@@ -12,10 +12,7 @@ import { RouterSelector } from "@/components/chat/router-selector";
 import { AssistantMessageState, getToolDisplay } from "@/components/chat/assistant-message";
 import { Menu, Settings } from "lucide-react";
 import { useModelSelection } from "@/hooks/useModelSelection";
-import { LockedInProvider, useLockedIn } from "@/components/study/locked-in-context";
-import { LockedInSetup } from "@/components/study/locked-in-setup";
-import { LockedInAnimation } from "@/components/study/locked-in-animation";
-import { LockedInMode } from "@/components/study/locked-in-mode";
+import { useLockedIn } from "@/components/study/locked-in-context";
 import { cn } from "@/lib/utils";
 
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
@@ -45,7 +42,7 @@ function getStoredMode(): ChatMode {
 }
 
 function ChatPageContent() {
-  const { isLockedIn, setDialogOpen } = useLockedIn();
+  const { setDialogOpen } = useLockedIn();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -335,31 +332,19 @@ function ChatPageContent() {
 
   return (
     <div className="flex h-[100dvh] sm:h-screen relative overflow-hidden">
-      <LockedInSetup />
-      <LockedInAnimation />
-      <LockedInMode />
-
       {/* Left: ChatSidebar (Area X + Y) */}
-      {!isLockedIn && (
-        <ChatSidebar
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          activeConversationId={activeConversationId}
-          onSelectConversation={setActiveConversationId}
-          onNewChat={handleNewChat}
-          refreshKey={refreshKey}
-          onOpenLockedIn={() => setDialogOpen(true)}
-        />
-      )}
+      <ChatSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        activeConversationId={activeConversationId}
+        onSelectConversation={setActiveConversationId}
+        onNewChat={handleNewChat}
+        refreshKey={refreshKey}
+        onOpenLockedIn={() => setDialogOpen(true)}
+      />
 
       {/* Right: Main Chat Area */}
-      <div 
-        className={
-          isLockedIn 
-            ? "fixed right-0 top-0 bottom-0 w-[400px] xl:w-[450px] z-[150] shadow-2xl border-l border-white/5 bg-black/80 backdrop-blur-xl flex flex-col min-w-0 transition-all duration-500" 
-            : "flex flex-1 flex-col min-w-0"
-        }
-      >
+      <div className="flex flex-1 flex-col min-w-0">
         {/* Header with Area A (Router) */}
         <header className="relative z-20 flex h-14 items-center gap-3 px-3 sm:px-4 border-b border-[hsl(0_0%_100%_/_0.04)] glass">
           {/* Hamburger (mobile + sidebar toggle) */}
@@ -423,9 +408,5 @@ function ChatPageContent() {
 }
 
 export default function ChatPage() {
-  return (
-    <LockedInProvider>
-      <ChatPageContent />
-    </LockedInProvider>
-  );
+  return <ChatPageContent />;
 }
