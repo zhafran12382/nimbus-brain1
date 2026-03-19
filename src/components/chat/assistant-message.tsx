@@ -64,7 +64,7 @@ function getToolDisplay(name: string, phase: "start" | "result"): { icon: string
 export { getToolDisplay };
 
 // Extract web search source URLs from tool result text
-function extractSources(result: string): { url: string; domain: string }[] {
+function extractSources(result: string): { title: string; url: string; domain: string }[] {
   const urlRegex = /https?:\/\/[^\s)>\]]+/g;
   const urls = result.match(urlRegex) || [];
   const seen = new Set<string>();
@@ -74,12 +74,12 @@ function extractSources(result: string): { url: string; domain: string }[] {
         const domain = new URL(url).hostname.replace(/^www\./, "");
         if (seen.has(domain)) return null;
         seen.add(domain);
-        return { url, domain };
+        return { title: domain, url, domain };
       } catch {
         return null;
       }
     })
-    .filter((s): s is { url: string; domain: string } => s !== null)
+    .filter((s): s is { title: string; url: string; domain: string } => s !== null)
     .slice(0, 5);
 }
 
