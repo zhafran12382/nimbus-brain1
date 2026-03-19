@@ -21,6 +21,7 @@ function logError(tag: string, ...args: unknown[]) {
 
 const toolLabels: Record<string, string> = {
   web_search: "🔍 Searching the web...",
+  get_information: "📚 Retrieving cited sources...",
   create_target: "🎯 Creating target...",
   update_target: "🔄 Updating target...",
   update_target_progress: "🔄 Updating target...",
@@ -43,6 +44,73 @@ const toolLabels: Record<string, string> = {
   get_quiz_history: "📚 Fetching quiz history...",
   get_quiz_stats: "📊 Analyzing study stats...",
 };
+
+interface CitationSourceEntry {
+  url: string;
+  title: string;
+  domain: string;
+}
+
+function buildCitationSourceMap(toolResult: string): Record<string, CitationSourceEntry> {
+  try {
+    const parsed = JSON.parse(toolResult) as Record<string, { url?: string; title?: string }>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+
+    const map: Record<string, CitationSourceEntry> = {};
+    for (const [rawId, source] of Object.entries(parsed)) {
+      if (!source || typeof source !== 'object') continue;
+      const url = source.url;
+      if (typeof url !== 'string') continue;
+      try {
+        const parsedUrl = new URL(url);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) continue;
+        const key = String(rawId);
+        map[key] = {
+          url,
+          title: typeof source.title === 'string' && source.title.trim() ? source.title.trim() : parsedUrl.hostname,
+          domain: parsedUrl.hostname.replace(/^www\./, ''),
+        };
+      } catch {
+        continue;
+      }
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+function renderMistralContent(content: unknown, citationSources?: Record<string, CitationSourceEntry>): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+
+  let rendered = '';
+
+  for (const chunk of content) {
+    if (!chunk || typeof chunk !== 'object') continue;
+    const typedChunk = chunk as { type?: string; text?: string; reference_ids?: Array<string | number> };
+
+    if (typedChunk.type === 'text' && typeof typedChunk.text === 'string') {
+      rendered += typedChunk.text;
+      continue;
+    }
+
+    if (typedChunk.type === 'reference' && Array.isArray(typedChunk.reference_ids)) {
+      const refs = typedChunk.reference_ids
+        .map((referenceId, idx) => {
+          const key = String(referenceId);
+          const parsedNumber = Number(referenceId);
+          const displayNumber = Number.isFinite(parsedNumber) ? parsedNumber + 1 : idx + 1;
+          const source = citationSources?.[key];
+          return source ? ` [${displayNumber}](${source.url})` : ` [${displayNumber}]`;
+        })
+        .join('');
+      rendered += refs;
+    }
+  }
+
+  return rendered;
+}
 
 const BASE_SYSTEM_INSTRUCTION = `Kamu Nimbus — sahabat dari pencipta lu Zhafran. Bukan asisten formal, bukan robot.
 
@@ -100,7 +168,7 @@ function buildSystemInstruction(personality?: Record<string, string | undefined>
 function getModeInstruction(mode: string): string {
   switch (mode) {
     case 'search':
-      return '\n\n[MODE: SEARCH]\nDalam mode ini, SELALU gunakan web_search terlebih dahulu sebelum menjawab pertanyaan faktual. Skip search HANYA untuk sapaan ringan atau perintah tool (buat target, catat expense, dll).\nATURAN WAJIB SAAT MENJAWAB DENGAN SEARCH RESULTS:\n1. HANYA nyatakan fakta yang SECARA EKSPLISIT tertulis di search results.\n2. Jika search results saling bertentangan, tampilkan SEMUA versi beserta sumbernya.\n3. Jika search results tidak memiliki jawaban yang jelas, katakan "Berdasarkan pencarian, informasi ini belum tersedia."\n4. Jangan pernah mengatakan sesuatu "sudah resmi" kecuali search results SECARA EKSPLISIT menyatakan demikian.\n5. WAJIB sertakan sumber di akhir response menggunakan format:\n---sources---\nJudul Artikel | URL\nJudul Artikel | URL\n---end-sources---\n[/MODE]';
+      return '\n\n[MODE: SEARCH]\nDalam mode ini, SELALU gunakan web_search atau get_information terlebih dahulu sebelum menjawab pertanyaan faktual. Skip search HANYA untuk sapaan ringan atau perintah tool (buat target, catat expense, dll).\nATURAN WAJIB SAAT MENJAWAB DENGAN SEARCH RESULTS:\n1. HANYA nyatakan fakta yang SECARA EKSPLISIT tertulis di search results.\n2. Jika search results saling bertentangan, tampilkan SEMUA versi beserta sumbernya.\n3. Jika search results tidak memiliki jawaban yang jelas, katakan "Berdasarkan pencarian, informasi ini belum tersedia."\n4. Jangan pernah mengatakan sesuatu "sudah resmi" kecuali search results SECARA EKSPLISIT menyatakan demikian.\n5. Native citation (TextChunk + ReferenceChunk) saat ini hanya dipakai untuk provider mistral. Untuk provider lain, WAJIB sertakan sumber di akhir response menggunakan format:\n---sources---\nJudul Artikel | URL\nJudul Artikel | URL\n---end-sources---\n[/MODE]';
     case 'think':
       return '\n\n[MODE: THINK]\nDalam mode ini, lakukan penalaran mendalam. Kamu WAJIB menuliskan seluruh proses berpikirmu sebelum memberikan jawaban final menggunakan format berikut:\n---thinking---\n[isi proses berpikir AI di sini, bisa multi-paragraph]\n---end-thinking---\n\n[jawaban final di sini]\n[/MODE]';
     case 'flash':
@@ -300,6 +368,7 @@ async function callProviderStream(
   signal?: AbortSignal,
   onRateLimit?: (rateLimit: GroqRateLimit) => void,
   onStatus?: (text: string) => void,
+  citationSources?: Record<string, CitationSourceEntry>,
 ): Promise<string> {
   const provider = getProviderConfig(providerId);
   if (!provider) throw new Error(`Provider "${providerId}" not found.`);
@@ -383,8 +452,9 @@ async function callProviderStream(
           accumulatedThinking += reasoning;
           onThinkingChunk?.(accumulatedThinking);
         }
-        if (content) {
-          accumulated += content;
+        const renderedContent = renderMistralContent(content, citationSources);
+        if (renderedContent) {
+          accumulated += renderedContent;
           onChunk(accumulated);
         }
       } catch (e) {
@@ -491,6 +561,7 @@ export async function POST(req: NextRequest) {
         log('API RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
 
         const toolResults: { name: string; args: Record<string, unknown>; result: string }[] = [];
+        let citationSources: Record<string, CitationSourceEntry> = {};
 
         // --- STEP 2: Handle tool calls (agentic loop, max 5 rounds) ---
         if (assistantMsg.tool_calls && useTools) {
@@ -574,6 +645,10 @@ export async function POST(req: NextRequest) {
                 const result = await executeTool(fnName, fnArgs);
                 log('TOOL EXEC', `${fnName} result:`, result.substring(0, 200));
 
+                if (fnName === 'get_information') {
+                  citationSources = buildCitationSourceMap(result);
+                }
+
                 toolResults.push({ name: fnName, args: fnArgs, result });
                 send({ type: "tool_result", name: fnName, result });
 
@@ -615,10 +690,11 @@ export async function POST(req: NextRequest) {
 
         // --- STEP 4: Handle non-tool models (JSON fallback) ---
         const parsedActions: { name: string; args: Record<string, unknown>; result: string }[] = [];
-        if (assistantMsg.content && (!assistantMsg.tool_calls || assistantMsg.tool_calls.length === 0)) {
-          if (assistantMsg.content.includes('{') && assistantMsg.content.includes('}')) {
+        if (!assistantMsg.tool_calls || assistantMsg.tool_calls.length === 0) {
+          const assistantContentAsText = renderMistralContent(assistantMsg.content, citationSources);
+          if (assistantContentAsText.includes('{') && assistantContentAsText.includes('}')) {
             try {
-              const cleanedContent = assistantMsg.content.replace(/```json\n?/ig, '').replace(/```\n?/g, '').trim();
+              const cleanedContent = assistantContentAsText.replace(/```json\n?/ig, '').replace(/```\n?/g, '').trim();
               const firstBrace = cleanedContent.indexOf('{');
               const lastBrace = cleanedContent.lastIndexOf('}');
               
@@ -641,7 +717,7 @@ export async function POST(req: NextRequest) {
                   parsedActions.push({ name: fnName, args: fnArgs, result });
                   send({ type: "tool_result", name: fnName, result });
                   
-                  assistantMsg.content = assistantMsg.content.replace(cleanedContent.substring(firstBrace, lastBrace + 1), '').trim();
+                  assistantMsg.content = assistantContentAsText.replace(cleanedContent.substring(firstBrace, lastBrace + 1), '').trim();
                 }
               }
             } catch (parseError) {
@@ -652,7 +728,7 @@ export async function POST(req: NextRequest) {
 
         // --- STEP 5: Handle response with streaming ---
         const allToolCalls = [...toolResults, ...parsedActions];
-        let finalContent = assistantMsg.content || "";
+        let finalContent = renderMistralContent(assistantMsg.content, citationSources);
         let streamed = false;
 
         // Case 1: Content empty after tool calls — retry with streaming
@@ -689,7 +765,8 @@ export async function POST(req: NextRequest) {
               targetTemperature,
               signal,
               sendRateLimit,
-              (text) => send({ type: "status", text })
+              (text) => send({ type: "status", text }),
+              citationSources
             );
             streamed = true;
             log('EMPTY RESP', `Retry stream result: "${finalContent.substring(0, 100)}..."`);
@@ -729,7 +806,8 @@ export async function POST(req: NextRequest) {
               targetTemperature,
               signal,
               sendRateLimit,
-              (text) => send({ type: "status", text })
+              (text) => send({ type: "status", text }),
+              citationSources
             );
             if (streamedContent.trim()) {
               finalContent = streamedContent;
@@ -765,7 +843,8 @@ export async function POST(req: NextRequest) {
               targetTemperature,
               signal,
               sendRateLimit,
-              (text) => send({ type: "status", text })
+              (text) => send({ type: "status", text }),
+              citationSources
             );
             log('EMPTY RESP', `Direct stream result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
@@ -797,7 +876,8 @@ export async function POST(req: NextRequest) {
               targetTemperature,
               signal,
               sendRateLimit,
-              (text) => send({ type: "status", text })
+              (text) => send({ type: "status", text }),
+              citationSources
             );
             if (streamedContent.trim()) {
               finalContent = streamedContent;
@@ -831,6 +911,10 @@ export async function POST(req: NextRequest) {
 
           // Send fallback content as final chunk
           send({ type: "chunk", content: finalContent });
+        }
+
+        if (thinkingContent && !/---thinking-duration-ms---/i.test(finalContent)) {
+          finalContent = `${finalContent}\n\n---thinking-duration-ms---\n${Date.now() - thinkingStartAt}\n---end-thinking-duration-ms---`;
         }
 
         // --- STEP 6: Save assistant message to DB (server-side) ---

@@ -202,6 +202,49 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       }
     }
 
+    case 'get_information': {
+      const query = String(args.query);
+      const apiKey = process.env.TAVILY_API_KEY;
+      if (!apiKey) {
+        return JSON.stringify({});
+      }
+      try {
+        const tavilyRes = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: apiKey,
+            query,
+            max_results: 5,
+            search_depth: 'basic',
+            include_answer: false,
+          }),
+        });
+        if (!tavilyRes.ok) {
+          return JSON.stringify({});
+        }
+        const data = await tavilyRes.json();
+        if (!data.results || !Array.isArray(data.results)) {
+          return JSON.stringify({});
+        }
+
+        const truncated = truncateSearchResults(data.results);
+        const formatted = truncated.reduce<Record<string, { url: string; title: string; snippets: string[][] }>>((acc, result, index) => {
+          if (!result.url) return acc;
+          acc[String(index)] = {
+            url: result.url,
+            title: result.title || 'Untitled',
+            snippets: [[result.snippet || ""]],
+          };
+          return acc;
+        }, {});
+
+        return JSON.stringify(formatted);
+      } catch {
+        return JSON.stringify({});
+      }
+    }
+
     case 'create_expense': {
       const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase

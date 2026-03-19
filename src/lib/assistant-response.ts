@@ -1,13 +1,24 @@
 export interface ParsedAssistantContent {
   text: string;
   thinking: string | null;
+  thinkingDurationMs: number | null;
   sources: { title: string; url: string; domain: string }[];
 }
 
 export function parseAssistantContent(content: string): ParsedAssistantContent {
-  let text = content;
+  let text = typeof content === "string" ? content : "";
   let thinking: string | null = null;
+  let thinkingDurationMs: number | null = null;
   let sources: { title: string; url: string; domain: string }[] = [];
+
+  const thinkingDurationRegex = /---thinking-duration-ms---\s*(\d+)\s*---end-thinking-duration-ms---/i;
+  const thinkingDurationMatch = text.match(thinkingDurationRegex);
+
+  if (thinkingDurationMatch) {
+    const parsedMs = Number(thinkingDurationMatch[1]);
+    thinkingDurationMs = Number.isFinite(parsedMs) ? parsedMs : null;
+    text = text.replace(thinkingDurationMatch[0], "");
+  }
 
   // Extract ---thinking--- blocks (handles newlines or spaces after tag)
   const thinkingRegex = /---thinking---\s*([\s\S]*?)(?:\s*---end-thinking---|\s*(?=---sources---)|$)/i;
@@ -54,6 +65,7 @@ export function parseAssistantContent(content: string): ParsedAssistantContent {
   return {
     text: text.trim(),
     thinking,
+    thinkingDurationMs,
     sources
   };
 }
@@ -103,6 +115,10 @@ export function sanitizeAssistantContent(content: string): string {
   );
   sanitized = sanitized.replace(
     /---thinking---\s*[\s\S]*?(?:\s*---end-thinking---|$)/gi,
+    "",
+  );
+  sanitized = sanitized.replace(
+    /---thinking-duration-ms---\s*\d+\s*---end-thinking-duration-ms---/gi,
     "",
   );
 

@@ -80,6 +80,20 @@ export const tools = [
   {
     type: "function" as const,
     function: {
+      name: "get_information",
+      description: "Ambil informasi web terstruktur untuk native citations. Gunakan untuk pertanyaan faktual agar jawaban bisa menggunakan inline citation dari sumber yang valid.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Kata kunci pencarian yang relevan" }
+        },
+        required: ["query"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "web_search",
       description: "PENTING: Gunakan tool ini HANYA JIKA user bertanya info terkini, berita realtime, profil seseorang, kejadian terbaru, atau info yang tidak kamu ketahui. WAJIB kutip sumber",
       parameters: {

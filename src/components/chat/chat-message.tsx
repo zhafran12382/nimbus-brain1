@@ -95,7 +95,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
               <>
                 {parsedAssistant?.thinking && (
                   <div className="mb-3">
-                    <ThinkingBlock content={parsedAssistant.thinking} />
+                    <ThinkingBlock
+                      content={parsedAssistant.thinking}
+                      durationMs={parsedAssistant.thinkingDurationMs ?? undefined}
+                    />
                   </div>
                 )}
                 <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">

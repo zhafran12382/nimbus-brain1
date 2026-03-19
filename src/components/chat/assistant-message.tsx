@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
-import { formatThinkingDuration, parseAssistantContent } from "@/lib/assistant-response";
+import { parseAssistantContent } from "@/lib/assistant-response";
 import { Copy, Download, Lock, RefreshCw } from "lucide-react";
 import { SourcesFooter } from "./sources-footer";
 import { ThinkingBlock } from "./thinking-block";
@@ -212,6 +212,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
   const parsedContent = parseAssistantContent(content);
   const displayContent = parsedContent.text;
   const combinedThinking = apiThinkingContent || parsedContent.thinking;
+  const combinedThinkingDurationMs = thinkingDurationMs ?? parsedContent.thinkingDurationMs ?? undefined;
   const displaySources = [...sources, ...parsedContent.sources];
   
   // Deduplicate sources by domain
@@ -266,7 +267,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                       >
                         <div className="spinner-perplexity" />
                         <span className="text-[13px] text-[hsl(0_0%_45%)] opacity-70">
-                          Thinking... {formatThinkingDuration(thinkingDurationMs)}
+                          Thinking...
                         </span>
                       </motion.div>
                     )}
@@ -357,7 +358,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
           {/* Thinking Block (shown above answer) */}
           {combinedThinking && (
             <div className="mt-3">
-              <ThinkingBlock content={combinedThinking} durationMs={thinkingDurationMs} />
+              <ThinkingBlock content={combinedThinking} durationMs={combinedThinkingDurationMs} />
             </div>
           )}
 
