@@ -2,9 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useLockedIn } from "./locked-in-context";
-import { Play, Pause, SkipForward } from "lucide-react";
+import { Play, Pause, SkipForward, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-export function PomodoroTimer() {
+interface PomodoroTimerProps {
+  onExitClick: () => void;
+  quote: string;
+}
+
+export function PomodoroTimer({ onExitClick, quote }: PomodoroTimerProps) {
   const {
     status, setStatus,
     focusMinutes, breakMinutes,
@@ -14,6 +20,7 @@ export function PomodoroTimer() {
 
   const [timeLeft, setTimeLeft] = useState(focusMinutes * 60);
   const [isPaused, setIsPaused] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Reset timer if status changes externally or initially
   useEffect(() => {
@@ -58,10 +65,6 @@ export function PomodoroTimer() {
     }
   };
 
-  const handleSkip = () => {
-    handleTimerEnd();
-  };
-
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -79,11 +82,15 @@ export function PomodoroTimer() {
 
   if (status === "finished") {
     return (
-      <div className="flex flex-col items-center justify-center p-8 space-y-6 animate-in fade-in duration-500">
-        <div className="text-6xl text-center">🎉</div>
-        <div className="text-center space-y-2">
-          <h2 className="text-3xl font-bold text-white">Selesai!</h2>
-          <p className="text-zinc-400">Kamu telah fokus selama {focusMinutes * totalSessions} menit hari ini.</p>
+      <motion.div 
+        initial={{ opacity: 0, y: -20, scale: 0.9 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className="bg-zinc-950/90 backdrop-blur-md border border-zinc-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center space-y-4 pointer-events-auto"
+      >
+        <div className="text-4xl text-center">🎉</div>
+        <div className="text-center space-y-1">
+          <h2 className="text-xl font-bold text-white">Selesai!</h2>
+          <p className="text-sm text-zinc-400">Kamu telah fokus selama {focusMinutes * totalSessions} menit.</p>
         </div>
         <button
           onClick={() => {
@@ -93,55 +100,139 @@ export function PomodoroTimer() {
               document.exitFullscreen().catch(e => console.error(e));
             }
           }}
-          className="rounded-xl px-6 py-3 bg-zinc-800 text-white font-medium hover:bg-zinc-700 transition"
+          className="rounded-full px-6 py-2.5 bg-zinc-800 text-white text-sm font-semibold hover:bg-zinc-700 transition"
         >
           Tutup
         </button>
-      </div>
+      </motion.div>
     );
   }
 
+  const isFocus = status === "focus";
+
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto space-y-8">
-      {/* Session Progress */}
-      <div className="flex flex-col items-center space-y-3">
-        <span className="text-sm font-semibold uppercase tracking-widest text-zinc-500">
-          {status === "focus" ? "🔥 Fokus" : "⏸️ Istirahat"}
-        </span>
-        <div className="flex items-center gap-2">
-          {Array.from({ length: totalSessions }).map((_, i) => (
-            <div
-              key={i}
-              className={`h-2 rounded-full transition-all duration-300 ${i + 1 < currentSession ? "w-4 bg-violet-600" :
-                  i + 1 === currentSession ? "w-8 bg-violet-400" : "w-2 bg-zinc-800"
-                }`}
-            />
-          ))}
-        </div>
-        <span className="text-xs text-zinc-500">Sesi {currentSession} dari {totalSessions}</span>
-      </div>
+    <>
+      {/* Click outside to collapse */}
+      {isExpanded && (
+        <div className="fixed inset-0 z-40 pointer-events-auto" onClick={() => setIsExpanded(false)} />
+      )}
 
-      {/* Timer */}
-      <div className="text-[7rem] sm:text-[9rem] font-bold tabular-nums tracking-tighter text-white drop-shadow-2xl">
-        {formatTime(timeLeft)}
-      </div>
+      <motion.div
+        layout
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        onClick={() => !isExpanded && setIsExpanded(true)}
+        className={`relative z-50 overflow-hidden pointer-events-auto ${
+          isExpanded 
+            ? "w-[340px] bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 shadow-2xl rounded-[32px] p-5 cursor-default" 
+            : "h-12 px-5 bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 shadow-xl flex items-center gap-3 rounded-full hover:bg-zinc-900 transition-colors cursor-pointer"
+        }`}
+      >
+        <AnimatePresence mode="popLayout" initial={false}>
+          {!isExpanded ? (
+            <motion.div
+              key="collapsed"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-2"
+            >
+              <div className={`text-sm ${isFocus ? 'text-green-500' : 'text-blue-500'} ${!isPaused && !showAnimation ? 'animate-pulse' : ''}`}>
+                {isFocus ? '🔥' : '⏸️'}
+              </div>
+              <div className={`font-semibold tabular-nums text-sm ${isFocus ? 'text-white' : 'text-blue-400'}`}>
+                {formatTime(timeLeft)}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="expanded"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col">
+                  <span className={`text-xs font-bold uppercase tracking-wider ${isFocus ? 'text-green-500' : 'text-blue-500'}`}>
+                    {isFocus ? "Sedang Fokus" : "Waktu Istirahat"}
+                  </span>
+                  <span className="text-[10px] text-zinc-400 font-medium">Sesi {currentSession} dari {totalSessions}</span>
+                </div>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded(false);
+                  }}
+                  className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => setIsPaused(!isPaused)}
-          className="flex items-center justify-center h-16 w-16 rounded-full bg-zinc-800/50 hover:bg-zinc-800 text-white border border-zinc-700 backdrop-blur-md transition-all active:scale-95"
-        >
-          {isPaused ? <Play className="h-6 w-6 ml-1" /> : <Pause className="h-6 w-6" />}
-        </button>
-        <button
-          onClick={handleSkip}
-          className="flex items-center gap-2 px-6 h-16 rounded-full bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 backdrop-blur-md transition-all active:scale-95"
-        >
-          <SkipForward className="h-5 w-5" />
-          <span className="font-medium">Lewati</span>
-        </button>
-      </div>
-    </div>
+              {/* Timer */}
+              <div className="text-[4rem] leading-none font-bold tabular-nums tracking-tighter text-white drop-shadow-md text-center mt-2 mb-4">
+                {formatTime(timeLeft)}
+              </div>
+
+              {/* Progress */}
+              <div className="flex items-center justify-center gap-1.5 mb-6">
+                {Array.from({ length: totalSessions }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      i + 1 < currentSession 
+                        ? (isFocus ? "w-4 bg-green-600" : "w-4 bg-blue-600") 
+                        : i + 1 === currentSession 
+                          ? (isFocus ? "w-8 bg-green-400" : "w-8 bg-blue-400") 
+                          : "w-1.5 bg-zinc-800"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Quote */}
+              <div className="text-center mb-6 px-4">
+                <p className="text-xs text-zinc-400 italic leading-relaxed">"{quote}"</p>
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center justify-between gap-2 mt-auto">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded(false);
+                    onExitClick();
+                  }}
+                  className="flex-1 px-3 py-2.5 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 text-xs font-semibold transition-colors"
+                >
+                  Akhiri
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsPaused(!isPaused);
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl ${isFocus ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'} text-xs font-semibold shadow-lg transition-colors`}
+                >
+                  {isPaused ? <Play className="h-3.5 w-3.5 fill-current" /> : <Pause className="h-3.5 w-3.5 fill-current" />}
+                  {isPaused ? "Lanjut" : "Jeda"}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTimerEnd();
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold transition-colors"
+                >
+                  <SkipForward className="h-3.5 w-3.5" />
+                  Skip
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </>
   );
 }

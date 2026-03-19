@@ -22,11 +22,21 @@ export function LockedInSetup() {
     
     // Request fullscreen
     try {
-      if (typeof document !== 'undefined' && document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen();
+      if (typeof document !== 'undefined') {
+        const docEl = document.documentElement as any;
+        if (docEl.requestFullscreen) {
+          docEl.requestFullscreen({ navigationUI: "hide" }).catch((e: any) => {
+            console.warn("Standard fullscreen failed, trying fallback", e);
+            if (docEl.webkitRequestFullscreen) {
+              docEl.webkitRequestFullscreen();
+            }
+          });
+        } else if (docEl.webkitRequestFullscreen) {
+          docEl.webkitRequestFullscreen();
+        }
       }
     } catch (e) {
-      console.error("Fullscreen API not supported", e);
+      console.error("Fullscreen API not supported or blocked", e);
     }
   };
 
