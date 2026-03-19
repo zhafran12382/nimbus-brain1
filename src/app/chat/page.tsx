@@ -340,7 +340,7 @@ function ChatPageContent() {
       <LockedInMode />
 
       {/* Left: ChatSidebar (Area X + Y) */}
-      <div className={cn("shrink-0 transition-opacity duration-300", isLockedIn ? "hidden opacity-0" : "block opacity-100")}>
+      {!isLockedIn && (
         <ChatSidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
@@ -350,16 +350,15 @@ function ChatPageContent() {
           refreshKey={refreshKey}
           onOpenLockedIn={() => setDialogOpen(true)}
         />
-      </div>
+      )}
 
       {/* Right: Main Chat Area */}
       <div 
-        className={cn(
-          "flex flex-col min-w-0 bg-background transition-all duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
+        className={
           isLockedIn 
-            ? "fixed right-0 top-0 bottom-0 w-[400px] xl:w-[450px] z-[150] shadow-2xl border-l border-white/5 bg-black/80 backdrop-blur-xl" 
-            : "flex-1 relative z-10"
-        )}
+            ? "fixed right-0 top-0 bottom-0 w-[400px] xl:w-[450px] z-[150] shadow-2xl border-l border-white/5 bg-black/80 backdrop-blur-xl flex flex-col min-w-0 transition-all duration-500" 
+            : "flex flex-1 flex-col min-w-0"
+        }
       >
         {/* Header with Area A (Router) */}
         <header className="relative z-20 flex h-14 items-center gap-3 px-3 sm:px-4 border-b border-[hsl(0_0%_100%_/_0.04)] glass">
