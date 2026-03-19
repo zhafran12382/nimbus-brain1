@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
 import { formatThinkingDuration, sanitizeAssistantContent } from "@/lib/assistant-response";
+import { Copy, Download, Lock, RefreshCw } from "lucide-react";
+import { SourcesFooter } from "./sources-footer";
+import { ThinkingBlock } from "./thinking-block";
 
 // Phase state machine
 export type AssistantPhase = "thinking" | "tool_executing" | "streaming" | "complete";
@@ -61,7 +64,7 @@ function getToolDisplay(name: string, phase: "start" | "result"): { icon: string
 export { getToolDisplay };
 
 // Extract web search source URLs from tool result text
-function extractSources(result: string): { url: string; domain: string }[] {
+function extractSources(result: string): { title: string; url: string; domain: string }[] {
   const urlRegex = /https?:\/\/[^\s)>\]]+/g;
   const urls = result.match(urlRegex) || [];
   const seen = new Set<string>();
@@ -71,12 +74,12 @@ function extractSources(result: string): { url: string; domain: string }[] {
         const domain = new URL(url).hostname.replace(/^www\./, "");
         if (seen.has(domain)) return null;
         seen.add(domain);
-        return { url, domain };
+        return { title: domain, url, domain };
       } catch {
         return null;
       }
     })
-    .filter((s): s is { url: string; domain: string } => s !== null)
+    .filter((s): s is { title: string; url: string; domain: string } => s !== null)
     .slice(0, 5);
 }
 
@@ -177,7 +180,7 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
 }
 
 export function AssistantMessage({ state }: AssistantMessageProps) {
-  const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs } = state;
+  const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs, thinkingContent } = state;
   const [showMetadata, setShowMetadata] = useState(false);
 
   // Show metadata with delay after completion
@@ -344,6 +347,11 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
             <MemoryCard tool={toolStatus} isStreaming={true} />
           )}
 
+          {/* Thinking Block */}
+          {thinkingContent && (
+            <ThinkingBlock content={thinkingContent} durationMs={thinkingDurationMs} />
+          )}
+
           {/* Response Content (phases 4-5) */}
           {isContentVisible && displayContent && (
             <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
@@ -360,21 +368,27 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
-              className="mt-3 pt-2 border-t border-[hsl(0_0%_100%_/_0.04)]"
+              className="mt-4 pt-4 border-t border-[hsl(0_0%_100%_/_0.06)] flex flex-col gap-3"
             >
-              <p className="text-[10px] text-[hsl(0_0%_30%)] mb-1">Sources</p>
-              <div className="space-y-0.5">
-                {sources.map((source, i) => (
-                  <a
-                    key={source.domain}
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-[11px] text-[hsl(0_0%_45%)] hover:text-[hsl(217_91%_60%)] transition-colors"
-                  >
-                    [{i + 1}] {source.domain}
-                  </a>
-                ))}
+              <div className="text-[12px] font-medium text-[hsl(0_0%_60%)]">
+                Prepared using {modelUsed}
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-3 text-[hsl(0_0%_50%)]">
+                  <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                    <Lock className="w-4 h-4" />
+                  </button>
+                  <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                    <Download className="w-4 h-4" />
+                  </button>
+                  <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                    <Copy className="w-4 h-4" />
+                  </button>
+                  <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+                <SourcesFooter sources={sources} />
               </div>
             </motion.div>
           )}

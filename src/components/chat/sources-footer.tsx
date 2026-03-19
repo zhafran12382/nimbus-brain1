@@ -40,11 +40,11 @@ export function SourcesFooter({ sources }: SourcesFooterProps) {
   const hasMore = sources.length > 3;
 
   return (
-    <div className="relative mt-2" ref={containerRef}>
+    <div className="relative" ref={containerRef}>
       {/* Collapsed Button */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 rounded-full border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)] px-3 py-1.5 transition-all hover:border-[hsl(0_0%_100%_/_0.15)] hover:bg-[hsl(0_0%_12%)] focus:outline-none focus:ring-2 focus:ring-[hsl(217_91%_60%_/_0.5)]"
+        className="flex items-center gap-2 rounded-full px-1 py-1 transition-all hover:bg-[hsl(0_0%_12%)] focus:outline-none"
       >
         <div className="flex -space-x-1.5">
           {displaySources.map((source, idx) => (
@@ -70,7 +70,7 @@ export function SourcesFooter({ sources }: SourcesFooterProps) {
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-1 text-[11px] font-medium text-[hsl(0_0%_70%)]">
+        <div className="flex items-center gap-1 text-[12px] font-medium text-[hsl(0_0%_50%)]">
           <span>{sources.length} sources</span>
           <motion.div
             animate={{ rotate: isExpanded ? 180 : 0 }}
