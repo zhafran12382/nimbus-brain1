@@ -100,9 +100,9 @@ function buildSystemInstruction(personality?: Record<string, string | undefined>
 function getModeInstruction(mode: string): string {
   switch (mode) {
     case 'search':
-      return '\n\n[MODE: SEARCH]\nDalam mode ini, SELALU gunakan web_search terlebih dahulu sebelum menjawab pertanyaan faktual. Skip search HANYA untuk sapaan ringan atau perintah tool (buat target, catat expense, dll).\n[/MODE]';
+      return '\n\n[MODE: SEARCH]\nDalam mode ini, SELALU gunakan web_search terlebih dahulu sebelum menjawab pertanyaan faktual. Skip search HANYA untuk sapaan ringan atau perintah tool (buat target, catat expense, dll).\nATURAN WAJIB SAAT MENJAWAB DENGAN SEARCH RESULTS:\n1. HANYA nyatakan fakta yang SECARA EKSPLISIT tertulis di search results.\n2. Jika search results saling bertentangan, tampilkan SEMUA versi beserta sumbernya.\n3. Jika search results tidak memiliki jawaban yang jelas, katakan "Berdasarkan pencarian, informasi ini belum tersedia."\n4. Jangan pernah mengatakan sesuatu "sudah resmi" kecuali search results SECARA EKSPLISIT menyatakan demikian.\n5. WAJIB sertakan sumber di akhir response menggunakan format:\n---sources---\nJudul Artikel | URL\nJudul Artikel | URL\n---end-sources---\n[/MODE]';
     case 'think':
-      return '\n\n[MODE: THINK]\nDalam mode ini, lakukan penalaran mendalam SECARA INTERNAL. JANGAN tampilkan proses berpikir atau chain-of-thought ke user, dan JANGAN gunakan tag <think> sama sekali. Berikan hanya jawaban final yang jelas, terstruktur, dan lengkap.\n[/MODE]';
+      return '\n\n[MODE: THINK]\nDalam mode ini, lakukan penalaran mendalam. Kamu WAJIB menuliskan seluruh proses berpikirmu sebelum memberikan jawaban final menggunakan format berikut:\n---thinking---\n[isi proses berpikir AI di sini, bisa multi-paragraph]\n---end-thinking---\n\n[jawaban final di sini]\n[/MODE]';
     case 'flash':
       return '\n\n[MODE: FLASH]\nDalam mode ini, jawab CEPAT dan SINGKAT. Langsung ke inti. Maksimal 2-3 kalimat kecuali diminta lebih. Tidak perlu intro atau outro.\n[/MODE]';
     default:
@@ -232,6 +232,7 @@ async function callProvider(
   messages: Record<string, unknown>[],
   useTools: boolean,
   maxTokens = 1024,
+  temperature = 0.7,
   signal?: AbortSignal,
   onRateLimit?: (rateLimit: GroqRateLimit) => void,
   onStatus?: (text: string) => void,
@@ -242,7 +243,7 @@ async function callProvider(
   const body: Record<string, unknown> = {
     model: modelId,
     messages,
-    temperature: (providerId === 'mistral' && useTools) ? 0.1 : 0.7,
+    temperature: (providerId === 'mistral' && useTools) ? 0.1 : temperature,
     max_tokens: maxTokens,
   };
   if (useTools) {
@@ -269,7 +270,7 @@ async function callProvider(
       if (waitTimeSec < 150) {
         if (onStatus) onStatus(`⏳ Rate limited. Coba lagi dalam ${waitTimeSec} detik...`);
         await new Promise(resolve => setTimeout(resolve, waitTimeSec * 1000));
-        return callProvider(providerId, modelId, messages, useTools, maxTokens, signal, onRateLimit, onStatus);
+        return callProvider(providerId, modelId, messages, useTools, maxTokens, temperature, signal, onRateLimit, onStatus);
       }
     }
     const err = await response.json().catch(() => ({}));
@@ -295,6 +296,7 @@ async function callProviderStream(
   onChunk: (accumulated: string) => void,
   onThinkingChunk?: (thinking: string) => void,
   maxTokens = 1024,
+  temperature = 0.7,
   signal?: AbortSignal,
   onRateLimit?: (rateLimit: GroqRateLimit) => void,
   onStatus?: (text: string) => void,
@@ -305,7 +307,7 @@ async function callProviderStream(
   const body = {
     model: modelId,
     messages,
-    temperature: 0.7,
+    temperature,
     max_tokens: maxTokens,
     stream: true,
   };
@@ -329,7 +331,7 @@ async function callProviderStream(
       if (waitTimeSec < 150) {
         if (onStatus) onStatus(`⏳ Rate limited. Coba lagi dalam ${waitTimeSec} detik...`);
         await new Promise(resolve => setTimeout(resolve, waitTimeSec * 1000));
-        return callProviderStream(providerId, modelId, messages, onChunk, onThinkingChunk, maxTokens, signal, onRateLimit, onStatus);
+        return callProviderStream(providerId, modelId, messages, onChunk, onThinkingChunk, maxTokens, temperature, signal, onRateLimit, onStatus);
       }
     }
     const err = await response.json().catch(() => ({}));
@@ -460,6 +462,7 @@ export async function POST(req: NextRequest) {
 
   log('SYSTEM', `instruction length=${systemInstruction.length}, useTools=${useTools}, mode=${mode}, maxTokens=${maxTokens}`);
   const historyLimit = mode === 'flash' ? 4 : mode === 'search' ? 8 : 10;
+  const targetTemperature = mode === 'search' ? 0.1 : 0.7;
   const apiMessages = [
     { role: "system", content: systemInstruction },
     ...messages.slice(-historyLimit),
@@ -483,7 +486,7 @@ export async function POST(req: NextRequest) {
         send({ type: "status", text: "Thinking..." });
 
         log('API CALL', `provider=${providerId}, Sending ${apiMessages.length} messages, useTools=${useTools}`);
-        const data = await callProvider(providerId, modelId, apiMessages, useTools, maxTokens, signal, sendRateLimit, (text) => send({ type: "status", text }));
+        const data = await callProvider(providerId, modelId, apiMessages, useTools, maxTokens, targetTemperature, signal, sendRateLimit, (text) => send({ type: "status", text }));
         let assistantMsg = data.choices[0].message;
         log('API RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
 
@@ -520,7 +523,7 @@ export async function POST(req: NextRequest) {
                 });
 
                 log('API CALL', `Continuation check with ${toolCallMessages.length} messages`);
-                const checkData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, signal, sendRateLimit, (text) => send({ type: "status", text }));
+                const checkData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, targetTemperature, signal, sendRateLimit, (text) => send({ type: "status", text }));
                 assistantMsg = checkData.choices[0].message;
 
                 log('TOOL LOOP', `Continuation check result: ${assistantMsg.tool_calls ? 'More tools needed' : 'All done'}`);
@@ -600,7 +603,7 @@ export async function POST(req: NextRequest) {
             log('API CALL', `Sending ${toolCallMessages.length} messages back to model...`);
 
             try {
-              const nextData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, signal, sendRateLimit, (text) => send({ type: "status", text }));
+              const nextData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, targetTemperature, signal, sendRateLimit, (text) => send({ type: "status", text }));
               assistantMsg = nextData.choices[0].message;
               log('API RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
             } catch (apiErr) {
@@ -683,6 +686,7 @@ export async function POST(req: NextRequest) {
                 });
               },
               maxTokens,
+              targetTemperature,
               signal,
               sendRateLimit,
               (text) => send({ type: "status", text })
@@ -722,6 +726,7 @@ export async function POST(req: NextRequest) {
                 });
               },
               maxTokens,
+              targetTemperature,
               signal,
               sendRateLimit,
               (text) => send({ type: "status", text })
@@ -757,6 +762,7 @@ export async function POST(req: NextRequest) {
                 });
               },
               maxTokens,
+              targetTemperature,
               signal,
               sendRateLimit,
               (text) => send({ type: "status", text })
@@ -788,6 +794,7 @@ export async function POST(req: NextRequest) {
                 });
               },
               maxTokens,
+              targetTemperature,
               signal,
               sendRateLimit,
               (text) => send({ type: "status", text })
