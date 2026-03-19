@@ -9,8 +9,8 @@ export function parseAssistantContent(content: string): ParsedAssistantContent {
   let thinking: string | null = null;
   let sources: { title: string; url: string; domain: string }[] = [];
 
-  // Extract ---thinking--- blocks
-  const thinkingRegex = /---thinking---\n([\s\S]*?)(?:\n---end-thinking---|(?=\n---sources---)|$)/;
+  // Extract ---thinking--- blocks (handles newlines or spaces after tag)
+  const thinkingRegex = /---thinking---\s*([\s\S]*?)(?:\s*---end-thinking---|\s*(?=---sources---)|$)/i;
   const thinkingMatch = text.match(thinkingRegex);
   
   if (thinkingMatch) {
@@ -19,30 +19,32 @@ export function parseAssistantContent(content: string): ParsedAssistantContent {
   }
 
   // Extract ---sources--- blocks
-  const sourcesRegex = /---sources---\n([\s\S]*?)(?:\n---end-sources---|$)/;
+  const sourcesRegex = /---sources---\s*([\s\S]*?)(?:\s*---end-sources---|$)/i;
   const sourcesMatch = text.match(sourcesRegex);
   
   if (sourcesMatch) {
     const sourcesText = sourcesMatch[1].trim();
     text = text.replace(sourcesMatch[0], "");
 
-    // Extract sources from Title | URL lines
-    sources = sourcesText
-      .split('\n')
-      .map(line => {
-        const parts = line.split('|');
-        if (parts.length >= 2) {
-          const title = parts[0].trim();
-          const url = parts.slice(1).join('|').trim();
-          let domain = "";
-          try {
-            domain = new URL(url).hostname.replace(/^www\./, "");
-          } catch {
-            return null;
-          }
-          return { title, url, domain };
+    // Robustly extract all URLs from the sources text block
+    const urlRegex = /https?:\/\/[^\s|—>\]]+/g;
+    const extractedUrls = sourcesText.match(urlRegex) || [];
+    
+    // Deduplicate and process URLs
+    const seenUrls = new Set<string>();
+    
+    sources = extractedUrls
+      .map(url => {
+        if (seenUrls.has(url)) return null;
+        seenUrls.add(url);
+        
+        let domain = "";
+        try {
+          domain = new URL(url).hostname.replace(/^www\./, "");
+        } catch {
+          return null;
         }
-        return null;
+        return { title: domain, url, domain };
       })
       .filter((s): s is { title: string; url: string; domain: string } => s !== null);
   }
