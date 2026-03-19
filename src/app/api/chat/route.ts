@@ -242,7 +242,7 @@ async function callProvider(
   const body: Record<string, unknown> = {
     model: modelId,
     messages,
-    temperature: 0.7,
+    temperature: (providerId === 'mistral' && useTools) ? 0.1 : 0.7,
     max_tokens: maxTokens,
   };
   if (useTools) {
@@ -452,7 +452,12 @@ export async function POST(req: NextRequest) {
   const useTools = model.supports_tools;
   const maxTokens = maxTokensMap[mode as keyof typeof maxTokensMap] || 1024;
   const memoriesContext = await fetchMemoriesContext();
-  const systemInstruction = buildSystemInstruction(personality) + getModeInstruction(mode) + memoriesContext;
+  let systemInstruction = buildSystemInstruction(personality) + getModeInstruction(mode) + memoriesContext;
+  
+  if (providerId === 'mistral' && useTools) {
+    systemInstruction += '\n\nINSTRUKSI KRITIS: Jika kamu memutuskan untuk menggunakan sebuah tool/fungsi, kamu WAJIB HANYA mengeluarkan objek JSON mentah untuk pemanggilan tool tersebut. JANGAN sertakan teks percakapan, sapaan, penjelasan, atau format markdown (seperti ```json) sebelum atau sesudah JSON tersebut.';
+  }
+
   log('SYSTEM', `instruction length=${systemInstruction.length}, useTools=${useTools}, mode=${mode}, maxTokens=${maxTokens}`);
   const historyLimit = mode === 'flash' ? 4 : mode === 'search' ? 8 : 10;
   const apiMessages = [
@@ -607,25 +612,37 @@ export async function POST(req: NextRequest) {
 
         // --- STEP 4: Handle non-tool models (JSON fallback) ---
         const parsedActions: { name: string; args: Record<string, unknown>; result: string }[] = [];
-        if (!useTools && assistantMsg.content) {
-          const jsonMatch = assistantMsg.content.match(/```json\n?({[\s\S]*?})\n?```/);
-          if (jsonMatch) {
+        if (assistantMsg.content && (!assistantMsg.tool_calls || assistantMsg.tool_calls.length === 0)) {
+          if (assistantMsg.content.includes('{') && assistantMsg.content.includes('}')) {
             try {
-              const action = JSON.parse(jsonMatch[1]);
-              if (action.action && action.params) {
-                send({
-                  type: "tool_start",
-                  name: action.action,
-                  args: action.params,
-                  text: toolLabels[action.action] || `🔧 Executing ${action.action}...`,
-                });
-                const result = await executeTool(action.action, action.params);
-                parsedActions.push({ name: action.action, args: action.params, result });
-                send({ type: "tool_result", name: action.action, result });
-                assistantMsg.content = assistantMsg.content.replace(/```json[\s\S]*?```/, '').trim();
+              const cleanedContent = assistantMsg.content.replace(/```json\n?/ig, '').replace(/```\n?/g, '').trim();
+              const firstBrace = cleanedContent.indexOf('{');
+              const lastBrace = cleanedContent.lastIndexOf('}');
+              
+              if (firstBrace !== -1 && lastBrace !== -1) {
+                const pureJson = cleanedContent.substring(firstBrace, lastBrace + 1);
+                const actionObj = JSON.parse(pureJson);
+                
+                const fnName = actionObj.action || actionObj.name;
+                const fnArgs = actionObj.params || actionObj.arguments || actionObj;
+                
+                if (fnName && typeof fnName === 'string' && toolLabels[fnName]) {
+                  log('FALLBACK', `Extracted leaked JSON for function: ${fnName}`);
+                  send({
+                    type: "tool_start",
+                    name: fnName,
+                    args: fnArgs,
+                    text: toolLabels[fnName] || `🔧 Executing ${fnName}...`,
+                  });
+                  const result = await executeTool(fnName, fnArgs);
+                  parsedActions.push({ name: fnName, args: fnArgs, result });
+                  send({ type: "tool_result", name: fnName, result });
+                  
+                  assistantMsg.content = assistantMsg.content.replace(cleanedContent.substring(firstBrace, lastBrace + 1), '').trim();
+                }
               }
             } catch (parseError) {
-              logError('PARSE ERROR', 'Failed to parse JSON action from model response:', parseError);
+              logError('PARSE ERROR', 'Failed to extract JSON from assistant content:', parseError);
             }
           }
         }
@@ -646,7 +663,7 @@ export async function POST(req: NextRequest) {
               ...messages.slice(-5),
               {
                 role: "user",
-                content: `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan respons yang informatif dan natural untuk user berdasarkan hasil di atas. JANGAN panggil tool lagi.`
+                content: `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan konfirmasi santai, ramah, dan natural (basa-basi) kepada user bahwa aksi telah berhasil dilakukan berdasarkan hasil di atas. Hindari respons seperti robot atau laporan formal. JANGAN panggil tool lagi.`
               }
             ];
 
@@ -686,7 +703,7 @@ export async function POST(req: NextRequest) {
               const toolSummary = toolResults.map(tc => `${tc.name}: ${tc.result}`).join('\n');
               streamMessages.push({
                 role: "user",
-                content: `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan respons natural. JANGAN panggil tool.`
+                content: `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan konfirmasi santai, ramah, dan natural (basa-basi) kepada user bahwa aksi telah berhasil dilakukan berdasarkan hasil di atas. Hindari respons seperti robot atau laporan formal. JANGAN panggil tool lagi.`
               });
             }
             const streamedContent = await callProviderStream(
