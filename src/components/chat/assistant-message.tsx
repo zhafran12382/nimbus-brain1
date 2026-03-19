@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
-import { formatThinkingDuration, sanitizeAssistantContent } from "@/lib/assistant-response";
+import { formatThinkingDuration, parseAssistantContent, sanitizeAssistantContent } from "@/lib/assistant-response";
 import { Copy, Download, Lock, RefreshCw } from "lucide-react";
 import { SourcesFooter } from "./sources-footer";
 import { ThinkingBlock } from "./thinking-block";
@@ -180,7 +180,7 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
 }
 
 export function AssistantMessage({ state }: AssistantMessageProps) {
-  const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs, thinkingContent } = state;
+  const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs, thinkingContent: apiThinkingContent } = state;
   const [showMetadata, setShowMetadata] = useState(false);
 
   // Show metadata with delay after completion
@@ -208,9 +208,16 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
   const memoryTools = toolHistory.filter(t => t.name === "save_memory");
   const isMemoryStreaming = phase === "tool_executing" && toolStatus?.name === "save_memory" && !toolStatus.result;
 
-  // Strip any leaked thinking blocks before rendering response to user
-  const responseContent = sanitizeAssistantContent(content);
-  const displayContent = responseContent;
+  // Parse custom mode blocks (thinking and sources) from text content
+  const parsedContent = parseAssistantContent(content);
+  const displayContent = parsedContent.text;
+  const combinedThinking = apiThinkingContent || parsedContent.thinking;
+  const displaySources = [...sources, ...parsedContent.sources];
+  
+  // Deduplicate sources by domain
+  const uniqueSources = displaySources.filter((source, index, self) => 
+    index === self.findIndex((s) => s.domain === source.domain)
+  ).slice(0, 5);
 
   const isStatusVisible = phase === "thinking" || phase === "tool_executing";
   const isContentVisible = phase === "streaming" || phase === "complete";
@@ -282,7 +289,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                 </div>
 
                 {/* Source Pills (web search) */}
-                {sources.length > 0 && (
+                {uniqueSources.length > 0 && (
                   <motion.div
                     initial="hidden"
                     animate="show"
@@ -292,7 +299,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                     }}
                     className="flex flex-wrap gap-1.5 mt-2"
                   >
-                    {sources.map((source) => (
+                    {uniqueSources.map((source) => (
                       <motion.a
                         key={source.domain}
                         href={source.url}
@@ -348,8 +355,8 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
           )}
 
           {/* Thinking Block */}
-          {thinkingContent && (
-            <ThinkingBlock content={thinkingContent} durationMs={thinkingDurationMs} />
+          {combinedThinking && (
+            <ThinkingBlock content={combinedThinking} durationMs={thinkingDurationMs} />
           )}
 
           {/* Response Content (phases 4-5) */}
@@ -363,7 +370,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
           )}
 
           {/* Source References (after web search, shown in complete phase) */}
-          {phase === "complete" && sources.length > 0 && (
+          {phase === "complete" && uniqueSources.length > 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -388,7 +395,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                     <RefreshCw className="w-4 h-4" />
                   </button>
                 </div>
-                <SourcesFooter sources={sources} />
+                <SourcesFooter sources={uniqueSources} />
               </div>
             </motion.div>
           )}

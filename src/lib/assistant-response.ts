@@ -1,3 +1,59 @@
+export interface ParsedAssistantContent {
+  text: string;
+  thinking: string | null;
+  sources: { title: string; url: string; domain: string }[];
+}
+
+export function parseAssistantContent(content: string): ParsedAssistantContent {
+  let text = sanitizeAssistantContent(content);
+  let thinking: string | null = null;
+  let sources: { title: string; url: string; domain: string }[] = [];
+
+  // Extract ---thinking--- blocks
+  const thinkingRegex = /---thinking---\n([\s\S]*?)(?:\n---end-thinking---|(?=\n---sources---)|$)/;
+  const thinkingMatch = text.match(thinkingRegex);
+  
+  if (thinkingMatch) {
+    thinking = thinkingMatch[1].trim();
+    text = text.replace(thinkingMatch[0], "");
+  }
+
+  // Extract ---sources--- blocks
+  const sourcesRegex = /---sources---\n([\s\S]*?)(?:\n---end-sources---|$)/;
+  const sourcesMatch = text.match(sourcesRegex);
+  
+  if (sourcesMatch) {
+    const sourcesText = sourcesMatch[1].trim();
+    text = text.replace(sourcesMatch[0], "");
+
+    // Extract sources from Title | URL lines
+    sources = sourcesText
+      .split('\n')
+      .map(line => {
+        const parts = line.split('|');
+        if (parts.length >= 2) {
+          const title = parts[0].trim();
+          const url = parts.slice(1).join('|').trim();
+          let domain = "";
+          try {
+            domain = new URL(url).hostname.replace(/^www\./, "");
+          } catch {
+            return null;
+          }
+          return { title, url, domain };
+        }
+        return null;
+      })
+      .filter((s): s is { title: string; url: string; domain: string } => s !== null);
+  }
+
+  return {
+    text: text.trim(),
+    thinking,
+    sources
+  };
+}
+
 export function sanitizeAssistantContent(content: string): string {
   let sanitized = content;
   // Safety cap: we only expect a handful of think blocks, but guard against malformed loops.
