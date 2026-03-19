@@ -81,11 +81,11 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "web_search",
-      description: "Search the web for current, real-time information. Use when user asks about recent events, news, people, current facts, or anything beyond your training data. Always cite sources from results.",
+      description: "PENTING: Gunakan tool ini HANYA JIKA user bertanya info terkini, berita realtime, profil seseorang, kejadian terbaru, atau info yang tidak kamu ketahui. WAJIB kutip sumber",
       parameters: {
         type: "object",
         properties: {
-          query: { type: "string", description: "The search query" }
+          query: { type: "string", description: "Kata kunci pencarian yang relevan" }
         },
         required: ["query"]
       }
@@ -95,19 +95,19 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "create_expense",
-      description: "Record money SPENT / pengeluaran. Use ONLY when user SPENDS money: buying things, paying bills, eating out, transportation cost, etc. Keywords: beli, bayar, habis, keluar, buat beli, jajan. Do NOT use this for incoming money — use create_income instead.",
+      description: "PENTING: Gunakan tool ini HANYA JIKA user MENGELUARKAN uang (membayar, beli, jajan, habis bayar cicilan). JANGAN gunakan untuk pemasukan.",
       parameters: {
         type: "object",
         properties: {
-          title: { type: "string", description: "Deskripsi pengeluaran" },
-          amount: { type: "number", description: "Jumlah dalam Rupiah" },
+          title: { type: "string", description: "Deskripsi pengeluaran yang jelas" },
+          amount: { type: "number", description: "Jumlah pengeluaran dalam angka mutlak Rupiah" },
           category: {
             type: "string",
             enum: ["food", "transport", "shopping", "entertainment", "health", "education", "bills", "other"],
-            description: "Kategori pengeluaran"
+            description: "Kategori pengeluaran. Default ke other jika bingung"
           },
-          date: { type: "string", description: "Tanggal format YYYY-MM-DD, default hari ini" },
-          notes: { type: "string", description: "Catatan tambahan (opsional)" }
+          date: { type: "string", description: "Opsional. Tanggal format YYYY-MM-DD. Kosongkan jika hari ini." },
+          notes: { type: "string", description: "Catatan ekstra." }
         },
         required: ["title", "amount", "category"]
       }
@@ -165,19 +165,19 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "create_income",
-      description: "Record incoming money / pemasukan. Use when user RECEIVES money: salary, transfer from someone, freelance payment, gift, investment returns, refund, etc. Keywords: gaji, transfer masuk, dikasih, terima, dapat, TF dari, income, pemasukan.",
+      description: "PENTING: Gunakan tool ini HANYA JIKA user MENERIMA uang (gajian, dikasih, dapat hadiah, hasil investasi). JANGAN gunakan untuk pengeluaran.",
       parameters: {
         type: "object",
         properties: {
-          title: { type: "string", description: "Deskripsi pemasukan" },
-          amount: { type: "number", description: "Jumlah dalam Rupiah" },
+          title: { type: "string", description: "Deskripsi pemasukan yang jelas" },
+          amount: { type: "number", description: "Jumlah pemasukan dalam Rupiah" },
           category: {
             type: "string",
             enum: ["salary", "transfer", "freelance", "gift", "investment", "refund", "other"],
             description: "Kategori pemasukan"
           },
-          date: { type: "string", description: "Tanggal format YYYY-MM-DD, default hari ini" },
-          notes: { type: "string", description: "Catatan tambahan (opsional)" }
+          date: { type: "string", description: "Opsional. Tanggal YYYY-MM-DD" },
+          notes: { type: "string", description: "Catatan opsional" }
         },
         required: ["title", "amount", "category"]
       }
@@ -253,17 +253,17 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "save_memory",
-      description: "Save important information about the user to long-term memory. Use this when: 1) User explicitly asks to remember something ('inget ini', 'remember this', 'catat ya'), 2) User shares a significant personal fact (allergy, birthday, school, preference), 3) User states a strong preference or dislike. Do NOT save trivial conversation, greetings, or temporary information.",
+      description: "PENTING: Simpan fakta kunci/jangka panjang tentang user. JANGAN simpan obrolan remeh. Hanya gunakan jika ada fakta krusial (sekolah, alergi, hobi, tujuan, atau user secara eksplisit memintamu mengingat hal spesifik).",
       parameters: {
         type: "object",
         properties: {
-          content: { type: "string", description: "Informasi yang disimpan, tulis sebagai fakta ringkas" },
+          content: { type: "string", description: "Deskripsi fakta yang dicatat untuk masa depan" },
           category: {
             type: "string",
             enum: ["preference", "fact", "goal", "routine", "relationship", "general"],
-            description: "Kategori memory"
+            description: "Pilih kategori memory yang cocok"
           },
-          importance: { type: "number", description: "Seberapa penting info ini (1-10, default 5)" }
+          importance: { type: "number", description: "Skala 1 - 10 seberapa penting ingatan ini bergantung pada permintaannya / krusialitasnya." }
         },
         required: ["content", "category"]
       }
@@ -306,16 +306,16 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "create_quiz",
-      description: "Generate an interactive quiz from any topic. Use when user asks to create a quiz, practice questions, study test, atau latihan soal. AI generates multiple choice questions with correct answers and explanations.",
+      description: "Buat kuis atau tes soal latihan interaktif seputar topik apa saja untuk user belajar.",
       parameters: {
         type: "object",
         properties: {
-          topic: { type: "string", description: "Topik quiz yang ingin digenerate" },
-          num_questions: { type: "number", description: "Jumlah soal (default 5, min 3, max 20)" },
+          topic: { type: "string", description: "Topik spesifik kuis" },
+          num_questions: { type: "number", description: "Jumlah pertanyaan ganda (cth: 5)" },
           difficulty: {
             type: "string",
             enum: ["easy", "medium", "hard"],
-            description: "Tingkat kesulitan quiz (default: medium)"
+            description: "Level kesulitan yang dipesan user."
           }
         },
         required: ["topic"]
