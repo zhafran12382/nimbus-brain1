@@ -99,6 +99,10 @@ export function sanitizeAssistantContent(content: string): string {
     (tag) => new RegExp(`&lt;\\/\\s*${tag}\\s*&gt;`, "i"),
     /&lt;\/\s*(think|thinking)\s*&gt;/gi,
   );
+  sanitized = sanitized.replace(
+    /---thinking---\s*[\s\S]*?(?:\s*---end-thinking---|$)/gi,
+    "",
+  );
 
   return sanitized.trim();
 }
