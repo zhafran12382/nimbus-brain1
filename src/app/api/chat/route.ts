@@ -82,6 +82,9 @@ function buildCitationSourceMap(toolResult: string): Record<string, CitationSour
 
 function renderMistralContent(content: unknown, citationSources?: Record<string, CitationSourceEntry>): string {
   if (typeof content === 'string') return content;
+  if (content && typeof content === 'object' && !Array.isArray(content)) {
+    return renderMistralContent([content], citationSources);
+  }
   if (!Array.isArray(content)) return '';
 
   let rendered = '';
@@ -89,13 +92,14 @@ function renderMistralContent(content: unknown, citationSources?: Record<string,
   for (const chunk of content) {
     if (!chunk || typeof chunk !== 'object') continue;
     const typedChunk = chunk as { type?: string; text?: string; reference_ids?: Array<string | number> };
+    const chunkType = typeof typedChunk.type === 'string' ? typedChunk.type.toLowerCase() : '';
 
-    if (typedChunk.type === 'text' && typeof typedChunk.text === 'string') {
+    if ((chunkType === 'text' || chunkType === 'textchunk' || chunkType === 'text_chunk') && typeof typedChunk.text === 'string') {
       rendered += typedChunk.text;
       continue;
     }
 
-    if (typedChunk.type === 'reference' && Array.isArray(typedChunk.reference_ids)) {
+    if ((chunkType === 'reference' || chunkType === 'referencechunk' || chunkType === 'reference_chunk') && Array.isArray(typedChunk.reference_ids)) {
       const refs = typedChunk.reference_ids
         .map((referenceId, idx) => {
           const key = String(referenceId);
@@ -106,6 +110,11 @@ function renderMistralContent(content: unknown, citationSources?: Record<string,
         })
         .join('');
       rendered += refs;
+      continue;
+    }
+
+    if (typeof typedChunk.text === 'string' && !chunkType) {
+      rendered += typedChunk.text;
     }
   }
 
@@ -730,6 +739,12 @@ export async function POST(req: NextRequest) {
         const allToolCalls = [...toolResults, ...parsedActions];
         let finalContent = renderMistralContent(assistantMsg.content, citationSources);
         let streamed = false;
+        const hasMistralNativeCitations = providerId === 'mistral' && Object.keys(citationSources).length > 0 && /\[[0-9]+\]\(/.test(finalContent);
+
+        if (hasMistralNativeCitations) {
+          send({ type: "chunk", content: finalContent });
+          streamed = true;
+        }
 
         // Case 1: Content empty after tool calls — retry with streaming
         if (!finalContent.trim() && allToolCalls.length > 0) {
@@ -913,7 +928,7 @@ export async function POST(req: NextRequest) {
           send({ type: "chunk", content: finalContent });
         }
 
-        if (thinkingContent && !/---thinking-duration-ms---/i.test(finalContent)) {
+        if ((thinkingContent || /---thinking---/i.test(finalContent)) && !/---thinking-duration-ms---/i.test(finalContent)) {
           finalContent = `${finalContent}\n\n---thinking-duration-ms---\n${Date.now() - thinkingStartAt}\n---end-thinking-duration-ms---`;
         }
 
