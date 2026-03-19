@@ -123,7 +123,7 @@ export function PomodoroTimer({ onExitClick, quote }: PomodoroTimerProps) {
         onClick={() => !isExpanded && setIsExpanded(true)}
         className={`relative z-50 overflow-hidden pointer-events-auto ${
           isExpanded 
-            ? "w-[340px] bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 shadow-2xl rounded-[32px] p-5 cursor-default" 
+            ? "w-[calc(100vw-32px)] max-w-[340px] bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 shadow-2xl rounded-[32px] p-5 cursor-default" 
             : "h-12 px-5 bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 shadow-xl flex items-center gap-3 rounded-full hover:bg-zinc-900 transition-colors cursor-pointer"
         }`}
       >

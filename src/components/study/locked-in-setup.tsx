@@ -14,30 +14,26 @@ export function LockedInSetup() {
   } = useLockedIn();
 
   const handleStart = () => {
-    setDialogOpen(false);
-    setLockedIn(true);
-    setShowAnimation(true);
-    setStatus("focus");
-    setCurrentSession(1);
-    
-    // Request fullscreen
+    // Request fullscreen synchronously first to preserve user gesture context on Android
     try {
       if (typeof document !== 'undefined') {
         const docEl = document.documentElement as any;
-        if (docEl.requestFullscreen) {
-          docEl.requestFullscreen({ navigationUI: "hide" }).catch((e: any) => {
-            console.warn("Standard fullscreen failed, trying fallback", e);
-            if (docEl.webkitRequestFullscreen) {
-              docEl.webkitRequestFullscreen();
-            }
+        const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+        if (requestFS) {
+          requestFS.call(docEl).catch((e: any) => {
+            console.warn("Fullscreen error", e);
           });
-        } else if (docEl.webkitRequestFullscreen) {
-          docEl.webkitRequestFullscreen();
         }
       }
     } catch (e) {
       console.error("Fullscreen API not supported or blocked", e);
     }
+
+    setDialogOpen(false);
+    setLockedIn(true);
+    setShowAnimation(true);
+    setStatus("focus");
+    setCurrentSession(1);
   };
 
   return (

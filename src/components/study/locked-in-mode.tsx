@@ -51,14 +51,16 @@ export function LockedInMode() {
 
   const handleReturnFullscreen = () => {
     setFullscreenGuardActive(false);
-    if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(err => {
-        console.warn("Fullscreen error", err);
+    try {
+      if (typeof document !== 'undefined') {
         const docEl = document.documentElement as any;
-        if (docEl.webkitRequestFullscreen) {
-          docEl.webkitRequestFullscreen();
+        const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+        if (requestFS) {
+          requestFS.call(docEl).catch((e: any) => console.warn("Fullscreen error", e));
         }
-      });
+      }
+    } catch (e) {
+      console.warn("Fullscreen API block", e);
     }
   };
 
@@ -71,9 +73,16 @@ export function LockedInMode() {
     }
   };
 
+  const [isAndroid, setIsAndroid] = useState(false);
+  useEffect(() => {
+    if (typeof navigator !== 'undefined') {
+      setIsAndroid(/android/i.test(navigator.userAgent));
+    }
+  }, []);
+
   return (
     <>
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center pointer-events-none">
+      <div className={`fixed left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center pointer-events-none transition-all duration-500 ${isAndroid ? 'top-[max(env(safe-area-inset-top,24px),40px)]' : 'top-6'}`}>
         <div className="pointer-events-auto">
           <PomodoroTimer onExitClick={() => setShowExitConfirm(true)} quote={quote} />
         </div>
