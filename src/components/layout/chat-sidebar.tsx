@@ -33,6 +33,7 @@ interface ChatSidebarProps {
   onSelectConversation: (id: string | null) => void;
   onNewChat: () => void;
   refreshKey?: number;
+  onOpenLockedIn?: () => void;
 }
 
 /* ──────────────── Helpers ──────────────── */
@@ -88,6 +89,14 @@ const studyItems = [
     gradient: "from-violet-500 to-purple-400",
     description: "Generate & take quizzes",
   },
+  {
+    href: "#",
+    id: "locked-in",
+    label: "🔒 Locked In Mode",
+    icon: Target,
+    gradient: "from-indigo-600 to-blue-500",
+    description: "Deep focus pomodoro",
+  }
 ];
 
 /* ──────────────── Component ──────────────── */
@@ -99,6 +108,7 @@ export function ChatSidebar({
   onSelectConversation,
   onNewChat,
   refreshKey,
+  onOpenLockedIn,
 }: ChatSidebarProps) {
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("personal");
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -302,7 +312,15 @@ export function ChatSidebar({
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() => { if (window.innerWidth < 1024) onClose(); }}
+                      onClick={(e) => { 
+                        if (item.id === "locked-in") {
+                          e.preventDefault();
+                          onOpenLockedIn?.();
+                          if (window.innerWidth < 1024) onClose();
+                          return;
+                        }
+                        if (window.innerWidth < 1024) onClose(); 
+                      }}
                       className={cn(
                         "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 group",
                         isActive
