@@ -32,8 +32,10 @@ function parseQuizData(content: string): { quizData: unknown; remainingContent: 
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
-  const assistantContent = !isUser ? sanitizeAssistantContent(message.content) : message.content;
   const parsedAssistant = !isUser ? parseAssistantContent(message.content) : null;
+  const assistantText = !isUser
+    ? parsedAssistant?.text || sanitizeAssistantContent(message.content)
+    : message.content;
 
   const timestamp = new Date(message.created_at).toLocaleTimeString("id-ID", {
     hour: "2-digit",
@@ -41,7 +43,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   });
 
   // Check if this is a quiz message
-  const quizParsed = !isUser ? parseQuizData(assistantContent) : null;
+  const quizParsed = !isUser ? parseQuizData(assistantText) : null;
 
   return (
     <motion.div
@@ -89,12 +91,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
           >
             {isUser ? (
               <p className="whitespace-pre-wrap">{message.content}</p>
-            ) : assistantContent.startsWith('⚠️') ? (
-              <p className="text-amber-400">{assistantContent}</p>
+            ) : assistantText.startsWith('⚠️') ? (
+              <p className="text-amber-400">{assistantText}</p>
             ) : (
               <>
                 <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
-                  <Markdown>{parsedAssistant?.text || assistantContent}</Markdown>
+                  <Markdown>{assistantText}</Markdown>
                 </div>
                 {parsedAssistant?.thinking && (
                   <div className="mt-3">

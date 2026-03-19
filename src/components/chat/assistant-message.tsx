@@ -372,7 +372,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
           )}
 
           {/* Source references placed directly under answer content */}
-          {uniqueSources.length > 0 && (
+          {phase === "complete" && uniqueSources.length > 0 && (
             <div className="mt-3">
               <SourcesFooter sources={uniqueSources} />
             </div>
