@@ -5,10 +5,10 @@ import { useLockedIn } from "./locked-in-context";
 import { Play, Pause, SkipForward } from "lucide-react";
 
 export function PomodoroTimer() {
-  const { 
-    status, setStatus, 
-    focusMinutes, breakMinutes, 
-    currentSession, setCurrentSession, 
+  const {
+    status, setStatus,
+    focusMinutes, breakMinutes,
+    currentSession, setCurrentSession,
     totalSessions, setLockedIn, showAnimation
   } = useLockedIn();
 
@@ -53,7 +53,7 @@ export function PomodoroTimer() {
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         new Notification("Lanjut fokus! 🔥");
       }
-      setCurrentSession((prev) => prev + 1);
+      setCurrentSession(currentSession + 1);
       setStatus("focus");
     }
   };
@@ -110,12 +110,11 @@ export function PomodoroTimer() {
         </span>
         <div className="flex items-center gap-2">
           {Array.from({ length: totalSessions }).map((_, i) => (
-            <div 
-              key={i} 
-              className={`h-2 rounded-full transition-all duration-300 ${
-                i + 1 < currentSession ? "w-4 bg-violet-600" : 
-                i + 1 === currentSession ? "w-8 bg-violet-400" : "w-2 bg-zinc-800"
-              }`}
+            <div
+              key={i}
+              className={`h-2 rounded-full transition-all duration-300 ${i + 1 < currentSession ? "w-4 bg-violet-600" :
+                  i + 1 === currentSession ? "w-8 bg-violet-400" : "w-2 bg-zinc-800"
+                }`}
             />
           ))}
         </div>
