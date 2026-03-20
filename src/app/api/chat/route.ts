@@ -261,6 +261,7 @@ HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
 }
 
 const maxTokensMap: Record<string, number> = { flash: 256, search: 1024, think: 1500 };
+const GEMINI_MODEL_ID = 'gemini-2.5-flash-lite';
 
 function formatProviderError(message: string): string {
   if (message.includes('is not a valid model ID') || message.includes('not a valid model')) {
@@ -273,6 +274,20 @@ function formatProviderError(message: string): string {
     return '⚠️ Batas penggunaan tercapai. Coba lagi nanti.';
   }
   return `⚠️ Terjadi kesalahan: ${message}`;
+}
+
+function validateGeminiRequest(providerId: ProviderId, modelId: string): string | null {
+  if (providerId !== 'gemini') return null;
+
+  if (modelId !== GEMINI_MODEL_ID) {
+    return `Model tidak valid untuk provider Gemini. Gunakan "${GEMINI_MODEL_ID}".`;
+  }
+
+  if (!process.env.GEMINI_API_KEY?.trim()) {
+    return 'API key tidak valid atau belum disetel.';
+  }
+
+  return null;
 }
 
 function parseGroqRateLimitHeaders(headers: Headers): GroqRateLimit | null {
@@ -488,6 +503,14 @@ export async function POST(req: NextRequest) {
   const providerId: ProviderId = incomingProvider || model?.providerId || DEFAULT_PROVIDER_ID;
 
   log('REQUEST', `provider=${providerId}, model=${modelId}, messages=${messages.length}, convId=${incomingConvId || 'new'}, personality=${personality?.preset || 'none'}, mode=${mode}`);
+
+  const geminiValidationError = validateGeminiRequest(providerId, modelId);
+  if (geminiValidationError) {
+    return new Response(
+      JSON.stringify({ error: geminiValidationError }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 
   if (!model) {
     return new Response(

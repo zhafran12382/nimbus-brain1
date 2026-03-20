@@ -45,6 +45,16 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
       'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
     }),
   },
+  gemini: {
+    id: 'gemini',
+    name: 'Gemini',
+    icon: '✨',
+    baseUrl: 'https://api.koboillm.com/v1',
+    getHeaders: () => ({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.GEMINI_API_KEY}`,
+    }),
+  },
 };
 
 // --- Model List ---
@@ -299,6 +309,17 @@ export const AVAILABLE_MODELS: AIModel[] = [
     description: "Fast, efficient, everyday tasks",
     category: "fast",
   },
+  {
+    id: "gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
+    provider: "Gemini",
+    providerId: "gemini",
+    capabilities: ["chat", "functions"],
+    context_length: null,
+    supports_tools: true,
+    description: "Gemini provider model",
+    category: "fast",
+  },
 ];
 
 // --- Default ---
@@ -336,4 +357,5 @@ export const CLIENT_PROVIDERS: { id: ProviderId; name: string; icon: string }[] 
   { id: 'openrouter', name: 'OpenRouter', icon: '🔵' },
   { id: 'groq', name: 'Groq', icon: '⚡' },
   { id: 'mistral', name: 'Mistral AI', icon: '🟠' },
+  { id: 'gemini', name: 'Gemini', icon: '✨' },
 ];
