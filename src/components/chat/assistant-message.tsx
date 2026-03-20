@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { parseAssistantContent } from "@/lib/assistant-response";
 import { Copy, Download, Lock, RefreshCw } from "lucide-react";
 import { SourcesFooter } from "./sources-footer";
@@ -365,7 +366,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
           {/* Response Content (phases 4-5) */}
           {isContentVisible && displayContent && (
             <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
-              <Markdown>{displayContent}</Markdown>
+              <Markdown remarkPlugins={[remarkGfm]}>{displayContent}</Markdown>
               {phase === "streaming" && (
                 <span className="streaming-cursor" />
               )}

@@ -7,6 +7,7 @@ import { messageBubble } from "@/lib/animations";
 import { QUIZ_DATA_REGEX } from "@/lib/constants";
 import { QuizCard } from "./quiz-card";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { parseAssistantContent } from "@/lib/assistant-response";
 import { ThinkingBlock } from "./thinking-block";
 import { SourcesFooter } from "./sources-footer";
@@ -74,7 +75,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {quizParsed.remainingContent && (
               <div className="glass-card text-[hsl(0_0%_93%)] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed mt-2">
                 <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                  <Markdown>{quizParsed.remainingContent}</Markdown>
+                  <Markdown remarkPlugins={[remarkGfm]}>{quizParsed.remainingContent}</Markdown>
                 </div>
               </div>
             )}
@@ -102,7 +103,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                   </div>
                 )}
                 <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
-                  <Markdown>{assistantText}</Markdown>
+                  <Markdown remarkPlugins={[remarkGfm]}>{assistantText}</Markdown>
                 </div>
                 {parsedAssistant?.sources && parsedAssistant.sources.length > 0 && (
                   <div className="mt-3">
