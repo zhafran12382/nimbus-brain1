@@ -280,11 +280,11 @@ function validateGeminiRequest(providerId: ProviderId, modelId: string): string 
   if (providerId !== 'gemini') return null;
 
   if (modelId !== GEMINI_MODEL_ID) {
-    return `Model tidak valid untuk provider gemini. Gunakan "${GEMINI_MODEL_ID}".`;
+    return `Model tidak valid untuk provider Gemini. Gunakan "${GEMINI_MODEL_ID}".`;
   }
 
   if (!process.env.GEMINI_API_KEY?.trim()) {
-    return 'GEMINI_API_KEY belum disetel.';
+    return 'API key tidak valid atau belum disetel.';
   }
 
   return null;
