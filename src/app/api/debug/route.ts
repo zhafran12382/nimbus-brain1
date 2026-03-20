@@ -26,6 +26,13 @@ export async function GET() {
     detail: `Key: ${groqKey ? 'set' : 'missing'}`,
   };
 
+  // Check Gemini env var
+  const geminiKey = process.env.GEMINI_API_KEY;
+  checks.gemini = {
+    status: geminiKey ? 'ok' : 'missing',
+    detail: `Key: ${geminiKey ? 'set' : 'missing'}`,
+  };
+
   // Check Tavily env var
   const tavilyKey = process.env.TAVILY_API_KEY;
   checks.tavily = {
