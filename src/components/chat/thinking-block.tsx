@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Atom } from "lucide-react";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ThinkingBlockProps {
   content: string;
@@ -43,7 +44,7 @@ export function ThinkingBlock({ content, durationMs }: ThinkingBlockProps) {
           >
             <div className="mt-3 pl-4 border-l-2 border-[hsl(0_0%_100%_/_0.1)] text-[13px] leading-relaxed text-[hsl(0_0%_70%)]">
               <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:mb-3 [&_li]:mb-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-4">
-                <Markdown>{content}</Markdown>
+                <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
               </div>
             </div>
           </motion.div>
