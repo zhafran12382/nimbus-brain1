@@ -260,7 +260,7 @@ HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
   }
 }
 
-const maxTokensMap: Record<string, number> = { flash: 256, search: 1024, think: 1500 };
+const maxTokensMap: Record<string, number> = { flash: 8000, search: 16000, think: 16000 };
 const GEMINI_MODEL_ID = 'gemini-2.5-flash-lite';
 
 function formatProviderError(message: string): string {
