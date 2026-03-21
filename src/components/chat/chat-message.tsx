@@ -82,9 +82,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         ) : (
           <div
-            className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+            className={`text-sm leading-relaxed ${
               isUser
-                ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm"
+                ? "rounded-2xl px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm"
                 : "text-[hsl(0_0%_93%)]"
             }`}
           >
