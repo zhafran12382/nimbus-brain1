@@ -179,3 +179,32 @@ body {
 .progress-fill {
   transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+.markdown-body {
+  overflow-x: auto;
+  font-size: 14px;
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 520px;
+  color: hsl(0 0% 93%);
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid hsl(0 0% 100% / 0.18);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-body th {
+  background: hsl(0 0% 7%);
+  font-weight: 600;
+}
+
+.markdown-body tr:nth-child(even) {
+  background: hsl(0 0% 100% / 0.03);
+}

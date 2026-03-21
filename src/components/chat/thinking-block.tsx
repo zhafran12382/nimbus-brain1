@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Atom } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { normalizeMarkdownTables } from "@/lib/markdown";
 
 interface ThinkingBlockProps {
   content: string;
@@ -14,6 +15,7 @@ interface ThinkingBlockProps {
 export function ThinkingBlock({ content, durationMs }: ThinkingBlockProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const seconds = durationMs ? (durationMs / 1000).toFixed(1) : "0.0";
+  const normalizedContent = normalizeMarkdownTables(content);
 
   if (!content) return null;
 
@@ -43,8 +45,8 @@ export function ThinkingBlock({ content, durationMs }: ThinkingBlockProps) {
             className="overflow-hidden w-full"
           >
             <div className="mt-3 pl-4 border-l-2 border-[hsl(0_0%_100%_/_0.1)] text-[13px] leading-relaxed text-[hsl(0_0%_70%)]">
-              <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:mb-3 [&_li]:mb-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-4">
-                <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
+              <div className="markdown-body prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:mb-3 [&_li]:mb-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-4">
+                <Markdown remarkPlugins={[remarkGfm]}>{normalizedContent}</Markdown>
               </div>
             </div>
           </motion.div>

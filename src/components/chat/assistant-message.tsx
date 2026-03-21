@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { parseAssistantContent } from "@/lib/assistant-response";
+import { normalizeMarkdownTables } from "@/lib/markdown";
 import { Copy, Download, Lock, RefreshCw } from "lucide-react";
 import { SourcesFooter } from "./sources-footer";
 import { ThinkingBlock } from "./thinking-block";
@@ -212,6 +213,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
   // Parse custom mode blocks (thinking and sources) from text content
   const parsedContent = parseAssistantContent(content);
   const displayContent = parsedContent.text;
+  const normalizedDisplayContent = normalizeMarkdownTables(displayContent);
   const combinedThinking = apiThinkingContent || parsedContent.thinking;
   const combinedThinkingDurationMs = thinkingDurationMs ?? parsedContent.thinkingDurationMs ?? undefined;
   const displaySources = [...sources, ...parsedContent.sources];
@@ -365,8 +367,8 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
 
           {/* Response Content (phases 4-5) */}
           {isContentVisible && displayContent && (
-            <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
-              <Markdown remarkPlugins={[remarkGfm]}>{displayContent}</Markdown>
+            <div className="markdown-body prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
+              <Markdown remarkPlugins={[remarkGfm]}>{normalizedDisplayContent}</Markdown>
               {phase === "streaming" && (
                 <span className="streaming-cursor" />
               )}

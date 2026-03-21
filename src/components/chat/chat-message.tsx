@@ -9,6 +9,7 @@ import { QuizCard } from "./quiz-card";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { parseAssistantContent } from "@/lib/assistant-response";
+import { normalizeMarkdownTables } from "@/lib/markdown";
 import { ThinkingBlock } from "./thinking-block";
 import { SourcesFooter } from "./sources-footer";
 
@@ -35,6 +36,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
   const parsedAssistant = !isUser ? parseAssistantContent(message.content) : null;
   const assistantText = !isUser ? (parsedAssistant?.text ?? "") : message.content;
+  const normalizedAssistantText = !isUser ? normalizeMarkdownTables(assistantText) : assistantText;
 
   const timestamp = new Date(message.created_at).toLocaleTimeString("id-ID", {
     hour: "2-digit",
@@ -74,8 +76,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <QuizCard quizData={quizParsed.quizData as { id: string; topic: string; difficulty: "easy" | "medium" | "hard"; total_questions: number; questions: { id: number; question: string; options: string[] }[] }} />
             {quizParsed.remainingContent && (
               <div className="text-[hsl(0_0%_93%)] px-4 py-2.5 text-sm leading-relaxed mt-2">
-                <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                  <Markdown remarkPlugins={[remarkGfm]}>{quizParsed.remainingContent}</Markdown>
+                <div className="markdown-body prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                  <Markdown remarkPlugins={[remarkGfm]}>{normalizeMarkdownTables(quizParsed.remainingContent)}</Markdown>
                 </div>
               </div>
             )}
@@ -102,8 +104,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     />
                   </div>
                 )}
-                <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
-                  <Markdown remarkPlugins={[remarkGfm]}>{assistantText}</Markdown>
+                <div className="markdown-body prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
+                  <Markdown remarkPlugins={[remarkGfm]}>{normalizedAssistantText}</Markdown>
                 </div>
                 {parsedAssistant?.sources && parsedAssistant.sources.length > 0 && (
                   <div className="mt-3">
