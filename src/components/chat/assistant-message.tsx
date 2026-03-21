@@ -242,7 +242,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
 
       {/* Response container */}
       <div className="max-w-[75%] sm:max-w-[70%] space-y-1 flex flex-col items-start">
-        <div className="glass-card rounded-2xl rounded-bl-sm px-4 py-3 w-full min-w-[120px]">
+        <div className="w-full min-w-[120px]">
           {/* Status Area (phases 2-3) */}
           <AnimatePresence mode="wait">
             {isStatusVisible && (

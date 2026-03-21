@@ -73,7 +73,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="w-full max-w-md">
             <QuizCard quizData={quizParsed.quizData as { id: string; topic: string; difficulty: "easy" | "medium" | "hard"; total_questions: number; questions: { id: number; question: string; options: string[] }[] }} />
             {quizParsed.remainingContent && (
-              <div className="glass-card text-[hsl(0_0%_93%)] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed mt-2">
+              <div className="text-[hsl(0_0%_93%)] px-4 py-2.5 text-sm leading-relaxed mt-2">
                 <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                   <Markdown remarkPlugins={[remarkGfm]}>{quizParsed.remainingContent}</Markdown>
                 </div>
@@ -85,7 +85,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
               isUser
                 ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm"
-                : "glass-card text-[hsl(0_0%_93%)] rounded-bl-sm"
+                : "text-[hsl(0_0%_93%)]"
             }`}
           >
             {isUser ? (
