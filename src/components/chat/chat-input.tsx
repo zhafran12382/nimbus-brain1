@@ -91,7 +91,7 @@ export function ChatInput({
             type="submit"
             disabled={!hasText || isLoading}
             whileTap={hasText && !isLoading ? { scale: 0.9 } : undefined}
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all duration-200 self-end ${hasText
+            className={`flex min-h-11 min-w-11 h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all duration-200 self-end ${hasText
                 ? "bg-[hsl(217_91%_60%)] text-white shadow-[0_0_16px_hsl(217_91%_60%_/_0.25)]"
                 : "bg-[hsl(0_0%_10%)] text-[hsl(0_0%_30%)]"
               } disabled:opacity-50`}
