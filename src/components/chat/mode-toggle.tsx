@@ -55,7 +55,7 @@ export function ModeToggle({ value, onChange }: { value: ChatMode; onChange: (mo
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(0_0%_100%_/_0.03)] hover:bg-[hsl(0_0%_100%_/_0.06)] transition-colors group"
+        className="flex min-h-11 items-center gap-2 px-3 py-1.5 rounded-full border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(0_0%_100%_/_0.03)] hover:bg-[hsl(0_0%_100%_/_0.06)] transition-colors group"
       >
         <currentMode.icon className={`h-3.5 w-3.5 ${currentMode.color}`} />
         <span className="text-xs font-medium text-[hsl(0_0%_80%)] group-hover:text-white transition-colors">

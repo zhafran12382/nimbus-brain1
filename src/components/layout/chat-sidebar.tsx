@@ -213,7 +213,7 @@ export function ChatSidebar({
               onNewChat();
               if (window.innerWidth < 1024) onClose();
             }}
-            className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border-default px-3 py-2.5 text-sm text-text-secondary hover:text-text-primary hover:border-accent/40 hover:bg-hover transition-colors"
+            className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-dashed border-border-default px-3 py-2.5 text-sm text-text-secondary hover:text-text-primary hover:border-accent/40 hover:bg-hover transition-colors"
           >
             <Plus className="h-4 w-4" />
             New Chat
@@ -270,7 +270,7 @@ export function ChatSidebar({
                       href={item.href}
                       onClick={() => { if (window.innerWidth < 1024) onClose(); }}
                       className={cn(
-                        "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 group",
+                        "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 group",
                         isActive
                           ? "bg-accent-muted border border-accent/20"
                           : "hover:bg-hover border border-transparent"
@@ -322,7 +322,7 @@ export function ChatSidebar({
                         if (window.innerWidth < 1024) onClose(); 
                       }}
                       className={cn(
-                        "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 group",
+                        "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 group",
                         isActive
                           ? "bg-violet-500/10 border border-violet-500/20"
                           : "hover:bg-hover border border-transparent"

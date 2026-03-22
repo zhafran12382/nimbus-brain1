@@ -46,8 +46,8 @@ export function ChatContainer({
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <ScrollArea className="flex-1 p-4">
-        <div className="mx-auto max-w-3xl space-y-5 sm:space-y-5 pb-4">
+      <ScrollArea className="flex-1 p-3 sm:p-4">
+        <div className="mx-auto max-w-full sm:max-w-3xl space-y-4 sm:space-y-5 pb-4">
           {messages.length === 0 && !isLoading && (
             <div className="flex flex-col items-center justify-center pt-[25vh] text-center">
               {/* Logo with glow */}

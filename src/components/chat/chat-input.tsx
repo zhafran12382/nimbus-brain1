@@ -45,10 +45,9 @@ export function ChatInput({
 
   return (
     <div
-      className="border-t border-[hsl(0_0%_100%_/_0.04)]"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="border-t border-[hsl(0_0%_100%_/_0.04)] pb-[env(safe-area-inset-bottom)]"
     >
-      <div className="mx-auto max-w-3xl px-3 sm:px-4">
+      <div className="mx-auto max-w-full sm:max-w-3xl px-3 sm:px-4">
         {/* Input Row */}
         <form
           onSubmit={handleSubmit}
@@ -92,7 +91,7 @@ export function ChatInput({
             type="submit"
             disabled={!hasText || isLoading}
             whileTap={hasText && !isLoading ? { scale: 0.9 } : undefined}
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-all duration-200 self-end ${hasText
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all duration-200 self-end ${hasText
                 ? "bg-[hsl(217_91%_60%)] text-white shadow-[0_0_16px_hsl(217_91%_60%_/_0.25)]"
                 : "bg-[hsl(0_0%_10%)] text-[hsl(0_0%_30%)]"
               } disabled:opacity-50`}

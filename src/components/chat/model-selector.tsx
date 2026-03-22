@@ -44,7 +44,7 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-white/60 hover:bg-white/8 hover:text-white/80 transition-colors"
+        className="flex min-h-11 items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-white/60 hover:bg-white/8 hover:text-white/80 transition-colors"
       >
         <span>{currentProvider?.icon}</span>
         <span className="max-w-[120px] truncate text-white/80 font-medium">{currentModel?.name || "Select model"}</span>

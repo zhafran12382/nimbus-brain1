@@ -185,7 +185,19 @@ body {
   overflow-y: hidden;
   max-width: 100%;
   -webkit-overflow-scrolling: touch;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   font-size: 14px;
+}
+
+.markdown-body pre {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.markdown-body code {
+  word-break: normal;
 }
 
 .markdown-body table {

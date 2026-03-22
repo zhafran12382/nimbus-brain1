@@ -84,14 +84,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         ) : (
           <div
-            className={`text-sm leading-relaxed ${
-              isUser
-                ? "rounded-2xl px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm"
-                : "text-[hsl(0_0%_93%)]"
-            }`}
+            className={`text-sm leading-relaxed break-words ${
+                isUser
+                  ? "rounded-2xl px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-br-sm"
+                  : "text-[hsl(0_0%_93%)]"
+              }`}
           >
             {isUser ? (
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              <p className="whitespace-pre-wrap break-words">{message.content}</p>
             ) : assistantText.startsWith('⚠️') ? (
               <p className="text-amber-400">{assistantText}</p>
             ) : (
