@@ -11,6 +11,7 @@ import remarkGfm from "remark-gfm";
 import { parseAssistantContent } from "@/lib/assistant-response";
 import { ThinkingBlock } from "./thinking-block";
 import { SourcesFooter } from "./sources-footer";
+import { chatMarkdownComponents } from "./markdown-components";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -58,7 +59,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
       )}
 
-      <div className={`max-w-[75%] sm:max-w-[70%] space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
+      <div className={`w-full max-w-[min(75%,44rem)] sm:max-w-[min(70%,44rem)] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
         {/* Action badges for assistant messages */}
         {!isUser && message.tool_calls && message.tool_calls.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-0.5">
@@ -74,8 +75,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <QuizCard quizData={quizParsed.quizData as { id: string; topic: string; difficulty: "easy" | "medium" | "hard"; total_questions: number; questions: { id: number; question: string; options: string[] }[] }} />
             {quizParsed.remainingContent && (
               <div className="glass-card text-[hsl(0_0%_93%)] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed mt-2">
-                <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                  <Markdown remarkPlugins={[remarkGfm]}>{quizParsed.remainingContent}</Markdown>
+                <div className="chat-markdown prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                  <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{quizParsed.remainingContent}</Markdown>
                 </div>
               </div>
             )}
@@ -102,8 +103,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     />
                   </div>
                 )}
-                <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_pre]:bg-[hsl(0_0%_5%)] [&_pre]:rounded-lg [&_pre]:text-[13px] [&_pre]:p-3 [&_code]:text-[13px]">
-                  <Markdown remarkPlugins={[remarkGfm]}>{assistantText}</Markdown>
+                <div className="chat-markdown prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                  <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{assistantText}</Markdown>
                 </div>
                 {parsedAssistant?.sources && parsedAssistant.sources.length > 0 && (
                   <div className="mt-3">

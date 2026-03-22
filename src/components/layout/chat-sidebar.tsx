@@ -9,12 +9,10 @@ import {
   Pencil,
   Trash2,
   Search,
-  X,
   MessageCircle,
   Wallet,
   Target,
   BookOpen,
-  ChevronDown,
   User,
   GraduationCap,
 } from "lucide-react";
@@ -213,7 +211,7 @@ export function ChatSidebar({
               onNewChat();
               if (window.innerWidth < 1024) onClose();
             }}
-            className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border-default px-3 py-2.5 text-sm text-text-secondary hover:text-text-primary hover:border-accent/40 hover:bg-hover transition-colors"
+            className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-dashed border-border-default px-3 py-2.5 text-sm text-text-secondary hover:text-text-primary hover:border-accent/40 hover:bg-hover transition-colors"
           >
             <Plus className="h-4 w-4" />
             New Chat
@@ -223,25 +221,25 @@ export function ChatSidebar({
         {/* ─── Area X: Personal / Study Tabs ─── */}
         <div className="px-3 pt-3 pb-1">
           <div className="flex gap-1 p-0.5 rounded-lg bg-[hsl(0_0%_7%)] border border-border-subtle">
-            <button
-              onClick={() => setSidebarTab("personal")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200",
-                sidebarTab === "personal"
-                  ? "bg-accent-muted text-accent shadow-sm"
-                  : "text-text-muted hover:text-text-secondary"
+              <button
+                onClick={() => setSidebarTab("personal")}
+                className={cn(
+                  "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200",
+                  sidebarTab === "personal"
+                    ? "bg-accent-muted text-accent shadow-sm"
+                    : "text-text-muted hover:text-text-secondary"
               )}
             >
               <User className="h-3.5 w-3.5" />
               Personal
             </button>
-            <button
-              onClick={() => setSidebarTab("study")}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200",
-                sidebarTab === "study"
-                  ? "bg-violet-500/15 text-violet-400 shadow-sm"
-                  : "text-text-muted hover:text-text-secondary"
+              <button
+                onClick={() => setSidebarTab("study")}
+                className={cn(
+                  "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all duration-200",
+                  sidebarTab === "study"
+                    ? "bg-violet-500/15 text-violet-400 shadow-sm"
+                    : "text-text-muted hover:text-text-secondary"
               )}
             >
               <GraduationCap className="h-3.5 w-3.5" />
@@ -373,7 +371,7 @@ export function ChatSidebar({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search conversations..."
-                className="w-full rounded-lg bg-elevated border border-border-subtle pl-8 pr-3 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40 transition-colors"
+                className="min-h-11 w-full rounded-lg bg-elevated border border-border-subtle pl-8 pr-3 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40 transition-colors"
               />
             </div>
           </div>

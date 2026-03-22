@@ -13,7 +13,6 @@ import { AssistantMessageState, getToolDisplay } from "@/components/chat/assista
 import { Menu, Settings } from "lucide-react";
 import { useModelSelection } from "@/hooks/useModelSelection";
 import { useLockedIn } from "@/components/study/locked-in-context";
-import { cn } from "@/lib/utils";
 
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
 const PERSONALITY_KEY = "nimbus-brain-personality";
@@ -331,7 +330,7 @@ function ChatPageContent() {
   }, [messages, activeConversationId, chatMode, modelId, providerId]);
 
   return (
-    <div className="flex h-[100dvh] sm:h-screen relative overflow-hidden">
+    <div className="relative flex h-[100dvh] w-full overflow-hidden">
       {/* Left: ChatSidebar (Area X + Y) */}
       <ChatSidebar
         open={sidebarOpen}
@@ -346,11 +345,11 @@ function ChatPageContent() {
       {/* Right: Main Chat Area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Header with Area A (Router) */}
-        <header className="relative z-20 flex h-14 items-center gap-3 px-3 sm:px-4 border-b border-[hsl(0_0%_100%_/_0.04)] glass">
+        <header className="relative z-20 flex h-14 min-w-0 items-center gap-2 border-b border-[hsl(0_0%_100%_/_0.04)] px-2.5 sm:gap-3 sm:px-4 glass">
           {/* Hamburger (mobile + sidebar toggle) */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -362,14 +361,14 @@ function ChatPageContent() {
           />
 
           {/* Spacer */}
-          <div className="flex-1" />
+          <div className="min-w-0 flex-1" />
 
           {/* Settings (optional) */}
           <button
             onClick={() => {
               /* Could open settings panel — currently handled by AppShell */
             }}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
             title="Settings"
           >
             <Settings className="h-4 w-4" />
