@@ -32,7 +32,7 @@ export function RouterSelector({ providerId, onProviderChange }: RouterSelectorP
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="group flex min-h-11 max-w-[min(62vw,14rem)] items-center gap-2 rounded-full border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(0_0%_100%_/_0.03)] px-2.5 py-1.5 transition-colors hover:bg-[hsl(0_0%_100%_/_0.06)] sm:max-w-none sm:px-3"
+        className="group flex min-h-11 max-w-[62vw] items-center gap-2 overflow-hidden rounded-full border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(0_0%_100%_/_0.03)] px-2.5 py-2 transition-colors hover:bg-[hsl(0_0%_100%_/_0.06)] sm:max-w-none sm:px-3"
       >
         <span className="shrink-0 text-sm">{currentProvider.icon}</span>
         <span className="truncate text-xs font-medium text-[hsl(0_0%_80%)] transition-colors group-hover:text-white">

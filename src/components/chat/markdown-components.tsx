@@ -1,4 +1,5 @@
 import type { Components } from "react-markdown";
+import { cn } from "@/lib/utils";
 
 export const chatMarkdownComponents: Components = {
   table({ children, ...props }) {
@@ -10,7 +11,7 @@ export const chatMarkdownComponents: Components = {
   },
   pre({ className, children, ...props }) {
     return (
-      <pre className={["chat-markdown-pre", className].filter(Boolean).join(" ")} {...props}>
+      <pre className={cn("chat-markdown-pre", className)} {...props}>
         {children}
       </pre>
     );
@@ -22,7 +23,7 @@ export const chatMarkdownComponents: Components = {
         className={
           isInline
             ? "chat-markdown-code-inline"
-            : ["chat-markdown-code-block", className].filter(Boolean).join(" ")
+            : cn("chat-markdown-code-block", className)
         }
         {...props}
       >

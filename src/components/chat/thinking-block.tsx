@@ -23,7 +23,7 @@ export function ThinkingBlock({ content, durationMs }: ThinkingBlockProps) {
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex min-h-11 items-center gap-2 rounded-md px-1 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        className="flex min-h-11 items-center gap-2 rounded-md px-2 text-[12px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(0_0%_7%)]"
       >
         <Atom className="h-4 w-4 text-[hsl(217_91%_60%)]" />
         <span className="text-[hsl(0_0%_50%)] hover:text-[hsl(0_0%_70%)]">Thought for {seconds} seconds</span>
