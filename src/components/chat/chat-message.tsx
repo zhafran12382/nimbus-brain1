@@ -59,7 +59,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
       )}
 
-      <div className={`w-full max-w-[75%] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
+      <div className={`w-full max-w-[82%] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
         {/* Action badges for assistant messages */}
         {!isUser && message.tool_calls && message.tool_calls.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-0.5">
@@ -74,7 +74,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="w-full max-w-md">
             <QuizCard quizData={quizParsed.quizData as { id: string; topic: string; difficulty: "easy" | "medium" | "hard"; total_questions: number; questions: { id: number; question: string; options: string[] }[] }} />
             {quizParsed.remainingContent && (
-              <div className="mt-2 px-3.5 py-3 text-base leading-[1.6] text-[#E6E6E6]">
+              <div className="mt-2 px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]">
                 <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                   <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{quizParsed.remainingContent}</Markdown>
                 </div>
@@ -84,8 +84,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : (
           <div
             className={isUser
-              ? "rounded-2xl rounded-br-sm bg-gradient-to-r from-blue-600 to-blue-500 px-3.5 py-3 text-base leading-[1.6] text-[#E6E6E6]"
-              : "px-3.5 py-3 text-base leading-[1.6] text-[#E6E6E6]"
+              ? "rounded-2xl rounded-br-sm bg-gradient-to-r from-blue-600 to-blue-500 px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#F3F7FF]"
+              : "px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]"
             }
           >
             {isUser ? (

@@ -242,7 +242,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       </div>
 
       {/* Response container */}
-      <div className="w-full max-w-[75%] space-y-1 flex flex-col items-start min-w-0">
+      <div className="w-full max-w-[82%] space-y-1 flex flex-col items-start min-w-0">
         <div className="w-full min-w-[120px] px-3.5 py-3">
           {/* Status Area (phases 2-3) */}
           <AnimatePresence mode="wait">
