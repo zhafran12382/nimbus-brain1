@@ -38,6 +38,7 @@
   --cat-finance: hsl(160 84% 39%);
   --cat-project: hsl(38 92% 50%);
   --cat-custom: hsl(217 91% 60%);
+  --chat-content-max-width: 52rem;
 }
 
 @theme inline {
@@ -64,7 +65,7 @@
 body {
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: "Inter", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: system-ui, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

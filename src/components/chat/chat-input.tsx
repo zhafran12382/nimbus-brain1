@@ -48,7 +48,7 @@ export function ChatInput({
       className="border-t border-[hsl(0_0%_100%_/_0.04)]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="mx-auto max-w-[52rem] px-3 sm:px-4">
+      <div className="mx-auto max-w-[var(--chat-content-max-width)] px-3 sm:px-4">
         {/* Input Row */}
         <form
           onSubmit={handleSubmit}
