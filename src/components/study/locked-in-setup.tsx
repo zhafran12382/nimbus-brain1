@@ -4,6 +4,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Lock } from "lucide-react";
 import { useLockedIn } from "./locked-in-context";
 
+type FullscreenDocEl = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+  mozRequestFullScreen?: () => Promise<void> | void;
+  msRequestFullscreen?: () => Promise<void> | void;
+};
+
 export function LockedInSetup() {
   const { 
     isDialogOpen, setDialogOpen, 
@@ -17,12 +23,15 @@ export function LockedInSetup() {
     // Request fullscreen synchronously first to preserve user gesture context on Android
     try {
       if (typeof document !== 'undefined') {
-        const docEl = document.documentElement as any;
+        const docEl = document.documentElement as FullscreenDocEl;
         const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
         if (requestFS) {
-          requestFS.call(docEl).catch((e: any) => {
-            console.warn("Fullscreen error", e);
-          });
+          const fullscreenResult = requestFS.call(docEl);
+          if (fullscreenResult && typeof (fullscreenResult as Promise<void>).catch === "function") {
+            fullscreenResult.catch((e: unknown) => {
+              console.warn("Fullscreen error", e);
+            });
+          }
         }
       }
     } catch (e) {
