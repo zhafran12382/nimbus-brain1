@@ -28,14 +28,14 @@ export function RouterSelector({ providerId, onProviderChange }: RouterSelectorP
   }, [open]);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative min-w-0" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(0_0%_100%_/_0.03)] hover:bg-[hsl(0_0%_100%_/_0.06)] transition-colors group"
+        className="group flex min-h-11 max-w-[62vw] items-center gap-2 overflow-hidden rounded-full border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(0_0%_100%_/_0.03)] px-2.5 py-2 transition-colors hover:bg-[hsl(0_0%_100%_/_0.06)] sm:max-w-none sm:px-3"
       >
-        <span className="text-sm">{currentProvider.icon}</span>
-        <span className="text-xs font-medium text-[hsl(0_0%_80%)] group-hover:text-white transition-colors">
+        <span className="shrink-0 text-sm">{currentProvider.icon}</span>
+        <span className="truncate text-xs font-medium text-[hsl(0_0%_80%)] transition-colors group-hover:text-white">
           {currentProvider.name}
         </span>
         <ChevronUp

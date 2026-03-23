@@ -68,7 +68,7 @@ export function ChatInput({
               onBlur={() => setFocused(false)}
               placeholder="Tanya Nimbus Brain..."
               disabled={isLoading}
-              className="w-full bg-transparent px-4 py-3.5 text-sm text-[hsl(0_0%_93%)] placeholder:text-[hsl(0_0%_40%)] focus:outline-none disabled:opacity-50"
+              className="w-full bg-transparent px-4 py-3.5 text-[16px] leading-[1.6] text-[#E6E6E6] placeholder:text-[15px] placeholder:text-[#8A8A8A] focus:outline-none disabled:opacity-50"
             />
 
             {/* Bottom Row inside input box: Mode (Left) + Model (Right) */}

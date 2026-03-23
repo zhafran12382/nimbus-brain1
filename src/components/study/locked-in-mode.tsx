@@ -5,6 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLockedIn } from "./locked-in-context";
 import { PomodoroTimer } from "./pomodoro-timer";
 
+type FullscreenDocEl = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+  mozRequestFullScreen?: () => Promise<void> | void;
+  msRequestFullscreen?: () => Promise<void> | void;
+};
+
 const MOTIVATIONAL_QUOTES = [
   "Sedikit demi sedikit, lama-lama menjadi bukit.",
   "Fokuslah pada tujuannya, bukan rintangannya.",
@@ -23,12 +29,9 @@ export function LockedInMode() {
   const [isFullscreenGuardActive, setFullscreenGuardActive] = useState(false);
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [quote, setQuote] = useState(MOTIVATIONAL_QUOTES[0]);
-
-  // Set random quote on mount and per session
-  useEffect(() => {
-    setQuote(MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
-  }, [currentSession]);
+  const safeSession = Math.max(1, currentSession);
+  const quote = MOTIVATIONAL_QUOTES[(safeSession - 1) % MOTIVATIONAL_QUOTES.length];
+  const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
 
   // Fullscreen Guard
   useEffect(() => {
@@ -53,10 +56,13 @@ export function LockedInMode() {
     setFullscreenGuardActive(false);
     try {
       if (typeof document !== 'undefined') {
-        const docEl = document.documentElement as any;
+        const docEl = document.documentElement as FullscreenDocEl;
         const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
         if (requestFS) {
-          requestFS.call(docEl).catch((e: any) => console.warn("Fullscreen error", e));
+          const fullscreenResult = requestFS.call(docEl);
+          if (fullscreenResult && typeof (fullscreenResult as Promise<void>).catch === "function") {
+            fullscreenResult.catch((e: unknown) => console.warn("Fullscreen error", e));
+          }
         }
       }
     } catch (e) {
@@ -72,13 +78,6 @@ export function LockedInMode() {
       document.exitFullscreen().catch(err => console.error(err));
     }
   };
-
-  const [isAndroid, setIsAndroid] = useState(false);
-  useEffect(() => {
-    if (typeof navigator !== 'undefined') {
-      setIsAndroid(/android/i.test(navigator.userAgent));
-    }
-  }, []);
 
   return (
     <>
