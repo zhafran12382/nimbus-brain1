@@ -59,7 +59,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
       )}
 
-      <div className={`w-full max-w-[75%] sm:max-w-[70%] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
+      <div className={`w-full max-w-[75%] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
         {/* Action badges for assistant messages */}
         {!isUser && message.tool_calls && message.tool_calls.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-0.5">
@@ -74,8 +74,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="w-full max-w-md">
             <QuizCard quizData={quizParsed.quizData as { id: string; topic: string; difficulty: "easy" | "medium" | "hard"; total_questions: number; questions: { id: number; question: string; options: string[] }[] }} />
             {quizParsed.remainingContent && (
-              <div className="mt-2 px-1 py-1 text-sm leading-relaxed text-[hsl(0_0%_93%)]">
-                <div className="chat-markdown prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+              <div className="mt-2 px-3.5 py-3 text-base leading-[1.6] text-[#E6E6E6]">
+                <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                   <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{quizParsed.remainingContent}</Markdown>
                 </div>
               </div>
@@ -84,8 +84,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : (
           <div
             className={isUser
-              ? "rounded-2xl rounded-br-sm bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2.5 text-sm leading-relaxed text-white"
-              : "px-1 py-1 text-sm leading-relaxed text-[hsl(0_0%_93%)]"
+              ? "rounded-2xl rounded-br-sm bg-gradient-to-r from-blue-600 to-blue-500 px-3.5 py-3 text-base leading-[1.6] text-[#E6E6E6]"
+              : "px-3.5 py-3 text-base leading-[1.6] text-[#E6E6E6]"
             }
           >
             {isUser ? (
@@ -102,7 +102,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     />
                   </div>
                 )}
-                <div className="chat-markdown prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                   <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{assistantText}</Markdown>
                 </div>
                 {parsedAssistant?.sources && parsedAssistant.sources.length > 0 && (
@@ -117,9 +117,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
         {/* Timestamp & model info */}
         <div className="flex items-center gap-2 px-1">
-          <span className="text-[10px] text-[hsl(0_0%_93%_/_0.4)]">{timestamp}</span>
+          <span className="text-[12px] text-[#8A8A8A]">{timestamp}</span>
           {!isUser && message.model_used && (
-            <span className="hidden sm:inline text-[10px] text-[hsl(0_0%_93%_/_0.3)]">
+            <span className="hidden sm:inline text-[12px] text-[#8A8A8A]">
               {message.provider_used === 'openrouter' ? '🔵' : '🟢'} {message.model_used}
             </span>
           )}

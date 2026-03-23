@@ -242,8 +242,8 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       </div>
 
       {/* Response container */}
-      <div className="w-full max-w-[75%] sm:max-w-[70%] space-y-1 flex flex-col items-start min-w-0">
-        <div className="w-full min-w-[120px] px-1 py-1">
+      <div className="w-full max-w-[75%] space-y-1 flex flex-col items-start min-w-0">
+        <div className="w-full min-w-[120px] px-3.5 py-3">
           {/* Status Area (phases 2-3) */}
           <AnimatePresence mode="wait">
             {isStatusVisible && (
@@ -366,7 +366,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
 
           {/* Response Content (phases 4-5) */}
           {isContentVisible && displayContent && (
-            <div className="chat-markdown prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+            <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
               <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{displayContent}</Markdown>
               {phase === "streaming" && (
                 <span className="streaming-cursor" />
@@ -420,10 +420,10 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
               className="flex items-center gap-2 px-1"
             >
               {timestamp && (
-                <span className="text-[10px] text-[hsl(0_0%_93%_/_0.4)]">{timestamp}</span>
+                <span className="text-[12px] text-[#8A8A8A]">{timestamp}</span>
               )}
               {modelUsed && (
-                <span className="hidden sm:inline text-[10px] text-[hsl(0_0%_93%_/_0.3)]">
+                <span className="hidden sm:inline text-[12px] text-[#8A8A8A]">
                   {modelUsed}
                 </span>
               )}
