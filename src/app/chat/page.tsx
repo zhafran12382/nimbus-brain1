@@ -10,9 +10,10 @@ import { ChatContainer } from "@/components/chat/chat-container";
 import { ChatSidebar } from "@/components/layout/chat-sidebar";
 import { RouterSelector } from "@/components/chat/router-selector";
 import { AssistantMessageState, getToolDisplay } from "@/components/chat/assistant-message";
-import { Menu, Settings } from "lucide-react";
+import { Menu, LogOut } from "lucide-react";
 import { useModelSelection } from "@/hooks/useModelSelection";
 import { useLockedIn } from "@/components/study/locked-in-context";
+import { useRouter } from "next/navigation";
 
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
 const PERSONALITY_KEY = "nimbus-brain-personality";
@@ -41,6 +42,7 @@ function getStoredMode(): ChatMode {
 }
 
 function ChatPageContent() {
+  const router = useRouter();
   const { setDialogOpen } = useLockedIn();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -117,6 +119,64 @@ function ChatPageContent() {
     }
     switchProvider(id);
   }, [switchProvider]);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/login");
+      router.refresh();
+    } catch {
+      // Force redirect even if API fails
+      router.push("/login");
+    }
+  }, [router]);
+
+  const handleImageGenerate = useCallback(async (prompt: string) => {
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: `🎨 Generate image: ${prompt}`,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/image/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Image generation failed.");
+      }
+
+      const imageContent = data.is_base64
+        ? `![Generated Image](data:image/png;base64,${data.image_url})`
+        : `![Generated Image](${data.image_url})`;
+
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `${imageContent}\n\n*Prompt: "${data.prompt}"*`,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Image generation failed.";
+      const errorMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `❌ Image generation error: ${message}`,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const handleSend = useCallback(async (content: string) => {
     const conversationId = activeConversationId;
@@ -350,6 +410,7 @@ function ChatPageContent() {
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
+            style={{ minWidth: "44px", minHeight: "44px" }}
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -363,15 +424,14 @@ function ChatPageContent() {
           {/* Spacer */}
           <div className="min-w-0 flex-1" />
 
-          {/* Settings (optional) */}
+          {/* Logout button */}
           <button
-            onClick={() => {
-              /* Could open settings panel — currently handled by AppShell */
-            }}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
-            title="Settings"
+            onClick={handleLogout}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            title="Logout"
+            style={{ minWidth: "44px", minHeight: "44px" }}
           >
-            <Settings className="h-4 w-4" />
+            <LogOut className="h-4 w-4" />
           </button>
         </header>
 
@@ -382,6 +442,7 @@ function ChatPageContent() {
               type="button"
               onClick={() => setTpmWarning(null)}
               className="shrink-0 rounded px-2 py-0.5 text-[11px] text-amber-100/90 hover:bg-amber-500/20"
+              style={{ minHeight: "40px", minWidth: "40px" }}
             >
               Tutup
             </button>
@@ -400,6 +461,7 @@ function ChatPageContent() {
           modelId={modelId}
           onProviderChange={handleProviderChange}
           onModelChange={switchModel}
+          onImageGenerate={handleImageGenerate}
         />
       </div>
     </div>
