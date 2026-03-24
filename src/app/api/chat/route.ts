@@ -342,6 +342,10 @@ async function callProvider(
     body.tools = tools;
     body.tool_choice = "auto";
   }
+  // OpenRouter Paid: lock provider to DeepInfra
+  if (providerId === 'openrouter-paid') {
+    body.provider = { order: ["DeepInfra"] };
+  }
 
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -397,13 +401,17 @@ async function callProviderStream(
   const provider = getProviderConfig(providerId);
   if (!provider) throw new Error(`Provider "${providerId}" not found.`);
 
-  const body = {
+  const body: Record<string, unknown> = {
     model: modelId,
     messages,
     temperature,
     max_tokens: maxTokens,
     stream: true,
   };
+  // OpenRouter Paid: lock provider to DeepInfra
+  if (providerId === 'openrouter-paid') {
+    body.provider = { order: ["DeepInfra"] };
+  }
 
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
