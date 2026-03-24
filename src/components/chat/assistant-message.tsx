@@ -209,40 +209,57 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
   );
 }
 
-// Pipeline flow node component
-function PipelineNode({ label, isActive, isCompleted, isLast }: { 
+// Random "X" labels for initial node (the user wants dynamic starting labels)
+const X_LABELS = [
+  "Spinning up the AI...",
+  "Warming up the AI...",
+  "Bringing the AI online...",
+  "Initializing neural pathways...",
+  "Powering up the brain...",
+  "Preparing the AI engine...",
+  "Activating intelligence...",
+  "Loading the AI core...",
+];
+
+function getRandomXLabel(): string {
+  return X_LABELS[Math.floor(Math.random() * X_LABELS.length)];
+}
+
+// Pipeline flow node component — VERTICAL layout with arrow connectors
+function PipelineNode({ label, isActive, isCompleted, isFirst }: { 
   label: string; 
   isActive: boolean; 
   isCompleted: boolean;
-  isLast: boolean;
+  isFirst: boolean;
 }) {
+  // Arrow prefix based on position
+  const arrow = isFirst ? "→" : "---->";
+  
   return (
     <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className="flex items-center gap-0"
+      initial={{ opacity: 0, x: -6 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.25 }}
+      className="flex flex-col"
     >
-      {/* Node label */}
-      <div className={`flex items-center gap-1.5 text-[12px] font-medium ${
+      {/* Vertical connector line (above, except first node) */}
+      {!isFirst && (
+        <div className="ml-1.5 h-4 border-l border-[hsl(0_0%_20%)]" />
+      )}
+      {/* Node row: arrow + label */}
+      <div className={`flex items-center gap-1.5 text-[13px] font-medium ${
         isActive 
-          ? "text-[hsl(217_91%_65%)]" 
+          ? "text-[hsl(0_0%_80%)]" 
           : isCompleted 
             ? "text-[hsl(0_0%_50%)]" 
             : "text-[hsl(0_0%_35%)]"
       }`}>
+        <span className="text-[hsl(0_0%_30%)] text-[12px] font-mono shrink-0">{arrow}</span>
         {isActive && (
           <div className="spinner-perplexity" style={{ width: 11, height: 11 }} />
         )}
-        {isCompleted && !isActive && (
-          <span className="text-emerald-400/70 text-[11px]">✓</span>
-        )}
         <span>{label}</span>
       </div>
-      {/* Arrow connector */}
-      {!isLast && (
-        <span className="mx-1.5 text-[10px] text-[hsl(0_0%_25%)]">→</span>
-      )}
     </motion.div>
   );
 }
@@ -250,6 +267,8 @@ function PipelineNode({ label, isActive, isCompleted, isLast }: {
 export function AssistantMessage({ state }: AssistantMessageProps) {
   const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs, thinkingContent: apiThinkingContent } = state;
   const [showMetadata, setShowMetadata] = useState(false);
+  // Persist the random "X" label across re-renders so it doesn't change every time
+  const [xLabel] = useState(() => getRandomXLabel());
 
   // Show metadata with delay after completion
   useEffect(() => {
@@ -288,13 +307,13 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
   ).slice(0, 5);
 
   // Build pipeline nodes from tool history
-  // Deduplicate tool names and build the flow: Thinking → [tools...] → Generate response
+  // Deduplicate tool names and build the flow: X → [tools...] → Generate response
   const pipelineNodes: { id: string; label: string; completed: boolean; active: boolean }[] = [];
   
-  // Add initial thinking node
+  // Add initial "X" node (random dynamic label like "Spinning up the AI...")
   const thinkingDone = toolHistory.length > 0 || phase === "streaming" || phase === "complete";
   const thinkingActive = phase === "thinking" && toolHistory.filter(t => t.name !== "__thinking").length === 0;
-  pipelineNodes.push({ id: "thinking", label: "Thinking", completed: thinkingDone, active: thinkingActive });
+  pipelineNodes.push({ id: "x", label: xLabel, completed: thinkingDone, active: thinkingActive });
   
   // Add tool nodes (deduplicated by tool name to avoid showing "Search" 3 times)
   const seenToolLabels = new Set<string>();
@@ -358,13 +377,13 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       {/* Response container */}
       <div className="w-full max-w-[82%] space-y-1 flex flex-col items-start min-w-0">
         <div className="w-full min-w-[120px] px-3.5 py-3">
-          {/* Pipeline Flow (horizontal flow: Thinking → Search → Generate response) */}
+          {/* Pipeline Flow (VERTICAL: → X | ----->Search | ---> Generate response) */}
           {showPipeline && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.2 }}
-              className="flex flex-wrap items-center gap-y-1 mb-3"
+              className="flex flex-col mb-3"
             >
               {pipelineNodes.map((node, i) => (
                 <PipelineNode
@@ -372,7 +391,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                   label={node.label}
                   isActive={node.active}
                   isCompleted={node.completed}
-                  isLast={i === pipelineNodes.length - 1}
+                  isFirst={i === 0}
                 />
               ))}
             </motion.div>

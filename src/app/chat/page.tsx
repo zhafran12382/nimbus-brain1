@@ -314,7 +314,7 @@ function ChatPageContent() {
               finalContent = event.content || "";
               finalToolCalls = event.tool_calls || [];
               finalModelUsed = event.model_used || modelId;
-              // Force phase to streaming with final content so UI renders it immediately
+              // Set phase to "complete" so content renders and pipeline hides
               setStreamingState((prev) => {
                 if (!prev) return null;
                 const updatedHistory = prev.toolHistory.map(t => ({
@@ -323,8 +323,10 @@ function ChatPageContent() {
                 }));
                 return {
                   ...prev,
-                  phase: "streaming" as const,
+                  phase: "complete" as const,
                   content: event.content || prev.content,
+                  modelUsed: event.model_used || modelId,
+                  completedAt: new Date().toISOString(),
                   toolHistory: updatedHistory,
                   thinkingContent: event.thinking_content ?? prev.thinkingContent,
                   thinkingDurationMs: event.thinking_duration_ms ?? prev.thinkingDurationMs,
@@ -365,6 +367,7 @@ function ChatPageContent() {
         setRefreshKey((k) => k + 1);
       }
 
+      // Build the persisted message
       if (finalContent.trim() || finalToolCalls.length > 0) {
         const messageContent = finalContent.trim()
           ? finalContent
@@ -381,7 +384,12 @@ function ChatPageContent() {
           provider_used: finalProviderUsed,
           created_at: new Date().toISOString(),
         };
+        // Clear streaming state and add persisted message in the same batch
+        // This prevents a flash where neither is visible
+        setStreamingState(null);
         setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        setStreamingState(null);
       }
 
       if (returnedConvId) {
@@ -398,10 +406,13 @@ function ChatPageContent() {
         content: isProviderWarning ? message : `❌ Error: ${message}`,
         created_at: new Date().toISOString(),
       };
+      setStreamingState(null);
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
-      setStreamingState(null);
+      // Streaming state is already cleared in try/catch blocks above
+      // Only clear here as safety net if not already cleared
+      setStreamingState((prev) => prev ? null : prev);
       abortControllerRef.current = null;
     }
   }, [messages, activeConversationId, chatMode, modelId, providerId]);

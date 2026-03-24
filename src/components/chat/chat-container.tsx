@@ -92,9 +92,9 @@ export function ChatContainer({
             <ChatMessage key={msg.id} message={msg} />
           ))}
 
-          {/* Streaming assistant response */}
+          {/* Streaming assistant response — show when streamingState exists (regardless of isLoading) */}
           <AnimatePresence>
-            {isLoading && streamingState && (
+            {streamingState && (
               <motion.div
                 key="streaming-assistant"
                 initial={messageBubble.initial}
