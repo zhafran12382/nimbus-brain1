@@ -319,6 +319,27 @@ export const tools = [
   {
     type: "function" as const,
     function: {
+      name: "run_python",
+      description: "Eksekusi kode Python untuk perhitungan matematis, analisis data, verifikasi angka, konversi satuan, atau operasi numerik lainnya. Gunakan saat perlu menghitung sesuatu yang spesifik, memverifikasi angka dari web search, atau analisis yang membutuhkan presisi. JANGAN gunakan untuk hal yang bisa dijawab langsung tanpa perhitungan.",
+      parameters: {
+        type: "object",
+        properties: {
+          code: {
+            type: "string",
+            description: "Kode Python yang akan dieksekusi. Harus print() hasilnya. Library standar tersedia (math, json, datetime, statistics, decimal, fractions). JANGAN gunakan library external (numpy, pandas, dll) karena tidak tersedia."
+          },
+          purpose: {
+            type: "string",
+            description: "Penjelasan singkat tujuan eksekusi kode ini (untuk logging)"
+          }
+        },
+        required: ["code"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "create_quiz",
       description: "Buat kuis atau tes soal latihan interaktif seputar topik apa saja untuk user belajar.",
       parameters: {

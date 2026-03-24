@@ -238,9 +238,18 @@ function ChatPageContent() {
         (event) => {
           switch (event.type) {
             case "status":
-              setStreamingState((prev) =>
-                prev ? { ...prev, phase: "thinking" } : null
-              );
+              setStreamingState((prev) => {
+                if (!prev) return null;
+                // If this is the initial "Thinking..." status, add it as first step
+                if (prev.toolHistory.length === 0 && prev.phase !== "tool_executing") {
+                  return {
+                    ...prev,
+                    phase: "thinking",
+                    toolHistory: [{ name: "__thinking", icon: "💭", text: "Thinking...", result: undefined }]
+                  };
+                }
+                return { ...prev, phase: "thinking" };
+              });
               break;
 
             case "tool_start": {
@@ -280,11 +289,15 @@ function ChatPageContent() {
             }
 
             case "chunk":
-              setStreamingState((prev) =>
-                prev
-                  ? { ...prev, phase: "streaming", content: event.content || "" }
-                  : null
-              );
+              setStreamingState((prev) => {
+                if (!prev) return null;
+                // Mark all in-progress steps as completed
+                const updatedHistory = prev.toolHistory.map((t: { name: string; icon: string; text: string; result?: string; args?: Record<string, unknown> }) => ({
+                  ...t,
+                  result: t.result || "done"
+                }));
+                return { ...prev, phase: "streaming", content: event.content || "", toolHistory: updatedHistory };
+              });
               break;
 
             case "thinking":

@@ -752,6 +752,57 @@ JSON ARRAY ONLY. NO other text before or after.`;
       return output.trim();
     }
 
+    case 'run_python': {
+      const code = String(args.code);
+      const purpose = args.purpose ? String(args.purpose) : 'calculation';
+
+      // Security: basic sanitization
+      const dangerousPatterns = [
+        /import\s+os/i, /import\s+subprocess/i, /import\s+sys/i,
+        /__import__/i, /eval\s*\(/i, /exec\s*\(/i, /open\s*\(/i,
+        /import\s+socket/i, /import\s+shutil/i, /import\s+glob/i,
+      ];
+
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(code)) {
+          return `❌ Security error: Kode mengandung operasi yang tidak diizinkan.`;
+        }
+      }
+
+      // Try Python first (works locally / in environments with Python)
+      try {
+        const { execSync } = require('child_process');
+        const result = execSync(`python3 -c ${JSON.stringify(code)}`, {
+          timeout: 10000, // 10 second timeout
+          maxBuffer: 1024 * 100, // 100KB output limit
+          encoding: 'utf-8',
+        });
+        return `🐍 Python Result (${purpose}):\n${result.trim()}`;
+      } catch {
+        // Python not available, try JavaScript fallback
+        try {
+          // Convert simple Python math to JS and eval
+          const jsCode = code
+            .replace(/print\s*\((.*)\)/g, 'results.push(String($1))')
+            .replace(/\*\*/g, '**')
+            .replace(/True/g, 'true')
+            .replace(/False/g, 'false')
+            .replace(/None/g, 'null')
+            .replace(/^import .+$/gm, '// skip import');
+
+          const results: string[] = [];
+          const fn = new Function('results', 'Math', jsCode);
+          fn(results, Math);
+
+          if (results.length === 0) return `⚠️ Kode tidak menghasilkan output. Gunakan print() untuk menampilkan hasil.`;
+          return `🧮 Calculation Result (${purpose}):\n${results.join('\n')}`;
+        } catch (jsErr: unknown) {
+          const errMsg = jsErr instanceof Error ? jsErr.message : 'Unknown error';
+          return `❌ Execution Error:\n${errMsg.slice(0, 300)}`;
+        }
+      }
+    }
+
     default:
       return `Unknown tool: ${name}`;
   }

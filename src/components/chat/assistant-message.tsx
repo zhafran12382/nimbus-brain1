@@ -55,6 +55,7 @@ function getToolDisplay(name: string, phase: "start" | "result"): { icon: string
     create_quiz: { icon: "📝", startText: "Generating quiz...", resultText: "Quiz ready!" },
     get_quiz_history: { icon: "📚", startText: "Fetching quiz history...", resultText: "History loaded" },
     get_quiz_stats: { icon: "📊", startText: "Analyzing study stats...", resultText: "Stats loaded" },
+    run_python: { icon: "🐍", startText: "Running calculation...", resultText: "Calculation complete" },
   };
   const config = map[name] || { icon: "⚡", startText: `Executing ${name}...`, resultText: `${name} complete` };
   return {
@@ -244,7 +245,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       {/* Response container */}
       <div className="w-full max-w-[82%] space-y-1 flex flex-col items-start min-w-0">
         <div className="w-full min-w-[120px] px-3.5 py-3">
-          {/* Status Area (phases 2-3) */}
+          {/* Status Area — Step-by-step checklist (Perplexity/Agent AI style) */}
           <AnimatePresence mode="wait">
             {isStatusVisible && (
               <motion.div
@@ -255,41 +256,78 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                 transition={{ duration: 0.2, ease: "easeOut" }}
                 className="overflow-hidden"
               >
-                {/* Status Line */}
-                <div className="flex items-center gap-2 py-0.5">
-                  <AnimatePresence mode="wait">
-                    {phase === "thinking" && (
-                      <motion.div
-                        key="thinking"
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
-                        className="flex items-center gap-2"
-                      >
-                        <div className="spinner-perplexity" />
-                        <span className="text-[13px] text-[hsl(0_0%_45%)] opacity-70">
-                          Thinking...
-                        </span>
-                      </motion.div>
-                    )}
-                    {phase === "tool_executing" && toolStatus && (
-                      <motion.div
-                        key={`tool-${toolStatus.name}-${toolStatus.text}`}
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
-                        className="flex items-center gap-2"
-                      >
-                        <span className="text-sm leading-none">{toolStatus.icon}</span>
-                        <span className="text-[13px] text-[hsl(0_0%_45%)] opacity-70">
-                          {toolStatus.text}
-                        </span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                {/* Step-by-step list */}
+                <motion.div
+                  initial="hidden"
+                  animate="show"
+                  variants={{
+                    hidden: {},
+                    show: { transition: { staggerChildren: 0.1 } },
+                  }}
+                  className="space-y-1 pl-0.5"
+                >
+                  {/* Completed steps from toolHistory */}
+                  {toolHistory.map((tool, i) => (
+                    <motion.div
+                      key={`step-${tool.name}-${i}`}
+                      variants={{
+                        hidden: { opacity: 0, x: -10 },
+                        show: { opacity: 1, x: 0 },
+                      }}
+                      transition={{ duration: 0.15 }}
+                      className="flex items-center gap-2 py-0.5"
+                    >
+                      {tool.result ? (
+                        <span className="text-emerald-400 text-[13px] leading-none">✓</span>
+                      ) : (
+                        <div className="spinner-perplexity" style={{ width: 13, height: 13 }} />
+                      )}
+                      <span className={`text-[13px] ${
+                        tool.result
+                          ? "text-[hsl(0_0%_55%)]"
+                          : "text-[hsl(0_0%_65%)]"
+                      }`}>
+                        {tool.icon} {tool.text}
+                      </span>
+                    </motion.div>
+                  ))}
+
+                  {/* Current active step (toolStatus not yet in history) */}
+                  {phase === "tool_executing" && toolStatus && !toolHistory.find(
+                    (t) => t.name === toolStatus.name && t.text === toolStatus.text && t.result
+                  ) && !toolHistory.find(
+                    (t) => t.name === toolStatus.name && t.text === toolStatus.text && !t.result
+                  ) && (
+                    <motion.div
+                      key={`active-${toolStatus.name}-${toolStatus.text}`}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex items-center gap-2 py-0.5"
+                    >
+                      <div className="spinner-perplexity" style={{ width: 13, height: 13 }} />
+                      <span className="text-[13px] text-[hsl(0_0%_65%)]">
+                        {toolStatus.icon} {toolStatus.text}
+                      </span>
+                    </motion.div>
+                  )}
+
+                  {/* Thinking step (only if no tool history yet) */}
+                  {phase === "thinking" && toolHistory.length === 0 && (
+                    <motion.div
+                      key="thinking-step"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex items-center gap-2 py-0.5"
+                    >
+                      <div className="spinner-perplexity" style={{ width: 13, height: 13 }} />
+                      <span className="text-[13px] text-[hsl(0_0%_45%)] opacity-70">
+                        Thinking...
+                      </span>
+                    </motion.div>
+                  )}
+                </motion.div>
 
                 {/* Source Pills (web search) */}
                 {uniqueSources.length > 0 && (
