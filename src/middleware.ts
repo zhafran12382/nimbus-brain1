@@ -1,18 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 
-function getSessionSecret(): string {
-  return process.env.SESSION_SECRET || process.env.PASSWORD || 'nimbus-brain-default-secret-change-me';
-}
+export const runtime = 'experimental-edge';
 
-function verifySessionToken(token: string): boolean {
+async function verifySessionToken(token: string, secret: string): Promise<boolean> {
   try {
     const [encoded, hmac] = token.split('.');
     if (!encoded || !hmac) return false;
 
-    const payload = Buffer.from(encoded, 'base64url').toString('utf-8');
-    const secret = getSessionSecret();
-    const expectedHmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    const payload = atob(encoded.replace(/-/g, '+').replace(/_/g, '/'));
+
+    // Use Web Crypto API (available in Edge Runtime)
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+    const expectedHmac = Array.from(new Uint8Array(signature))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
 
     if (hmac !== expectedHmac) return false;
 
@@ -25,7 +34,11 @@ function verifySessionToken(token: string): boolean {
   }
 }
 
-export function middleware(req: NextRequest) {
+function getSessionSecret(): string {
+  return process.env.SESSION_SECRET || process.env.PASSWORD || 'nimbus-brain-default-secret-change-me';
+}
+
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Allow auth API routes and login page through without auth
@@ -41,8 +54,9 @@ export function middleware(req: NextRequest) {
   }
 
   const token = req.cookies.get('nimbus-session')?.value;
+  const secret = getSessionSecret();
 
-  if (!token || !verifySessionToken(token)) {
+  if (!token || !(await verifySessionToken(token, secret))) {
     // For API routes, return 401
     if (pathname.startsWith('/api')) {
       return NextResponse.json(
@@ -61,12 +75,6 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico
-     */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+import { createHmac } from 'crypto';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 function getSessionSecret(): string {
   return process.env.SESSION_SECRET || process.env.PASSWORD || 'nimbus-brain-default-secret-change-me';
@@ -14,7 +15,7 @@ function verifySessionToken(token: string): { username: string } | null {
 
     const payload = Buffer.from(encoded, 'base64url').toString('utf-8');
     const secret = getSessionSecret();
-    const expectedHmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    const expectedHmac = createHmac('sha256', secret).update(payload).digest('hex');
 
     if (hmac !== expectedHmac) return null;
 

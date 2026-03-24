@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+import { createHmac } from 'crypto';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 /**
  * Simple session-based auth using signed cookies.
@@ -15,7 +16,7 @@ function getSessionSecret(): string {
 function createSessionToken(username: string): string {
   const payload = JSON.stringify({ username, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 }); // 7 days
   const secret = getSessionSecret();
-  const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  const hmac = createHmac('sha256', secret).update(payload).digest('hex');
   const encoded = Buffer.from(payload).toString('base64url');
   return `${encoded}.${hmac}`;
 }
@@ -28,20 +29,22 @@ export async function POST(req: NextRequest) {
     const expectedPassword = process.env.PASSWORD;
 
     if (!expectedUsername || !expectedPassword) {
+      console.error('AUTH ERROR: USERNAME or PASSWORD env vars not set');
       return NextResponse.json(
-        { error: 'Server authentication not configured.' },
+        { error: 'Server authentication not configured. Set USERNAME and PASSWORD environment variables.' },
         { status: 500 }
       );
     }
 
-    if (username !== expectedUsername || password !== expectedPassword) {
+    // Trim to handle potential whitespace in env vars
+    if (username.trim() !== expectedUsername.trim() || password !== expectedPassword) {
       return NextResponse.json(
         { error: 'Invalid username or password.' },
         { status: 401 }
       );
     }
 
-    const token = createSessionToken(username);
+    const token = createSessionToken(username.trim());
 
     const response = NextResponse.json({ success: true });
     response.cookies.set('nimbus-session', token, {
@@ -53,7 +56,8 @@ export async function POST(req: NextRequest) {
     });
 
     return response;
-  } catch {
+  } catch (err) {
+    console.error('Login error:', err);
     return NextResponse.json(
       { error: 'Invalid request.' },
       { status: 400 }
