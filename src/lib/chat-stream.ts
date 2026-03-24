@@ -31,7 +31,9 @@ export async function sendChatStream(
   if (personality) body.personality = personality;
   if (conversationId) body.conversationId = conversationId;
   if (mode) body.mode = mode;
-  if (provider) body.provider = provider;
+  // Provider MUST always be sent — prevents backend from guessing via getModelById()
+  // which can return wrong provider for duplicate model IDs
+  body.provider = provider;
 
   const response = await fetch('/api/chat', {
     method: 'POST',

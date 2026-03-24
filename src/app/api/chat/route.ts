@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { tools } from '@/lib/tools';
 import { executeTool } from '@/lib/tool-executor';
-import { getModelById, getProviderConfig, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID } from '@/lib/models';
+import { getModelById, getModelByIdAndProvider, getProviderConfig, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
 import type { GroqRateLimit, ProviderId } from '@/types';
 
@@ -318,6 +318,8 @@ function parseGroqRateLimitHeaders(headers: Headers): GroqRateLimit | null {
   };
 }
 
+const MAX_RATE_LIMIT_RETRIES = 3;
+
 async function callProvider(
   providerId: ProviderId,
   modelId: string,
@@ -328,6 +330,7 @@ async function callProvider(
   signal?: AbortSignal,
   onRateLimit?: (rateLimit: GroqRateLimit) => void,
   onStatus?: (text: string) => void,
+  _retryCount = 0,
 ) {
   const provider = getProviderConfig(providerId);
   if (!provider) throw new Error(`Provider "${providerId}" not found.`);
@@ -342,10 +345,18 @@ async function callProvider(
     body.tools = tools;
     body.tool_choice = "auto";
   }
-  // OpenRouter Paid: lock provider to DeepInfra
+
+  // === PROVIDER ROUTING CONTROL ===
   if (providerId === 'openrouter-paid') {
-    body.provider = { order: ["DeepInfra"] };
+    body.provider = { order: ["DeepInfra"], require_parameters: true };
   }
+  if (providerId === 'openrouter') {
+    // Disable auto-routing: only allow providers that support the exact model requested
+    body.provider = { require_parameters: true };
+    body.route = "fallback";
+  }
+
+  log('PROVIDER ROUTING', `provider=${providerId}, model=${modelId}, routing=${JSON.stringify(body.provider || 'none')}, route=${body.route || 'default'}`);
 
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -361,12 +372,15 @@ async function callProvider(
 
   if (!response.ok) {
     if (response.status === 429 && providerId === 'mistral') {
+      if (_retryCount >= MAX_RATE_LIMIT_RETRIES) {
+        throw new Error('⚠️ Mistral rate limit exceeded. Terlalu banyak retry. Coba lagi nanti.');
+      }
       const resetDelayStr = response.headers.get('ratelimit-reset') || response.headers.get('retry-after') || "10";
       const waitTimeSec = parseInt(resetDelayStr, 10) || 10;
       if (waitTimeSec < 150) {
-        if (onStatus) onStatus(`⏳ Rate limited. Coba lagi dalam ${waitTimeSec} detik...`);
+        if (onStatus) onStatus(`⏳ Rate limited (${_retryCount + 1}/${MAX_RATE_LIMIT_RETRIES}). Menunggu ${waitTimeSec}s...`);
         await new Promise(resolve => setTimeout(resolve, waitTimeSec * 1000));
-        return callProvider(providerId, modelId, messages, useTools, maxTokens, temperature, signal, onRateLimit, onStatus);
+        return callProvider(providerId, modelId, messages, useTools, maxTokens, temperature, signal, onRateLimit, onStatus, _retryCount + 1);
       }
     }
     const err = await response.json().catch(() => ({}));
@@ -375,6 +389,11 @@ async function callProvider(
   }
 
   const data = await response.json();
+
+  // === MODEL ASSERTION: verify provider didn't swap to a different model ===
+  if (data.model && data.model !== modelId) {
+    logError('MODEL MISMATCH', `REQUESTED: "${modelId}" → ACTUAL: "${data.model}" (provider: ${providerId})`);
+  }
 
   // Check for error in response body (some providers return 200 with error payload)
   if (data.type === 'error' || data.error) {
@@ -397,6 +416,7 @@ async function callProviderStream(
   onRateLimit?: (rateLimit: GroqRateLimit) => void,
   onStatus?: (text: string) => void,
   citationSources?: Record<string, CitationSourceEntry>,
+  _retryCount = 0,
 ): Promise<string> {
   const provider = getProviderConfig(providerId);
   if (!provider) throw new Error(`Provider "${providerId}" not found.`);
@@ -408,9 +428,14 @@ async function callProviderStream(
     max_tokens: maxTokens,
     stream: true,
   };
-  // OpenRouter Paid: lock provider to DeepInfra
+
+  // === PROVIDER ROUTING CONTROL ===
   if (providerId === 'openrouter-paid') {
-    body.provider = { order: ["DeepInfra"] };
+    body.provider = { order: ["DeepInfra"], require_parameters: true };
+  }
+  if (providerId === 'openrouter') {
+    body.provider = { require_parameters: true };
+    body.route = "fallback";
   }
 
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
@@ -427,12 +452,15 @@ async function callProviderStream(
 
   if (!response.ok) {
     if (response.status === 429 && providerId === 'mistral') {
+      if (_retryCount >= MAX_RATE_LIMIT_RETRIES) {
+        throw new Error('⚠️ Mistral rate limit exceeded. Terlalu banyak retry. Coba lagi nanti.');
+      }
       const resetDelayStr = response.headers.get('ratelimit-reset') || response.headers.get('retry-after') || "10";
       const waitTimeSec = parseInt(resetDelayStr, 10) || 10;
       if (waitTimeSec < 150) {
-        if (onStatus) onStatus(`⏳ Rate limited. Coba lagi dalam ${waitTimeSec} detik...`);
+        if (onStatus) onStatus(`⏳ Rate limited (${_retryCount + 1}/${MAX_RATE_LIMIT_RETRIES}). Menunggu ${waitTimeSec}s...`);
         await new Promise(resolve => setTimeout(resolve, waitTimeSec * 1000));
-        return callProviderStream(providerId, modelId, messages, onChunk, onThinkingChunk, maxTokens, temperature, signal, onRateLimit, onStatus);
+        return callProviderStream(providerId, modelId, messages, onChunk, onThinkingChunk, maxTokens, temperature, signal, onRateLimit, onStatus, citationSources, _retryCount + 1);
       }
     }
     const err = await response.json().catch(() => ({}));
@@ -506,11 +534,29 @@ export async function POST(req: NextRequest) {
   const { messages, model: modelId = DEFAULT_MODEL_ID, personality, conversationId: incomingConvId, mode = 'flash', provider: incomingProvider } = await req.json();
   const signal = req.signal;
 
-  // Resolve provider from request or model config
-  const model = getModelById(modelId);
-  const providerId: ProviderId = incomingProvider || model?.providerId || DEFAULT_PROVIDER_ID;
+  // === PROVIDER RESOLUTION: prefer frontend provider, validate match ===
+  let providerId: ProviderId;
+  let model;
 
-  log('REQUEST', `provider=${providerId}, model=${modelId}, messages=${messages.length}, convId=${incomingConvId || 'new'}, personality=${personality?.preset || 'none'}, mode=${mode}`);
+  if (incomingProvider) {
+    providerId = incomingProvider as ProviderId;
+    model = getModelByIdAndProvider(modelId, providerId);
+    if (!model) {
+      // Model not found in the selected provider — reject, don't silently fallback
+      logError('VALIDATION', `Model "${modelId}" not found in provider "${providerId}". Rejecting.`);
+      return new Response(
+        JSON.stringify({ error: `Model "${modelId}" tidak tersedia di provider ${providerId}. Pilih model yang sesuai.` }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  } else {
+    // Fallback: resolve from model config (legacy, less safe)
+    log('WARN', `No provider sent from frontend for model=${modelId}. Using model config fallback.`);
+    model = getModelById(modelId);
+    providerId = model?.providerId || DEFAULT_PROVIDER_ID;
+  }
+
+  log('REQUEST', `provider=${providerId}, model=${modelId}, providerSource=${incomingProvider ? 'frontend' : 'fallback'}, messages=${messages.length}, convId=${incomingConvId || 'new'}, mode=${mode}`);
 
   const geminiValidationError = validateGeminiRequest(providerId, modelId);
   if (geminiValidationError) {
@@ -899,41 +945,12 @@ export async function POST(req: NextRequest) {
           streamed = true;
         }
 
-        // Case 4: Has content, no tools — re-stream for real TTFT
+        // Case 4: Has content, no tools — send existing content directly
+        // DO NOT re-request from provider — wastes tokens and can trigger auto-routing
         if (!streamed && finalContent.trim() && allToolCalls.length === 0) {
-          send({ type: "status", text: "Generating response..." });
-          try {
-            const streamedContent = await callProviderStream(
-              providerId,
-              modelId,
-              apiMessages,
-              (accumulated) => {
-                send({ type: "chunk", content: accumulated });
-              },
-              (thinking) => {
-                thinkingContent = thinking;
-                send({
-                  type: "thinking",
-                  thinking_content: thinkingContent,
-                  thinking_duration_ms: Date.now() - thinkingStartAt,
-                });
-              },
-              maxTokens,
-              targetTemperature,
-              signal,
-              sendRateLimit,
-              (text) => send({ type: "status", text }),
-              citationSources
-            );
-            if (streamedContent.trim()) {
-              finalContent = streamedContent;
-            } else {
-              send({ type: "chunk", content: finalContent });
-            }
-          } catch {
-            send({ type: "chunk", content: finalContent });
-          }
+          send({ type: "chunk", content: finalContent });
           streamed = true;
+          log('STREAM', 'Sent existing content directly (no re-request to save tokens)');
         }
 
         // FINAL fallback — generate summary manually
@@ -1002,9 +1019,12 @@ export async function POST(req: NextRequest) {
         });
 
         // --- STEP 7: Auto-extract memories (background, non-blocking) ---
-        // Use last 6 messages for context (3 user + 3 assistant turns)
+        // Use Maia Router (internal, free) instead of user's model to avoid
+        // extra OpenRouter usage and potential auto-routing to unwanted models
         const MEMORY_EXTRACTION_CONTEXT_SIZE = 6;
-        extractMemories(messages.slice(-MEMORY_EXTRACTION_CONTEXT_SIZE), modelId, providerId).catch(err =>
+        const MEMORY_MODEL_ID = 'zai/glm-4.5-flash';
+        const MEMORY_PROVIDER_ID: ProviderId = 'maia';
+        extractMemories(messages.slice(-MEMORY_EXTRACTION_CONTEXT_SIZE), MEMORY_MODEL_ID, MEMORY_PROVIDER_ID).catch(err =>
           logError('MEMORY', 'Auto-extract failed:', err)
         );
 
