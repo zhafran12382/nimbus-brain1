@@ -240,14 +240,6 @@ function ChatPageContent() {
             case "status":
               setStreamingState((prev) => {
                 if (!prev) return null;
-                // If this is the initial "Thinking..." status, add it as first step
-                if (prev.toolHistory.length === 0 && prev.phase !== "tool_executing") {
-                  return {
-                    ...prev,
-                    phase: "thinking",
-                    toolHistory: [{ name: "__thinking", icon: "💭", text: "Thinking...", result: undefined }]
-                  };
-                }
                 return { ...prev, phase: "thinking" };
               });
               break;
@@ -291,12 +283,17 @@ function ChatPageContent() {
             case "chunk":
               setStreamingState((prev) => {
                 if (!prev) return null;
-                // Mark all in-progress steps as completed
-                const updatedHistory = prev.toolHistory.map((t: { name: string; icon: string; text: string; result?: string; args?: Record<string, unknown> }) => ({
+                // Mark all in-progress steps as completed when content starts streaming
+                const updatedHistory = prev.toolHistory.map(t => ({
                   ...t,
                   result: t.result || "done"
                 }));
-                return { ...prev, phase: "streaming", content: event.content || "", toolHistory: updatedHistory };
+                return { 
+                  ...prev, 
+                  phase: "streaming" as const, 
+                  content: event.content || "", 
+                  toolHistory: updatedHistory 
+                };
               });
               break;
 
@@ -317,15 +314,22 @@ function ChatPageContent() {
               finalContent = event.content || "";
               finalToolCalls = event.tool_calls || [];
               finalModelUsed = event.model_used || modelId;
-              setStreamingState((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      thinkingContent: event.thinking_content ?? prev.thinkingContent,
-                      thinkingDurationMs: event.thinking_duration_ms ?? prev.thinkingDurationMs,
-                    }
-                  : null
-              );
+              // Force phase to streaming with final content so UI renders it immediately
+              setStreamingState((prev) => {
+                if (!prev) return null;
+                const updatedHistory = prev.toolHistory.map(t => ({
+                  ...t,
+                  result: t.result || "done"
+                }));
+                return {
+                  ...prev,
+                  phase: "streaming" as const,
+                  content: event.content || prev.content,
+                  toolHistory: updatedHistory,
+                  thinkingContent: event.thinking_content ?? prev.thinkingContent,
+                  thinkingDurationMs: event.thinking_duration_ms ?? prev.thinkingDurationMs,
+                };
+              });
               if (event.provider_used) finalProviderUsed = event.provider_used as typeof providerId;
               if (event.conversationId) {
                 returnedConvId = event.conversationId;

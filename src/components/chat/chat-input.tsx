@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowUp, Loader2, ImageIcon } from "lucide-react";
 import { ChatMode, ProviderId } from "@/types";
@@ -34,7 +34,25 @@ export function ChatInput({
   const [input, setInput] = useState("");
   const [focused, setFocused] = useState(false);
   const [imageMode, setImageMode] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea to grow upward
+  const resizeTextarea = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    // Reset height to auto to get the correct scrollHeight
+    el.style.height = "auto";
+    // Clamp to max ~200px (roughly 8 lines)
+    const maxHeight = 200;
+    const newHeight = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${newHeight}px`;
+    // Show scrollbar only when exceeding max
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, []);
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [input, resizeTextarea]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +65,18 @@ export function ChatInput({
       onSend(trimmed);
     }
     setInput("");
+    // Reset height after send
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter to send (without shift), Shift+Enter for newline
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
   };
 
   const hasText = input.trim().length > 0;
@@ -68,15 +98,18 @@ export function ChatInput({
                 : "border-[hsl(0_0%_100%_/_0.1)]"
               }`}
           >
-            <input
-              ref={inputRef}
+            <textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               placeholder={imageMode ? "Describe the image you want..." : "Tanya Nimbus Brain..."}
               disabled={isLoading}
-              className="w-full bg-transparent px-4 py-3.5 text-[16px] leading-[1.65] tracking-[0.01em] text-[#ECECEC] placeholder:text-[15px] placeholder:text-[#8F9198] focus:outline-none disabled:opacity-50 min-w-0"
+              rows={1}
+              className="w-full resize-none bg-transparent px-4 py-3.5 text-[16px] leading-[1.65] tracking-[0.01em] text-[#ECECEC] placeholder:text-[15px] placeholder:text-[#8F9198] focus:outline-none disabled:opacity-50 min-w-0 overflow-hidden"
+              style={{ maxHeight: "200px" }}
             />
 
             {/* Bottom Row inside input box: Mode (Left) + Image + Model (Right) */}
