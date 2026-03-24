@@ -94,11 +94,15 @@ src/
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
-   # Maia Router API
+   # Login Auth (required)
+   USERNAME=your-login-username
+   PASSWORD=your-login-password
+
+   # Maia Router API (chat/image backend usage)
    MAIA_BASE_URL=https://your-maia-api-url
    MAIA_API_KEY=your-api-key
 
-   # Groq API
+   # Groq API (optional for internal compatibility)
    GROQ_API_KEY=your-groq-api-key
 
    # Tavily Web Search (opsional — fallback ke DuckDuckGo)
@@ -130,10 +134,12 @@ Project ini sudah dikonfigurasi untuk deploy ke Vercel dengan `vercel.json`.
 1. Push repository ke GitHub
 2. Hubungkan repository di [Vercel Dashboard](https://vercel.com/dashboard)
 3. Set environment variables di **Settings → Environment Variables**:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `MAIA_BASE_URL`
-   - `MAIA_API_KEY`
+    - `NEXT_PUBLIC_SUPABASE_URL`
+    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+    - `USERNAME`
+    - `PASSWORD`
+    - `MAIA_BASE_URL`
+    - `MAIA_API_KEY`
    - `GROQ_API_KEY`
    - `TAVILY_API_KEY` (opsional, untuk web search)
 4. Vercel akan otomatis build dan deploy setiap ada push ke branch utama

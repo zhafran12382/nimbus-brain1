@@ -1,17 +1,20 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [redirectPath, setRedirectPath] = useState("/chat");
 
-  const redirectPath = searchParams.get("redirect") || "/chat";
+  useEffect(() => {
+    const redirect = new URLSearchParams(window.location.search).get("redirect");
+    if (redirect) setRedirectPath(redirect);
+  }, []);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();

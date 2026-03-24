@@ -103,7 +103,23 @@ export function ChatMessage({ message }: ChatMessageProps) {
                   </div>
                 )}
                 <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                  <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{assistantText}</Markdown>
+                  <Markdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      ...chatMarkdownComponents,
+                      img: ({ src, alt }) => (
+                        // Important: image generation responses render as markdown image links.
+                        <img
+                          src={typeof src === "string" ? src : ""}
+                          alt={alt || "Generated image"}
+                          className="mt-2 max-w-full rounded-xl border border-white/10"
+                          loading="lazy"
+                        />
+                      ),
+                    }}
+                  >
+                    {assistantText}
+                  </Markdown>
                 </div>
                 {parsedAssistant?.sources && parsedAssistant.sources.length > 0 && (
                   <div className="mt-3">

@@ -10,7 +10,7 @@ import { ChatContainer } from "@/components/chat/chat-container";
 import { ChatSidebar } from "@/components/layout/chat-sidebar";
 import { RouterSelector } from "@/components/chat/router-selector";
 import { AssistantMessageState, getToolDisplay } from "@/components/chat/assistant-message";
-import { Menu, Settings } from "lucide-react";
+import { LogOut, Menu, Settings } from "lucide-react";
 import { useModelSelection } from "@/hooks/useModelSelection";
 import { useLockedIn } from "@/components/study/locked-in-context";
 
@@ -343,7 +343,7 @@ function ChatPageContent() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || "Gagal generate image.");
+        throw new Error(data.error || "Failed to generate image.");
       }
 
       const timestamp = new Date().toISOString();
@@ -358,7 +358,7 @@ function ChatPageContent() {
         id: crypto.randomUUID(),
         conversation_id: data.conversationId || undefined,
         role: "assistant",
-        content: data.assistantMessage || (data.imageUrl ? `![Generated image](${data.imageUrl})` : "⚠️ Gambar tidak tersedia."),
+        content: data.assistantMessage || (data.imageUrl ? `![Generated image](${data.imageUrl})` : "⚠️ Image not available."),
         model_used: "flux-ultra",
         provider_used: "maia",
         created_at: new Date().toISOString(),
@@ -371,7 +371,7 @@ function ChatPageContent() {
       }
       setRefreshKey((k) => k + 1);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Terjadi kesalahan.";
+      const message = error instanceof Error ? error.message : "An error occurred.";
       const errorMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
@@ -383,6 +383,11 @@ function ChatPageContent() {
       setIsLoading(false);
     }
   }, [activeConversationId, isLoading]);
+
+  const handleLogout = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    window.location.href = "/login";
+  }, []);
 
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden">
@@ -427,6 +432,13 @@ function ChatPageContent() {
             title="Settings"
           >
             <Settings className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted hover:text-text-secondary hover:bg-hover transition-colors"
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4" />
           </button>
         </header>
 

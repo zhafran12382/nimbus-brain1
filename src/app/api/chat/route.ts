@@ -301,8 +301,11 @@ function resolveProvider(modelId: string, incomingProvider?: ProviderId): Provid
 function validateModelProviderCompatibility(providerId: ProviderId, modelId: string): string | null {
   const model = getModelById(modelId);
   if (!model) return `Model "${modelId}" not found.`;
+  if (providerId === "openrouter" && !isOpenRouterDeepInfraModel(modelId)) {
+    return 'OpenRouter model not allowed. Use "openai/gpt-oss-120b" or "deepseek/deepseek-v3.2".';
+  }
   if (model.providerId !== providerId) {
-    return `Model "${modelId}" tidak tersedia untuk provider "${providerId}".`;
+    return `Model "${modelId}" is not available for provider "${providerId}".`;
   }
   return null;
 }
