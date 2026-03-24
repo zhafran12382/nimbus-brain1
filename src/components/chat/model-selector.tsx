@@ -45,15 +45,16 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
         type="button"
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-white/60 hover:bg-white/8 hover:text-white/80 transition-colors"
+        style={{ minHeight: "40px", minWidth: "40px" }}
       >
         <span>{currentProvider?.icon}</span>
-        <span className="max-w-[120px] truncate text-white/80 font-medium">{currentModel?.name || "Select model"}</span>
+        <span className="max-w-[100px] sm:max-w-[120px] truncate text-white/80 font-medium">{currentModel?.name || "Select model"}</span>
         <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 bottom-full mb-2 w-[320px] rounded-2xl border border-white/10 bg-[#1a1a2e] shadow-2xl z-50 overflow-hidden">
+        <div className="absolute right-0 bottom-full mb-2 w-[min(320px,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-[#1a1a2e] shadow-2xl z-50 overflow-hidden">
           {/* Model List */}
           <div className="max-h-[320px] overflow-y-auto p-1.5">
             {models.map((m) => (
@@ -72,7 +73,10 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
           {/* Footer */}
           <div className="border-t border-white/10 px-3 py-2">
             <p className="text-[10px] text-white/30">
-              Models with <span className="text-purple-400">Tools</span> badge support quiz, expense, memory, search
+              {providerId === 'openrouter-paid'
+                ? 'Paid models · Provider locked to DeepInfra'
+                : <>Models with <span className="text-purple-400">Tools</span> badge support quiz, expense, memory, search</>
+              }
             </p>
           </div>
         </div>
@@ -91,11 +95,16 @@ function ModelItem({ model, selected, onClick }: { model: AIModel; selected: boo
           ? "bg-blue-500/15 border border-blue-500/30"
           : "border border-transparent hover:bg-white/5"
       }`}
+      style={{ minHeight: "44px" }}
     >
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 flex-wrap">
         <span className="text-sm font-medium text-white/90">{model.name}</span>
         {model.badge && (
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-500/20 text-green-400">
+          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+            model.badge === 'PAID' 
+              ? 'bg-violet-500/20 text-violet-400' 
+              : 'bg-green-500/20 text-green-400'
+          }`}>
             {model.badge}
           </span>
         )}

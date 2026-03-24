@@ -25,6 +25,18 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
       'X-Title': 'Nimbus Brain',
     }),
   },
+  'openrouter-paid': {
+    id: 'openrouter-paid',
+    name: 'OpenRouter (paid)',
+    icon: '💎',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    getHeaders: () => ({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'HTTP-Referer': 'https://nimbus-brain.vercel.app',
+      'X-Title': 'Nimbus Brain',
+    }),
+  },
   groq: {
     id: 'groq',
     name: 'Groq',
@@ -60,7 +72,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
 // --- Model List ---
 
 export const AVAILABLE_MODELS: AIModel[] = [
-  // --- Maia Router ---
+  // --- Maia Router (internal only, not shown in UI dropdown) ---
   {
     id: "zai/glm-4.5-flash",
     name: "GLM-4.5 Flash",
@@ -218,7 +230,33 @@ export const AVAILABLE_MODELS: AIModel[] = [
     badge: "FREE",
   },
 
-  // --- Groq ---
+  // --- OpenRouter (Paid) — locked to DeepInfra ---
+  {
+    id: "openai/gpt-oss-120b",
+    name: "GPT-OSS 120B",
+    provider: "DeepInfra",
+    providerId: "openrouter-paid",
+    capabilities: ["functions", "chat"],
+    context_length: 131000,
+    supports_tools: true,
+    description: "Paid · DeepInfra provider, 131K context",
+    category: "fast",
+    badge: "PAID",
+  },
+  {
+    id: "deepseek/deepseek-v3.2",
+    name: "DeepSeek V3.2",
+    provider: "DeepInfra",
+    providerId: "openrouter-paid",
+    capabilities: ["functions", "chat"],
+    context_length: 128000,
+    supports_tools: true,
+    description: "Paid · DeepInfra provider, 128K context",
+    category: "fast",
+    badge: "PAID",
+  },
+
+  // --- Groq (internal, kept for backward compat but hidden from UI) ---
   {
     id: "openai/gpt-oss-120b",
     name: "GPT-OSS 120B",
@@ -324,8 +362,8 @@ export const AVAILABLE_MODELS: AIModel[] = [
 
 // --- Default ---
 
-export const DEFAULT_PROVIDER_ID: ProviderId = 'maia';
-export const DEFAULT_MODEL_ID = 'zai/glm-4.5-flash';
+export const DEFAULT_PROVIDER_ID: ProviderId = 'openrouter';
+export const DEFAULT_MODEL_ID = 'openai/gpt-oss-120b:free';
 
 // --- Helper Functions ---
 
@@ -351,11 +389,12 @@ export function getToolCapableModels(): AIModel[] {
 /**
  * Client-safe provider list (no secrets).
  * Used by the model-selector dropdown in the browser.
+ * NOTE: Maia Router and Groq Router are intentionally excluded from the UI.
+ * They are still available internally (Maia for image generation, Groq for backend).
  */
 export const CLIENT_PROVIDERS: { id: ProviderId; name: string; icon: string }[] = [
-  { id: 'maia', name: 'Maia Router', icon: '🟢' },
   { id: 'openrouter', name: 'OpenRouter', icon: '🔵' },
-  { id: 'groq', name: 'Groq', icon: '⚡' },
+  { id: 'openrouter-paid', name: 'OpenRouter (paid)', icon: '💎' },
   { id: 'mistral', name: 'Mistral AI', icon: '🟠' },
   { id: 'gemini', name: 'Gemini', icon: '✨' },
 ];

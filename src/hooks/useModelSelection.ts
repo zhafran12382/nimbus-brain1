@@ -44,6 +44,7 @@ export function useModelSelection() {
     setIsMounted(true);
     const stored = readStorage();
     if (stored) {
+      // Only restore if the provider is still visible in the client dropdown
       const providerExists = CLIENT_PROVIDERS.some(p => p.id === stored.providerId);
       if (providerExists) {
         setProviderId(stored.providerId);
@@ -55,6 +56,10 @@ export function useModelSelection() {
         } else if (models.length > 0) {
           setModelId(models[0].id);
         }
+      } else {
+        // If stored provider was removed from UI (e.g. maia, groq), reset to default
+        setProviderId(DEFAULT_PROVIDER_ID);
+        setModelId(DEFAULT_MODEL_ID);
       }
     }
   }, []);
