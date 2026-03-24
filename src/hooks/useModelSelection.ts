@@ -5,7 +5,8 @@ import {
   DEFAULT_PROVIDER_ID,
   DEFAULT_MODEL_ID,
   getModelsByProvider,
-  CLIENT_PROVIDERS,
+  TEXT_CLIENT_PROVIDERS,
+  isOpenRouterDeepInfraModel,
 } from "@/lib/models";
 import type { ProviderId } from "@/types";
 
@@ -44,7 +45,7 @@ export function useModelSelection() {
     setIsMounted(true);
     const stored = readStorage();
     if (stored) {
-      const providerExists = CLIENT_PROVIDERS.some(p => p.id === stored.providerId);
+      const providerExists = TEXT_CLIENT_PROVIDERS.some(p => p.id === stored.providerId);
       if (providerExists) {
         setProviderId(stored.providerId);
         
@@ -66,16 +67,22 @@ export function useModelSelection() {
   }, [providerId, modelId, isMounted]);
 
   const switchProvider = useCallback((id: ProviderId) => {
+    if (isOpenRouterDeepInfraModel(modelId) && id !== "openrouter") {
+      return;
+    }
     setProviderId(id);
     // Auto-select first model of new provider
     const models = getModelsByProvider(id);
     if (models.length > 0) {
       setModelId(models[0].id);
     }
-  }, []);
+  }, [modelId]);
 
   const switchModel = useCallback((id: string) => {
     setModelId(id);
+    if (isOpenRouterDeepInfraModel(id)) {
+      setProviderId("openrouter");
+    }
   }, []);
 
   const availableModels = useMemo(
@@ -89,6 +96,6 @@ export function useModelSelection() {
     switchProvider,
     switchModel,
     availableModels,
-    providers: CLIENT_PROVIDERS,
+    providers: TEXT_CLIENT_PROVIDERS,
   };
 }

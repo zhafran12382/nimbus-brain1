@@ -329,6 +329,61 @@ function ChatPageContent() {
     }
   }, [messages, activeConversationId, chatMode, modelId, providerId]);
 
+  const handleGenerateImage = useCallback(async (prompt: string) => {
+    if (!prompt.trim() || isLoading) return;
+
+    setIsLoading(true);
+    setStreamingState(null);
+
+    try {
+      const res = await fetch("/api/chat/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, conversationId: activeConversationId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal generate image.");
+      }
+
+      const timestamp = new Date().toISOString();
+      const userMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        conversation_id: data.conversationId || undefined,
+        role: "user",
+        content: data.userMessage || `🖼️ Generate image: ${prompt}`,
+        created_at: timestamp,
+      };
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        conversation_id: data.conversationId || undefined,
+        role: "assistant",
+        content: data.assistantMessage || (data.imageUrl ? `![Generated image](${data.imageUrl})` : "⚠️ Gambar tidak tersedia."),
+        model_used: "flux-ultra",
+        provider_used: "maia",
+        created_at: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+
+      if (data.conversationId && data.conversationId !== activeConversationId) {
+        setActiveConversationId(data.conversationId);
+      }
+      setRefreshKey((k) => k + 1);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Terjadi kesalahan.";
+      const errorMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `❌ Error: ${message}`,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeConversationId, isLoading]);
+
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden">
       {/* Left: ChatSidebar (Area X + Y) */}
@@ -392,6 +447,7 @@ function ChatPageContent() {
         <ChatContainer
           messages={messages}
           onSend={handleSend}
+          onGenerateImage={handleGenerateImage}
           isLoading={isLoading}
           streamingState={streamingState}
           mode={chatMode}

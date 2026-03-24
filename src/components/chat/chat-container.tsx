@@ -13,6 +13,7 @@ import { messageBubble } from "@/lib/animations";
 interface ChatContainerProps {
   messages: ChatMessageType[];
   onSend: (message: string) => void;
+  onGenerateImage?: (prompt: string) => Promise<void>;
   isLoading: boolean;
   streamingState?: AssistantMessageState | null;
   streamStatus?: string | null;
@@ -29,6 +30,7 @@ interface ChatContainerProps {
 export function ChatContainer({
   messages,
   onSend,
+  onGenerateImage,
   isLoading,
   streamingState,
   mode,
@@ -46,7 +48,7 @@ export function ChatContainer({
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <ScrollArea className="flex-1 px-2 py-3 sm:p-4">
+      <ScrollArea className="flex-1 px-2 py-3 pb-36 md:pb-4 sm:p-4">
         <div className="mx-auto w-full max-w-[var(--chat-content-max-width)] min-w-0 space-y-[14px] pb-4">
           {messages.length === 0 && !isLoading && (
             <div className="flex flex-col items-center justify-center pt-[25vh] text-center">
@@ -107,9 +109,10 @@ export function ChatContainer({
       </ScrollArea>
 
       {/* Input area with integrated model/mode selectors (Area Z) */}
-      <ChatInput
-        onSend={onSend}
-        isLoading={isLoading}
+        <ChatInput
+          onSend={onSend}
+          onGenerateImage={onGenerateImage}
+          isLoading={isLoading}
         mode={mode}
         onModeChange={onModeChange}
         providerId={providerId}

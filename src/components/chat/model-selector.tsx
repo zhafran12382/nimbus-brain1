@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { AIModel, ProviderId } from "@/types";
-import { CLIENT_PROVIDERS, getModelsByProvider } from "@/lib/models";
+import { CLIENT_PROVIDERS, getModelsByProvider, isOpenRouterDeepInfraModel } from "@/lib/models";
 
 interface ModelSelectorProps {
   providerId: ProviderId;
@@ -26,6 +26,7 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
   const models = getModelsByProvider(providerId);
   const currentModel = models.find(m => m.id === modelId) || models[0];
   const currentProvider = CLIENT_PROVIDERS.find(p => p.id === providerId);
+  const isLockedToOpenRouter = isOpenRouterDeepInfraModel(modelId);
 
   // Close on outside click
   useEffect(() => {
@@ -61,6 +62,7 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
                 key={m.id}
                 model={m}
                 selected={m.id === modelId}
+                providerLocked={isLockedToOpenRouter}
                 onClick={() => {
                   onModelChange(m.id);
                   setOpen(false);
@@ -81,7 +83,7 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
   );
 }
 
-function ModelItem({ model, selected, onClick }: { model: AIModel; selected: boolean; onClick: () => void }) {
+function ModelItem({ model, selected, onClick, providerLocked }: { model: AIModel; selected: boolean; onClick: () => void; providerLocked: boolean }) {
   return (
     <button
       type="button"
@@ -108,6 +110,9 @@ function ModelItem({ model, selected, onClick }: { model: AIModel; selected: boo
       <p className="text-[11px] text-white/40 mt-0.5">
         {model.description}{model.context_length ? ` · ${formatContext(model.context_length)} ctx` : ""}
       </p>
+      {selected && providerLocked && (
+        <p className="text-[10px] text-cyan-300/80 mt-1">Provider locked: OpenRouter (DeepInfra route)</p>
+      )}
     </button>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronUp, Check } from "lucide-react";
 import { ProviderId } from "@/types";
-import { CLIENT_PROVIDERS } from "@/lib/models";
+import { TEXT_CLIENT_PROVIDERS } from "@/lib/models";
 
 interface RouterSelectorProps {
   providerId: ProviderId;
@@ -15,7 +15,7 @@ export function RouterSelector({ providerId, onProviderChange }: RouterSelectorP
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const currentProvider = CLIENT_PROVIDERS.find((provider) => provider.id === providerId) || CLIENT_PROVIDERS[0];
+  const currentProvider = TEXT_CLIENT_PROVIDERS.find((provider) => provider.id === providerId) || TEXT_CLIENT_PROVIDERS[0];
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -55,7 +55,7 @@ export function RouterSelector({ providerId, onProviderChange }: RouterSelectorP
             className="absolute left-0 top-full mt-2 w-64 rounded-xl border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(240_10%_10%)] shadow-2xl z-50 overflow-hidden"
           >
             <div className="p-1.5 flex flex-col gap-0.5">
-              {CLIENT_PROVIDERS.map((provider) => {
+              {TEXT_CLIENT_PROVIDERS.map((provider) => {
                 const isActive = provider.id === providerId;
                 return (
                   <button

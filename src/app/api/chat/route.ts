@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { tools } from '@/lib/tools';
 import { executeTool } from '@/lib/tool-executor';
-import { getModelById, getProviderConfig, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID } from '@/lib/models';
+import { getModelById, getProviderConfig, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID, isOpenRouterDeepInfraModel } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
 import type { GroqRateLimit, ProviderId } from '@/types';
 
@@ -290,6 +290,23 @@ function validateGeminiRequest(providerId: ProviderId, modelId: string): string 
   return null;
 }
 
+function resolveProvider(modelId: string, incomingProvider?: ProviderId): ProviderId {
+  if (isOpenRouterDeepInfraModel(modelId)) {
+    return 'openrouter';
+  }
+  const model = getModelById(modelId);
+  return incomingProvider || model?.providerId || DEFAULT_PROVIDER_ID;
+}
+
+function validateModelProviderCompatibility(providerId: ProviderId, modelId: string): string | null {
+  const model = getModelById(modelId);
+  if (!model) return `Model "${modelId}" not found.`;
+  if (model.providerId !== providerId) {
+    return `Model "${modelId}" tidak tersedia untuk provider "${providerId}".`;
+  }
+  return null;
+}
+
 function parseGroqRateLimitHeaders(headers: Headers): GroqRateLimit | null {
   const limitRequests = headers.get('x-ratelimit-limit-requests');
   const remainingRequests = headers.get('x-ratelimit-remaining-requests');
@@ -498,9 +515,10 @@ export async function POST(req: NextRequest) {
   const { messages, model: modelId = DEFAULT_MODEL_ID, personality, conversationId: incomingConvId, mode = 'flash', provider: incomingProvider } = await req.json();
   const signal = req.signal;
 
-  // Resolve provider from request or model config
+  // Resolve provider from request or model config.
+  // OpenRouter paid models are forced to OpenRouter (DeepInfra route) regardless of incoming provider.
+  const providerId: ProviderId = resolveProvider(modelId, incomingProvider as ProviderId | undefined);
   const model = getModelById(modelId);
-  const providerId: ProviderId = incomingProvider || model?.providerId || DEFAULT_PROVIDER_ID;
 
   log('REQUEST', `provider=${providerId}, model=${modelId}, messages=${messages.length}, convId=${incomingConvId || 'new'}, personality=${personality?.preset || 'none'}, mode=${mode}`);
 
@@ -512,6 +530,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const providerValidationError = validateModelProviderCompatibility(providerId, modelId);
+  if (providerValidationError) {
+    return new Response(
+      JSON.stringify({ error: providerValidationError }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
   if (!model) {
     return new Response(
       JSON.stringify({ error: `Model "${modelId}" not found.` }),

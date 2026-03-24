@@ -60,31 +60,30 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
 // --- Model List ---
 
 export const AVAILABLE_MODELS: AIModel[] = [
-  // --- Maia Router ---
+  // --- OpenRouter (Paid / forced DeepInfra routing) ---
   {
-    id: "zai/glm-4.5-flash",
-    name: "GLM-4.5 Flash",
-    provider: "Zai",
-    providerId: "maia",
-    capabilities: ["functions", "chat"],
-    context_length: 131000,
-    supports_tools: true,
-    description: "Functions + Chat, 131K context",
-    category: "fast",
-  },
-
-  // --- OpenRouter (Free) ---
-  {
-    id: "openai/gpt-oss-120b:free",
+    id: "openai/gpt-oss-120b",
     name: "GPT-OSS 120B",
-    provider: "OpenAI",
+    provider: "DeepInfra",
     providerId: "openrouter",
     capabilities: ["functions", "chat"],
     context_length: 131000,
     supports_tools: true,
-    description: "Functions + Chat, 131K context",
+    description: "OpenRouter paid · forced DeepInfra",
     category: "fast",
-    badge: "FREE",
+    badge: "PAID",
+  },
+  {
+    id: "deepseek/deepseek-v3.2",
+    name: "DeepSeek V3.2",
+    provider: "DeepInfra",
+    providerId: "openrouter",
+    capabilities: ["functions", "reasoning", "chat"],
+    context_length: 128000,
+    supports_tools: true,
+    description: "OpenRouter paid · forced DeepInfra",
+    category: "think",
+    badge: "PAID",
   },
   {
     id: "nvidia/nemotron-3-super-120b-a12b:free",
@@ -218,63 +217,6 @@ export const AVAILABLE_MODELS: AIModel[] = [
     badge: "FREE",
   },
 
-  // --- Groq ---
-  {
-    id: "openai/gpt-oss-120b",
-    name: "GPT-OSS 120B",
-    provider: "Groq",
-    providerId: "groq",
-    capabilities: ["functions", "chat"],
-    context_length: null,
-    supports_tools: true,
-    description: "TPD 200K · RPD 1K",
-    category: "fast",
-  },
-  {
-    id: "openai/gpt-oss-20b",
-    name: "GPT-OSS 20B",
-    provider: "Groq",
-    providerId: "groq",
-    capabilities: ["functions", "chat"],
-    context_length: null,
-    supports_tools: true,
-    description: "TPD 200K · RPD 1K",
-    category: "fast",
-  },
-  {
-    id: "llama-3.3-70b-versatile",
-    name: "Llama 3.3 70B",
-    provider: "Groq",
-    providerId: "groq",
-    capabilities: ["functions", "chat"],
-    context_length: null,
-    supports_tools: true,
-    description: "TPD 100K · RPD 1K",
-    category: "think",
-  },
-  {
-    id: "qwen/qwen3-32b",
-    name: "Qwen3 32B",
-    provider: "Groq",
-    providerId: "groq",
-    capabilities: ["functions", "chat"],
-    context_length: null,
-    supports_tools: true,
-    description: "TPD 500K · RPD 1K",
-    category: "think",
-  },
-  {
-    id: "meta-llama/llama-4-scout-17b-16e-instruct",
-    name: "Llama 4 Scout 17B",
-    provider: "Groq",
-    providerId: "groq",
-    capabilities: ["functions", "chat"],
-    context_length: null,
-    supports_tools: true,
-    description: "TPD 500K · RPD 1K",
-    category: "fast",
-  },
-
   // --- Mistral AI ---
   {
     id: "mistral-large-latest",
@@ -324,12 +266,19 @@ export const AVAILABLE_MODELS: AIModel[] = [
 
 // --- Default ---
 
-export const DEFAULT_PROVIDER_ID: ProviderId = 'maia';
-export const DEFAULT_MODEL_ID = 'zai/glm-4.5-flash';
+export const DEFAULT_PROVIDER_ID: ProviderId = 'openrouter';
+export const DEFAULT_MODEL_ID = 'openai/gpt-oss-120b';
+export const OPENROUTER_DEEPINFRA_MODELS = new Set<string>([
+  "openai/gpt-oss-120b",
+  "deepseek/deepseek-v3.2",
+]);
 
 // --- Helper Functions ---
 
 export function getModelsByProvider(providerId: ProviderId): AIModel[] {
+  if (providerId === "openrouter") {
+    return AVAILABLE_MODELS.filter((m) => m.providerId === "openrouter" && isOpenRouterDeepInfraModel(m.id));
+  }
   return AVAILABLE_MODELS.filter(m => m.providerId === providerId);
 }
 
@@ -348,6 +297,10 @@ export function getToolCapableModels(): AIModel[] {
   return AVAILABLE_MODELS.filter(m => m.supports_tools);
 }
 
+export function isOpenRouterDeepInfraModel(modelId: string): boolean {
+  return OPENROUTER_DEEPINFRA_MODELS.has(modelId);
+}
+
 /**
  * Client-safe provider list (no secrets).
  * Used by the model-selector dropdown in the browser.
@@ -359,3 +312,11 @@ export const CLIENT_PROVIDERS: { id: ProviderId; name: string; icon: string }[] 
   { id: 'mistral', name: 'Mistral AI', icon: '🟠' },
   { id: 'gemini', name: 'Gemini', icon: '✨' },
 ];
+
+/**
+ * UI-selectable providers for text generation.
+ * Maia and Groq are intentionally hidden from text provider picker.
+ */
+export const TEXT_CLIENT_PROVIDERS: { id: ProviderId; name: string; icon: string }[] = CLIENT_PROVIDERS.filter(
+  (provider) => provider.id !== "maia" && provider.id !== "groq",
+);
