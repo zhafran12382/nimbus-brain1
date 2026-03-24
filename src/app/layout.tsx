@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
+import { AuthGuard } from "@/components/auth/auth-guard";
 
 export const metadata: Metadata = {
   title: "Nimbus Brain",
@@ -26,7 +27,9 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="antialiased">
-        <AppShell>{children}</AppShell>
+        <AuthGuard>
+          <AppShell>{children}</AppShell>
+        </AuthGuard>
       </body>
     </html>
   );

@@ -120,7 +120,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <span className="text-[12px] text-[#8A8A8A]">{timestamp}</span>
           {!isUser && message.model_used && (
             <span className="hidden sm:inline text-[12px] text-[#8A8A8A]">
-              {message.provider_used === 'openrouter' ? '🔵' : '🟢'} {message.model_used}
+              {message.provider_used === 'openrouter' ? '🔵' : message.provider_used === 'openrouter_paid' ? '💎' : message.provider_used === 'mistral' ? '🟠' : message.provider_used === 'gemini' ? '✨' : '🟢'} {message.model_used}
             </span>
           )}
         </div>

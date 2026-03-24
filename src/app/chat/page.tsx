@@ -10,7 +10,7 @@ import { ChatContainer } from "@/components/chat/chat-container";
 import { ChatSidebar } from "@/components/layout/chat-sidebar";
 import { RouterSelector } from "@/components/chat/router-selector";
 import { AssistantMessageState, getToolDisplay } from "@/components/chat/assistant-message";
-import { Menu, Settings } from "lucide-react";
+import { Menu, Settings, LogOut } from "lucide-react";
 import { useModelSelection } from "@/hooks/useModelSelection";
 import { useLockedIn } from "@/components/study/locked-in-context";
 
@@ -51,6 +51,7 @@ function ChatPageContent() {
   const [initialized, setInitialized] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>("flash");
   const [tpmWarning, setTpmWarning] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { providerId, modelId, switchProvider, switchModel } = useModelSelection();
 
@@ -117,6 +118,64 @@ function ChatPageContent() {
     }
     switchProvider(id);
   }, [switchProvider]);
+
+  const handleGenerateImage = useCallback(async (prompt: string) => {
+    setIsGeneratingImage(true);
+
+    // Add user message to chat
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: `🖼️ Generate image: ${prompt}`,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+
+    try {
+      const res = await fetch("/api/image/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const errorMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `❌ Image generation failed: ${data.error || "Unknown error"}`,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+        return;
+      }
+
+      const imageUrl = data.isBase64
+        ? `data:image/png;base64,${data.imageUrl}`
+        : data.imageUrl;
+
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `![Generated Image](${imageUrl})\n\n*Generated with flux-ultra: "${prompt}"*`,
+        model_used: "flux-ultra",
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Network error";
+      const errorMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `❌ Image generation error: ${message}`,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  }, []);
 
   const handleSend = useCallback(async (content: string) => {
     const conversationId = activeConversationId;
@@ -373,6 +432,18 @@ function ChatPageContent() {
           >
             <Settings className="h-4 w-4" />
           </button>
+
+          {/* Logout */}
+          <button
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              window.location.href = "/login";
+            }}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text-muted hover:text-red-400 hover:bg-hover transition-colors"
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </header>
 
         {tpmWarning && (
@@ -394,6 +465,8 @@ function ChatPageContent() {
           onSend={handleSend}
           isLoading={isLoading}
           streamingState={streamingState}
+          onGenerateImage={handleGenerateImage}
+          isGeneratingImage={isGeneratingImage}
           mode={chatMode}
           onModeChange={handleModeChange}
           providerId={providerId}

@@ -16,6 +16,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Chat page handles its own layout with sidebar
   const isChatPage = pathname === "/chat" || pathname === "/";
+  const isLoginPage = pathname === "/login";
+
+  // Login page: render bare without any chrome
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   return (
     <LockedInProvider>

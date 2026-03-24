@@ -44,6 +44,7 @@ export function useModelSelection() {
     setIsMounted(true);
     const stored = readStorage();
     if (stored) {
+      // Check that the provider is still in our visible list
       const providerExists = CLIENT_PROVIDERS.some(p => p.id === stored.providerId);
       if (providerExists) {
         setProviderId(stored.providerId);
@@ -55,6 +56,11 @@ export function useModelSelection() {
         } else if (models.length > 0) {
           setModelId(models[0].id);
         }
+      } else {
+        // Stored provider no longer visible (e.g., maia/groq were hidden)
+        // Reset to defaults
+        setProviderId(DEFAULT_PROVIDER_ID);
+        setModelId(DEFAULT_MODEL_ID);
       }
     }
   }, []);

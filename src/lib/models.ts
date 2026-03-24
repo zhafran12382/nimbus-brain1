@@ -55,6 +55,18 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
       'Authorization': `Bearer ${process.env.GEMINI_API_KEY}`,
     }),
   },
+  openrouter_paid: {
+    id: 'openrouter_paid',
+    name: 'OpenRouter (paid)',
+    icon: '💎',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    getHeaders: () => ({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'HTTP-Referer': 'https://nimbus-brain.vercel.app',
+      'X-Title': 'Nimbus Brain',
+    }),
+  },
 };
 
 // --- Model List ---
@@ -320,12 +332,38 @@ export const AVAILABLE_MODELS: AIModel[] = [
     description: "Gemini provider model",
     category: "fast",
   },
+
+  // --- OpenRouter (Paid) ---
+  {
+    id: "openai/gpt-oss-120b",
+    name: "GPT-OSS 120B",
+    provider: "OpenAI",
+    providerId: "openrouter_paid",
+    capabilities: ["functions", "chat"],
+    context_length: 131000,
+    supports_tools: true,
+    description: "Paid via DeepInfra, 131K context",
+    category: "fast",
+    badge: "PAID",
+  },
+  {
+    id: "deepseek/deepseek-v3.2",
+    name: "DeepSeek V3.2",
+    provider: "DeepSeek",
+    providerId: "openrouter_paid",
+    capabilities: ["functions", "chat"],
+    context_length: 131000,
+    supports_tools: true,
+    description: "Paid via DeepInfra, 131K context",
+    category: "fast",
+    badge: "PAID",
+  },
 ];
 
 // --- Default ---
 
-export const DEFAULT_PROVIDER_ID: ProviderId = 'maia';
-export const DEFAULT_MODEL_ID = 'zai/glm-4.5-flash';
+export const DEFAULT_PROVIDER_ID: ProviderId = 'openrouter';
+export const DEFAULT_MODEL_ID = 'openai/gpt-oss-120b:free';
 
 // --- Helper Functions ---
 
@@ -349,13 +387,13 @@ export function getToolCapableModels(): AIModel[] {
 }
 
 /**
- * Client-safe provider list (no secrets).
- * Used by the model-selector dropdown in the browser.
+ * Client-visible providers (no secrets).
+ * Maia Router and Groq Router are hidden from the UI but kept
+ * internally (Maia is used for image generation).
  */
 export const CLIENT_PROVIDERS: { id: ProviderId; name: string; icon: string }[] = [
-  { id: 'maia', name: 'Maia Router', icon: '🟢' },
   { id: 'openrouter', name: 'OpenRouter', icon: '🔵' },
-  { id: 'groq', name: 'Groq', icon: '⚡' },
+  { id: 'openrouter_paid', name: 'OpenRouter (paid)', icon: '💎' },
   { id: 'mistral', name: 'Mistral AI', icon: '🟠' },
   { id: 'gemini', name: 'Gemini', icon: '✨' },
 ];

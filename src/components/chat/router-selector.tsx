@@ -15,6 +15,7 @@ export function RouterSelector({ providerId, onProviderChange }: RouterSelectorP
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Find current provider in the visible list, fallback to first
   const currentProvider = CLIENT_PROVIDERS.find((provider) => provider.id === providerId) || CLIENT_PROVIDERS[0];
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export function RouterSelector({ providerId, onProviderChange }: RouterSelectorP
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="group flex min-h-11 max-w-[62vw] items-center gap-2 overflow-hidden rounded-full border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(0_0%_100%_/_0.03)] px-2.5 py-2 transition-colors hover:bg-[hsl(0_0%_100%_/_0.06)] sm:max-w-none sm:px-3"
+        className="group flex min-h-[44px] max-w-[62vw] items-center gap-2 overflow-hidden rounded-full border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(0_0%_100%_/_0.03)] px-2.5 py-2 transition-colors hover:bg-[hsl(0_0%_100%_/_0.06)] sm:max-w-none sm:px-3"
       >
         <span className="shrink-0 text-sm">{currentProvider.icon}</span>
         <span className="truncate text-xs font-medium text-[hsl(0_0%_80%)] transition-colors group-hover:text-white">
@@ -52,7 +53,7 @@ export function RouterSelector({ providerId, onProviderChange }: RouterSelectorP
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.97 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute left-0 top-full mt-2 w-64 rounded-xl border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(240_10%_10%)] shadow-2xl z-50 overflow-hidden"
+            className="absolute left-0 top-full mt-2 w-[min(16rem,85vw)] rounded-xl border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(240_10%_10%)] shadow-2xl z-50 overflow-hidden"
           >
             <div className="p-1.5 flex flex-col gap-0.5">
               {CLIENT_PROVIDERS.map((provider) => {
@@ -65,7 +66,7 @@ export function RouterSelector({ providerId, onProviderChange }: RouterSelectorP
                       onProviderChange(provider.id);
                       setOpen(false);
                     }}
-                    className={`w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                    className={`w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors min-h-[40px] ${
                       isActive
                         ? "bg-[hsl(217_91%_60%_/_0.1)]"
                         : "hover:bg-[hsl(0_0%_100%_/_0.05)]"

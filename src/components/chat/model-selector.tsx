@@ -27,6 +27,9 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
   const currentModel = models.find(m => m.id === modelId) || models[0];
   const currentProvider = CLIENT_PROVIDERS.find(p => p.id === providerId);
 
+  // For openrouter_paid, show "DeepInfra" as locked provider indicator
+  const isLockedProvider = providerId === "openrouter_paid";
+
   // Close on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -44,7 +47,7 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-white/60 hover:bg-white/8 hover:text-white/80 transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-white/60 hover:bg-white/8 hover:text-white/80 transition-colors min-h-[36px]"
       >
         <span>{currentProvider?.icon}</span>
         <span className="max-w-[120px] truncate text-white/80 font-medium">{currentModel?.name || "Select model"}</span>
@@ -53,7 +56,16 @@ export function ModelSelector({ providerId, modelId, onProviderChange, onModelCh
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 bottom-full mb-2 w-[320px] rounded-2xl border border-white/10 bg-[#1a1a2e] shadow-2xl z-50 overflow-hidden">
+        <div className="absolute right-0 bottom-full mb-2 w-[min(320px,90vw)] rounded-2xl border border-white/10 bg-[#1a1a2e] shadow-2xl z-50 overflow-hidden">
+          {/* Locked provider indicator */}
+          {isLockedProvider && (
+            <div className="px-3 py-2 border-b border-white/10">
+              <p className="text-[10px] text-amber-400/80 font-medium">
+                🔒 Provider locked to DeepInfra
+              </p>
+            </div>
+          )}
+
           {/* Model List */}
           <div className="max-h-[320px] overflow-y-auto p-1.5">
             {models.map((m) => (
@@ -86,16 +98,20 @@ function ModelItem({ model, selected, onClick }: { model: AIModel; selected: boo
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left rounded-xl px-3 py-2 transition-colors ${
+      className={`w-full text-left rounded-xl px-3 py-2 transition-colors min-h-[40px] ${
         selected
           ? "bg-blue-500/15 border border-blue-500/30"
           : "border border-transparent hover:bg-white/5"
       }`}
     >
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 flex-wrap">
         <span className="text-sm font-medium text-white/90">{model.name}</span>
         {model.badge && (
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-500/20 text-green-400">
+          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+            model.badge === "PAID"
+              ? "bg-amber-500/20 text-amber-400"
+              : "bg-green-500/20 text-green-400"
+          }`}>
             {model.badge}
           </span>
         )}

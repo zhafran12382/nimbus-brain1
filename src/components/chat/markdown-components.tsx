@@ -2,6 +2,19 @@ import type { Components } from "react-markdown";
 import { cn } from "@/lib/utils";
 
 export const chatMarkdownComponents: Components = {
+  img({ src, alt, ...props }) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt || "Generated image"}
+        className="max-w-full h-auto rounded-xl my-2 border border-white/10"
+        loading="lazy"
+        style={{ maxHeight: '512px', objectFit: 'contain' }}
+        {...props}
+      />
+    );
+  },
   table({ children, ...props }) {
     return (
       <div className="chat-markdown-table-wrap">
