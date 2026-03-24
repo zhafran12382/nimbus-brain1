@@ -225,41 +225,61 @@ function getRandomXLabel(): string {
   return X_LABELS[Math.floor(Math.random() * X_LABELS.length)];
 }
 
-// Pipeline flow node component — VERTICAL layout with arrow connectors
-function PipelineNode({ label, isActive, isCompleted, isFirst }: { 
-  label: string; 
-  isActive: boolean; 
-  isCompleted: boolean;
-  isFirst: boolean;
-}) {
-  // Arrow prefix based on position
-  const arrow = isFirst ? "→" : "---->";
-  
+// Vertical pipeline component — renders the ENTIRE pipeline as plain text
+// Matching exact reference format:
+// --> X
+// |
+// |
+// ----->Search
+// |
+// |
+// ---> Generate response
+function VerticalPipeline({ nodes }: { nodes: { id: string; label: string; active: boolean; completed: boolean }[] }) {
   return (
     <motion.div
-      initial={{ opacity: 0, x: -6 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.25 }}
-      className="flex flex-col"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+      className="font-mono text-[13px] leading-[1.6] mb-3"
     >
-      {/* Vertical connector line (above, except first node) */}
-      {!isFirst && (
-        <div className="ml-1.5 h-4 border-l border-[hsl(0_0%_20%)]" />
-      )}
-      {/* Node row: arrow + label */}
-      <div className={`flex items-center gap-1.5 text-[13px] font-medium ${
-        isActive 
-          ? "text-[hsl(0_0%_80%)]" 
-          : isCompleted 
-            ? "text-[hsl(0_0%_50%)]" 
-            : "text-[hsl(0_0%_35%)]"
-      }`}>
-        <span className="text-[hsl(0_0%_30%)] text-[12px] font-mono shrink-0">{arrow}</span>
-        {isActive && (
-          <div className="spinner-perplexity" style={{ width: 11, height: 11 }} />
-        )}
-        <span>{label}</span>
-      </div>
+      {nodes.map((node, i) => {
+        // Determine arrow prefix: first node gets "-->", others get "----->"/"--->"
+        const arrow = i === 0 ? "-->" : i === nodes.length - 1 ? "--->" : "----->";
+        // Color based on state
+        const textColor = node.active
+          ? "text-[hsl(0_0%_85%)]"
+          : node.completed
+            ? "text-[hsl(0_0%_45%)]"
+            : "text-[hsl(0_0%_30%)]";
+        const pipeColor = "text-[hsl(0_0%_25%)]";
+
+        return (
+          <motion.div
+            key={node.id}
+            initial={{ opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.2, delay: i * 0.08 }}
+          >
+            {/* Pipe connectors above (except first node) */}
+            {i > 0 && (
+              <>
+                <div className={pipeColor}>|</div>
+                <div className={pipeColor}>|</div>
+              </>
+            )}
+            {/* Arrow + label */}
+            <div className={`flex items-center gap-0 ${textColor}`}>
+              <span>{arrow}</span>
+              {node.active && (
+                <span className="inline-block ml-1">
+                  <span className="spinner-perplexity" style={{ width: 10, height: 10, display: "inline-block", verticalAlign: "middle" }} />
+                </span>
+              )}
+              <span className={node.active ? "ml-1" : ""}>{node.label}</span>
+            </div>
+          </motion.div>
+        );
+      })}
     </motion.div>
   );
 }
@@ -377,24 +397,9 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       {/* Response container */}
       <div className="w-full max-w-[82%] space-y-1 flex flex-col items-start min-w-0">
         <div className="w-full min-w-[120px] px-3.5 py-3">
-          {/* Pipeline Flow (VERTICAL: → X | ----->Search | ---> Generate response) */}
+          {/* Pipeline Flow (VERTICAL plain text format matching reference) */}
           {showPipeline && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
-              className="flex flex-col mb-3"
-            >
-              {pipelineNodes.map((node, i) => (
-                <PipelineNode
-                  key={node.id}
-                  label={node.label}
-                  isActive={node.active}
-                  isCompleted={node.completed}
-                  isFirst={i === 0}
-                />
-              ))}
-            </motion.div>
+            <VerticalPipeline nodes={pipelineNodes} />
           )}
 
           {/* Source Pills (web search) — shown during streaming and tool execution */}
