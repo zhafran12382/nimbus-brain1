@@ -84,9 +84,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : (
           <div
             className={isUser
-              ? "rounded-2xl rounded-br-sm bg-gradient-to-r from-blue-600 to-blue-500 px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#F3F7FF]"
+              ? "rounded-2xl rounded-br-sm px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]"
               : "px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]"
             }
+            style={isUser ? { background: "rgba(255,255,255,0.06)", borderRadius: 12 } : undefined}
           >
             {isUser ? (
               <p className="whitespace-pre-wrap">{message.content}</p>

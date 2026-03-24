@@ -67,31 +67,31 @@ function getToolDisplay(name: string, phase: "start" | "result"): { icon: string
 
 export { getToolDisplay };
 
-// Get a short label for the pipeline node
-function getPipelineLabel(name: string): string {
-  const labels: Record<string, string> = {
-    __thinking: "Thinking",
-    web_search: "Search",
-    get_information: "Search",
-    create_target: "Create target",
-    create_expense: "Record expense",
-    get_targets: "Fetch data",
-    get_target_summary: "Analyze",
-    get_expenses: "Fetch data",
-    get_expense_summary: "Analyze",
-    update_target_progress: "Update",
-    delete_target: "Delete",
-    delete_expense: "Delete",
-    save_memory: "Remember",
-    get_memories: "Recall",
-    delete_memory: "Forget",
-    create_quiz: "Generate quiz",
-    get_quiz_history: "Fetch history",
-    get_quiz_stats: "Analyze stats",
-    run_python: "Calculate",
-    __generating: "Generate response",
+// Get pipeline label and icon for a tool
+function getPipelineStep(name: string): { label: string; icon: string } {
+  const steps: Record<string, { label: string; icon: string }> = {
+    __thinking: { label: "Thinking", icon: "💭" },
+    web_search: { label: "Search", icon: "🔍" },
+    get_information: { label: "Reading sources", icon: "📖" },
+    create_target: { label: "Creating target", icon: "🎯" },
+    create_expense: { label: "Recording expense", icon: "💸" },
+    get_targets: { label: "Fetching data", icon: "📊" },
+    get_target_summary: { label: "Analyzing", icon: "📊" },
+    get_expenses: { label: "Fetching data", icon: "📊" },
+    get_expense_summary: { label: "Analyzing", icon: "📊" },
+    update_target_progress: { label: "Updating", icon: "🔄" },
+    delete_target: { label: "Deleting", icon: "🗑️" },
+    delete_expense: { label: "Deleting", icon: "🗑️" },
+    save_memory: { label: "Remembering", icon: "🧠" },
+    get_memories: { label: "Recalling", icon: "🧠" },
+    delete_memory: { label: "Forgetting", icon: "🧠" },
+    create_quiz: { label: "Generating quiz", icon: "📝" },
+    get_quiz_history: { label: "Fetching history", icon: "📚" },
+    get_quiz_stats: { label: "Analyzing stats", icon: "📊" },
+    run_python: { label: "Calculating", icon: "🧮" },
+    __generating: { label: "Generating response", icon: "✨" },
   };
-  return labels[name] || name;
+  return steps[name] || { label: name, icon: "⚡" };
 }
 
 // Extract web search source URLs from tool result text
@@ -209,86 +209,71 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
   );
 }
 
-// Random "X" labels for initial node (the user wants dynamic starting labels)
-const X_LABELS = [
-  "Spinning up the AI...",
-  "Warming up the AI...",
-  "Bringing the AI online...",
-  "Initializing neural pathways...",
-  "Powering up the brain...",
-  "Preparing the AI engine...",
-  "Activating intelligence...",
-  "Loading the AI core...",
-];
-
-function getRandomXLabel(): string {
-  return X_LABELS[Math.floor(Math.random() * X_LABELS.length)];
+// ---------------------------------------------------------------------------
+// ReasoningPipeline — modern vertical activity-log style
+// ---------------------------------------------------------------------------
+interface PipelineNode {
+  id: string;
+  label: string;
+  icon: string;
+  active: boolean;
+  completed: boolean;
 }
 
-// Vertical pipeline component — renders the ENTIRE pipeline as plain text
-// Matching exact reference format:
-// --> X
-// |
-// |
-// ----->Search
-// |
-// |
-// ---> Generate response
-function VerticalPipeline({ nodes }: { nodes: { id: string; label: string; active: boolean; completed: boolean }[] }) {
+function ReasoningPipeline({ nodes }: { nodes: PipelineNode[] }) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.2 }}
-      className="font-mono text-[13px] leading-[1.6] mb-3"
+    <div
+      className="flex flex-col pl-3 mb-4"
+      style={{ borderLeft: "1px solid rgba(255,255,255,0.08)" }}
     >
       {nodes.map((node, i) => {
-        // Determine arrow prefix: first node gets "-->", others get "----->"/"--->"
-        const arrow = i === 0 ? "-->" : i === nodes.length - 1 ? "--->" : "----->";
-        // Color based on state
-        const textColor = node.active
-          ? "text-[hsl(0_0%_85%)]"
-          : node.completed
-            ? "text-[hsl(0_0%_45%)]"
-            : "text-[hsl(0_0%_30%)]";
-        const pipeColor = "text-[hsl(0_0%_25%)]";
-
+        const isLast = i === nodes.length - 1;
         return (
           <motion.div
             key={node.id}
-            initial={{ opacity: 0, x: -4 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.2, delay: i * 0.08 }}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, delay: i * 0.06 }}
+            className="flex items-center gap-2"
+            style={{
+              paddingTop: i === 0 ? 0 : 10,
+              paddingBottom: isLast ? 0 : 2,
+            }}
           >
-            {/* Pipe connectors above (except first node) */}
-            {i > 0 && (
-              <>
-                <div className={pipeColor}>|</div>
-                <div className={pipeColor}>|</div>
-              </>
+            {/* Small icon */}
+            <span className="text-[12px] leading-none shrink-0">{node.icon}</span>
+
+            {/* Label */}
+            <span
+              className="text-[13px] leading-tight"
+              style={{
+                opacity: node.active ? 0.9 : node.completed ? 0.5 : 0.35,
+                color: node.active ? "hsl(0 0% 88%)" : "hsl(0 0% 62%)",
+              }}
+            >
+              {node.label}
+            </span>
+
+            {/* Spinner for active node */}
+            {node.active && (
+              <div
+                className="spinner-perplexity shrink-0"
+                style={{ width: 10, height: 10 }}
+              />
             )}
-            {/* Arrow + label */}
-            <div className={`flex items-center gap-0 ${textColor}`}>
-              <span>{arrow}</span>
-              {node.active && (
-                <span className="inline-block ml-1">
-                  <span className="spinner-perplexity" style={{ width: 10, height: 10, display: "inline-block", verticalAlign: "middle" }} />
-                </span>
-              )}
-              <span className={node.active ? "ml-1" : ""}>{node.label}</span>
-            </div>
           </motion.div>
         );
       })}
-    </motion.div>
+    </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export function AssistantMessage({ state }: AssistantMessageProps) {
   const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs, thinkingContent: apiThinkingContent } = state;
   const [showMetadata, setShowMetadata] = useState(false);
-  // Persist the random "X" label across re-renders so it doesn't change every time
-  const [xLabel] = useState(() => getRandomXLabel());
 
   // Show metadata with delay after completion
   useEffect(() => {
@@ -326,57 +311,55 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
     index === self.findIndex((s) => s.domain === source.domain)
   ).slice(0, 5);
 
-  // Build pipeline nodes from tool history
-  // Deduplicate tool names and build the flow: X → [tools...] → Generate response
-  const pipelineNodes: { id: string; label: string; completed: boolean; active: boolean }[] = [];
+  // Build pipeline nodes
+  const pipelineNodes: PipelineNode[] = [];
   
-  // Add initial "X" node (random dynamic label like "Spinning up the AI...")
-  const thinkingDone = toolHistory.length > 0 || phase === "streaming" || phase === "complete";
-  const thinkingActive = phase === "thinking" && toolHistory.filter(t => t.name !== "__thinking").length === 0;
-  pipelineNodes.push({ id: "x", label: xLabel, completed: thinkingDone, active: thinkingActive });
-  
-  // Add tool nodes (deduplicated by tool name to avoid showing "Search" 3 times)
-  const seenToolLabels = new Set<string>();
+  // Deduplicate tool labels and build flow
+  const seenLabels = new Set<string>();
   for (const tool of toolHistory) {
     if (tool.name === "__thinking") continue;
-    const label = getPipelineLabel(tool.name);
-    if (seenToolLabels.has(label)) continue;
-    seenToolLabels.add(label);
+    const step = getPipelineStep(tool.name);
+    if (seenLabels.has(step.label)) continue;
+    seenLabels.add(step.label);
     
-    // Check if ALL instances of this tool label are completed
-    const allCompleted = toolHistory
-      .filter(t => getPipelineLabel(t.name) === label)
+    const allDone = toolHistory
+      .filter(t => getPipelineStep(t.name).label === step.label)
       .every(t => !!t.result);
+    const isActive = !allDone && phase === "tool_executing";
     
-    // Check if any instance is currently active
-    const anyActive = !allCompleted && phase === "tool_executing";
-    
-    pipelineNodes.push({ id: tool.name, label, completed: allCompleted, active: anyActive });
+    pipelineNodes.push({ id: tool.name, label: step.label, icon: step.icon, completed: allDone, active: isActive });
   }
 
   // Add active tool if not yet in history
   if (phase === "tool_executing" && toolStatus && !toolHistory.find(t => t.name === toolStatus.name && !t.result)) {
-    const label = getPipelineLabel(toolStatus.name);
-    if (!seenToolLabels.has(label)) {
-      pipelineNodes.push({ id: toolStatus.name, label, completed: false, active: true });
+    const step = getPipelineStep(toolStatus.name);
+    if (!seenLabels.has(step.label)) {
+      pipelineNodes.push({ id: toolStatus.name, label: step.label, icon: step.icon, completed: false, active: true });
     }
   }
-  
-  // Add "Generate response" at the end if we have tool calls
+
+  // Append "Generating response" when streaming starts (after tool calls)
   const hasToolActivity = toolHistory.filter(t => t.name !== "__thinking").length > 0;
   if (hasToolActivity) {
-    const generating = phase === "streaming";
-    const generatingDone = phase === "complete";
-    pipelineNodes.push({ 
-      id: "generating", 
-      label: "Generate response", 
-      completed: generatingDone, 
-      active: generating 
+    const genStep = getPipelineStep("__generating");
+    pipelineNodes.push({
+      id: "generating",
+      label: genStep.label,
+      icon: genStep.icon,
+      completed: phase === "complete",
+      active: phase === "streaming",
     });
   }
 
+  // Show pipeline during thinking (with a single "Thinking" node), tool_executing, or streaming
+  const showThinkingOnly = phase === "thinking" && pipelineNodes.length === 0;
+  if (showThinkingOnly) {
+    const thinkStep = getPipelineStep("__thinking");
+    pipelineNodes.push({ id: "thinking", label: thinkStep.label, icon: thinkStep.icon, completed: false, active: true });
+  }
+
   const isContentVisible = phase === "streaming" || phase === "complete";
-  const showPipeline = pipelineNodes.length > 0 && (phase === "thinking" || phase === "tool_executing" || phase === "streaming");
+  const showPipeline = pipelineNodes.length > 0 && phase !== "complete";
 
   const timestamp = completedAt
     ? new Date(completedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
@@ -397,12 +380,12 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       {/* Response container */}
       <div className="w-full max-w-[82%] space-y-1 flex flex-col items-start min-w-0">
         <div className="w-full min-w-[120px] px-3.5 py-3">
-          {/* Pipeline Flow (VERTICAL plain text format matching reference) */}
+          {/* Reasoning Pipeline — clean vertical activity log */}
           {showPipeline && (
-            <VerticalPipeline nodes={pipelineNodes} />
+            <ReasoningPipeline nodes={pipelineNodes} />
           )}
 
-          {/* Source Pills (web search) — shown during streaming and tool execution */}
+          {/* Source Pills (web search) */}
           {uniqueSources.length > 0 && (phase === "tool_executing" || phase === "streaming" || phase === "complete") && (
             <motion.div
               initial="hidden"
@@ -472,7 +455,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
             </div>
           )}
 
-          {/* Response Content — ALWAYS render when there's content, no AnimatePresence blocking */}
+          {/* Response Content */}
           {isContentVisible && displayContent && (
             <motion.div
               initial={{ opacity: 0 }}
