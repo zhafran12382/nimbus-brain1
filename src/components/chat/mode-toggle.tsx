@@ -56,6 +56,7 @@ export function ModeToggle({ value, onChange }: { value: ChatMode; onChange: (mo
         type="button"
         onClick={() => setOpen(!open)}
         className="flex min-h-11 items-center gap-2 rounded-2xl border border-[hsl(222_18%_34%_/_0.5)] bg-[linear-gradient(180deg,hsl(224_14%_16%),hsl(224_12%_12%))] px-3 py-1.5 text-[hsl(0_0%_88%)] shadow-[inset_0_1px_0_hsl(0_0%_100%_/_0.04),0_6px_20px_-14px_hsl(221_80%_50%_/_0.8)] hover:border-[hsl(217_91%_60%_/_0.45)] hover:bg-[linear-gradient(180deg,hsl(224_16%_18%),hsl(224_13%_13%))] transition-all group"
+        style={{ minHeight: "40px", minWidth: "40px", touchAction: "manipulation" }}
       >
         <currentMode.icon className={`h-3.5 w-3.5 ${currentMode.color}`} />
         <span className="text-xs font-semibold text-[hsl(0_0%_88%)] group-hover:text-white transition-colors">
@@ -76,7 +77,7 @@ export function ModeToggle({ value, onChange }: { value: ChatMode; onChange: (mo
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.97 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute left-0 bottom-full z-50 mb-2 w-64 overflow-hidden rounded-2xl border border-[hsl(222_18%_30%_/_0.8)] bg-[hsl(224_16%_12%)] shadow-[0_20px_55px_-24px_hsl(220_90%_55%_/_0.45)]"
+            className="absolute left-0 bottom-full z-50 mb-2 w-[min(16rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[hsl(222_18%_30%_/_0.8)] bg-[hsl(224_16%_12%)] shadow-[0_20px_55px_-24px_hsl(220_90%_55%_/_0.45)]"
           >
             <div className="flex flex-col gap-1 p-1.5">
               {modes.map((m) => {
@@ -94,6 +95,7 @@ export function ModeToggle({ value, onChange }: { value: ChatMode; onChange: (mo
                         ? "bg-[hsl(217_91%_60%_/_0.16)] ring-1 ring-[hsl(217_91%_60%_/_0.3)]"
                         : "hover:bg-[hsl(0_0%_100%_/_0.04)]"
                     }`}
+                    style={{ minHeight: "44px" }}
                   >
                     <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${m.bg}`}>
                       <m.icon className={`h-4 w-4 ${m.color}`} />
