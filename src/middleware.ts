@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'experimental-edge';
-
 async function verifySessionToken(token: string, secret: string): Promise<boolean> {
   try {
     const [encoded, hmac] = token.split('.');
