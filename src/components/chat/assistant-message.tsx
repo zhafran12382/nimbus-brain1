@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { parseAssistantContent } from "@/lib/assistant-response";
-import { Copy, Download, Lock, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw } from "lucide-react";
 import { SourcesFooter } from "./sources-footer";
 import { ThinkingBlock } from "./thinking-block";
 import { chatMarkdownComponents } from "./markdown-components";
@@ -223,47 +223,46 @@ interface PipelineNode {
 function ReasoningPipeline({ nodes }: { nodes: PipelineNode[] }) {
   return (
     <div
-      className="flex flex-col pl-3 mb-4"
-      style={{ borderLeft: "1px solid rgba(255,255,255,0.08)" }}
+      className="flex flex-col mb-4"
+      style={{
+        borderLeft: "1px solid rgba(255,255,255,0.08)",
+        paddingLeft: 12,
+      }}
     >
-      {nodes.map((node, i) => {
-        const isLast = i === nodes.length - 1;
-        return (
-          <motion.div
-            key={node.id}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, delay: i * 0.06 }}
-            className="flex items-center gap-2"
+      {nodes.map((node, i) => (
+        <motion.div
+          key={node.id}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, delay: i * 0.06 }}
+          className="flex items-center gap-2"
+          style={{
+            paddingTop: i === 0 ? 0 : 12,
+          }}
+        >
+          {/* Small icon */}
+          <span className="text-[12px] leading-none shrink-0">{node.icon}</span>
+
+          {/* Label */}
+          <span
+            className="text-[13px] leading-tight"
             style={{
-              paddingTop: i === 0 ? 0 : 10,
-              paddingBottom: isLast ? 0 : 2,
+              opacity: node.active ? 0.8 : node.completed ? 0.5 : 0.35,
+              color: node.active ? "hsl(0 0% 85%)" : "hsl(0 0% 58%)",
             }}
           >
-            {/* Small icon */}
-            <span className="text-[12px] leading-none shrink-0">{node.icon}</span>
+            {node.label}
+          </span>
 
-            {/* Label */}
-            <span
-              className="text-[13px] leading-tight"
-              style={{
-                opacity: node.active ? 0.9 : node.completed ? 0.5 : 0.35,
-                color: node.active ? "hsl(0 0% 88%)" : "hsl(0 0% 62%)",
-              }}
-            >
-              {node.label}
-            </span>
-
-            {/* Spinner for active node */}
-            {node.active && (
-              <div
-                className="spinner-perplexity shrink-0"
-                style={{ width: 10, height: 10 }}
-              />
-            )}
-          </motion.div>
-        );
-      })}
+          {/* Spinner for active node */}
+          {node.active && (
+            <div
+              className="spinner-perplexity shrink-0"
+              style={{ width: 10, height: 10 }}
+            />
+          )}
+        </motion.div>
+      ))}
     </div>
   );
 }
@@ -477,31 +476,20 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
             </div>
           )}
 
-          {/* Metadata/footer */}
+          {/* Minimal action bar */}
           {phase === "complete" && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
-              className="mt-4 pt-4 border-t border-[hsl(0_0%_100%_/_0.06)] flex flex-col gap-3"
+              className="mt-3 flex items-center gap-3 text-[hsl(0_0%_40%)]"
             >
-              <div className="text-[12px] font-medium text-[hsl(0_0%_60%)]">
-                Prepared using {modelUsed}
-              </div>
-              <div className="flex items-center gap-3 text-[hsl(0_0%_50%)]">
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
-                  <Lock className="w-4 h-4" />
-                </button>
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
-                  <Download className="w-4 h-4" />
-                </button>
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
-                  <Copy className="w-4 h-4" />
-                </button>
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
+              <button className="hover:text-[hsl(0_0%_70%)] transition-colors" title="Copy">
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+              <button className="hover:text-[hsl(0_0%_70%)] transition-colors" title="Retry">
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
             </motion.div>
           )}
         </div>
