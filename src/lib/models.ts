@@ -375,6 +375,14 @@ export function getModelById(id: string): AIModel | undefined {
   return AVAILABLE_MODELS.find(m => m.id === id);
 }
 
+/**
+ * Get model by ID AND provider — disambiguates duplicate model IDs across providers.
+ * Preferred over getModelById() when providerId is known.
+ */
+export function getModelByIdAndProvider(id: string, providerId: ProviderId): AIModel | undefined {
+  return AVAILABLE_MODELS.find(m => m.id === id && m.providerId === providerId);
+}
+
 /** Alias used by the issue spec */
 export const getModelConfig = getModelById;
 
