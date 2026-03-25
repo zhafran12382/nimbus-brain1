@@ -43,6 +43,9 @@ const PIPELINE_STEPS = [
   { label: "Final answer" },
 ];
 
+const PIPELINE_LABEL_ACTIVE = "opacity-80 text-[hsl(0_0%_80%)]";
+const PIPELINE_LABEL_INACTIVE = "opacity-70 text-[hsl(0_0%_65%)]";
+
 // Map tool names to icons and status text
 function getToolDisplay(name: string, phase: "start" | "result"): { icon: string; text: string } {
   const map: Record<string, { icon: string; startText: string; resultText: string }> = {
@@ -285,10 +288,11 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                     {PIPELINE_STEPS.map((step, index) => {
                       const isCompleted = index < activeStepIndex;
                       const isActive = index === activeStepIndex;
-                      const circleClass = isActive ? "h-3.5 w-3.5 shrink-0 text-[hsl(217_91%_60%)]" : "h-3.5 w-3.5 shrink-0 text-white/35";
+                      const circleBaseClass = "h-3.5 w-3.5 shrink-0";
+                      const circleClass = `${circleBaseClass} ${isActive ? "text-[hsl(217_91%_60%)]" : "text-white/35"}`;
                       const labelClass = isActive
-                        ? "opacity-80 text-[hsl(0_0%_80%)]"
-                        : "opacity-70 text-[hsl(0_0%_65%)]";
+                        ? PIPELINE_LABEL_ACTIVE
+                        : PIPELINE_LABEL_INACTIVE;
                       return (
                         <div key={step.label} className="flex items-center gap-2.5 text-left">
                           {isCompleted ? (
