@@ -253,6 +253,10 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
         return -1;
     }
   })();
+  const activeToolStatusText =
+    phase === "tool_executing" && toolStatus
+      ? `${toolStatus.icon} ${toolStatus.text}`
+      : null;
 
   const timestamp = completedAt
     ? new Date(completedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
@@ -294,8 +298,13 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                       const labelClass = isActive
                         ? PIPELINE_LABEL_ACTIVE
                         : PIPELINE_LABEL_INACTIVE;
+                      const stepState = isCompleted ? "Completed" : isActive ? "In progress" : "Pending";
                       return (
-                        <div key={step.label} className="flex items-center gap-2.5 text-left">
+                        <div
+                          key={step.label}
+                          className="flex items-center gap-2.5 text-left"
+                          aria-label={`Step ${index + 1}: ${step.label} - ${stepState}`}
+                        >
                           {isCompleted ? (
                             <CheckCircle2 className={`h-3.5 w-3.5 shrink-0 ${PIPELINE_ACTIVE_COLOR}`} />
                           ) : (
@@ -304,9 +313,9 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                           <span className={labelClass}>
                             {step.label}
                           </span>
-                          {isActive && phase === "tool_executing" && toolStatus && (
+                          {isActive && activeToolStatusText && (
                             <span className="text-[13px] opacity-70 text-[hsl(0_0%_60%)]">
-                              {toolStatus.icon} {toolStatus.text}
+                              {activeToolStatusText}
                             </span>
                           )}
                         </div>
