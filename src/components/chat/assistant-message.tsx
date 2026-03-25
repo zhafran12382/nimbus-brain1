@@ -42,6 +42,11 @@ const PIPELINE_STEPS = [
   { label: "Generate response" },
   { label: "Final answer" },
 ];
+const PIPELINE_STEP_STATE_LABEL = {
+  completed: "Selesai",
+  active: "Sedang diproses",
+  pending: "Menunggu",
+};
 
 const PIPELINE_ACTIVE_COLOR = "text-[hsl(217_91%_60%)]";
 const PIPELINE_LABEL_ACTIVE = "opacity-80 text-[hsl(0_0%_80%)]";
@@ -298,7 +303,11 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                       const labelClass = isActive
                         ? PIPELINE_LABEL_ACTIVE
                         : PIPELINE_LABEL_INACTIVE;
-                      const stepStateLabel = isCompleted ? "Completed" : isActive ? "In progress" : "Pending";
+                      const stepStateLabel = isCompleted
+                        ? PIPELINE_STEP_STATE_LABEL.completed
+                        : isActive
+                          ? PIPELINE_STEP_STATE_LABEL.active
+                          : PIPELINE_STEP_STATE_LABEL.pending;
                       return (
                         <div
                           key={step.label}
@@ -315,7 +324,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                           </span>
                           {isActive && activeToolStatus && (
                             <span className="opacity-70 text-[hsl(0_0%_60%)]">
-                              <span aria-label="Tool status icon">{activeToolStatus.icon}</span>{" "}
+                              <span aria-hidden="true">{activeToolStatus.icon}</span>{" "}
                               {activeToolStatus.text}
                             </span>
                           )}
