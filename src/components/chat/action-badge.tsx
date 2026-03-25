@@ -17,9 +17,10 @@ const actionConfig: Record<string, { icon: string; label: string; bgClass: strin
 
 interface ActionBadgeProps {
   toolCall: ToolCallResult;
+  count?: number;
 }
 
-export function ActionBadge({ toolCall }: ActionBadgeProps) {
+export function ActionBadge({ toolCall, count = 1 }: ActionBadgeProps) {
   const config = actionConfig[toolCall.name] || {
     icon: "⚡",
     label: toolCall.name.replace(/_/g, " "),
@@ -31,6 +32,7 @@ export function ActionBadge({ toolCall }: ActionBadgeProps) {
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium border ${config.bgClass} ${config.textClass} ${config.borderClass}`}>
       {config.icon} {config.label}
+      {count > 1 && <span className="opacity-80">×{count}</span>}
     </span>
   );
 }

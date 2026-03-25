@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ChatMessage as ChatMessageType } from "@/types";
+import { ChatMessage as ChatMessageType, ToolCallResult } from "@/types";
 import { ActionBadge } from "./action-badge";
 import { messageBubble } from "@/lib/animations";
 import { QUIZ_DATA_REGEX } from "@/lib/constants";
@@ -36,6 +36,17 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
   const parsedAssistant = !isUser ? parseAssistantContent(message.content) : null;
   const assistantText = !isUser ? (parsedAssistant?.text ?? "") : message.content;
+  const groupedToolCalls = !isUser
+    ? (message.tool_calls ?? []).reduce<Array<{ toolCall: ToolCallResult; count: number }>>((acc, toolCall) => {
+        const existing = acc.find((item) => item.toolCall.name === toolCall.name);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          acc.push({ toolCall, count: 1 });
+        }
+        return acc;
+      }, [])
+    : [];
 
   const timestamp = new Date(message.created_at).toLocaleTimeString("id-ID", {
     hour: "2-digit",
@@ -61,10 +72,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
       <div className={`w-full max-w-[82%] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
         {/* Action badges for assistant messages */}
-        {!isUser && message.tool_calls && message.tool_calls.length > 0 && (
+        {!isUser && groupedToolCalls.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-0.5">
-            {message.tool_calls.map((tc, i) => (
-              <ActionBadge key={i} toolCall={tc} />
+            {groupedToolCalls.map(({ toolCall, count }, i) => (
+              <ActionBadge key={`${toolCall.name}-${i}`} toolCall={toolCall} count={count} />
             ))}
           </div>
         )}
