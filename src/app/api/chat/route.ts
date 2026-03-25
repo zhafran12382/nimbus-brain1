@@ -43,6 +43,7 @@ const toolLabels: Record<string, string> = {
   create_quiz: "📝 Generating quiz...",
   get_quiz_history: "📚 Fetching quiz history...",
   get_quiz_stats: "📊 Analyzing study stats...",
+  run_python: "⏳ Running Python code...",
 };
 
 interface CitationSourceEntry {
@@ -850,6 +851,7 @@ export async function POST(req: NextRequest) {
               try {
                 const result = await executeTool(fnName, fnArgs);
                 log('TOOL EXEC', `${fnName} result:`, result.substring(0, 200));
+                log('TOOL STATE', `${fnName} success=true, resultLength=${result.length}`);
 
                 if (fnName === 'get_information') {
                   citationSources = buildCitationSourceMap(result);
@@ -950,9 +952,18 @@ export async function POST(req: NextRequest) {
           try {
             const toolSummary = allToolCalls.map(tc => `${tc.name}: ${tc.result}`).join('\n');
             const hasSearchTools = allToolCalls.some(tc => tc.name === 'web_search' || tc.name === 'get_information');
-            const retryPrompt = hasSearchTools
-              ? `Kamu baru saja menjalankan search berikut:\n${toolSummary}\n\nBerdasarkan SEMUA hasil search di atas, berikan jawaban yang LENGKAP, DETAIL, dan KOMPREHENSIF. Target minimal 200-400 kata. Gunakan format: JUDUL, RINGKASAN, PENJELASAN LENGKAP (dengan kronologi jika relevan), FAKTA PENTING (bullet points), dan CATATAN (perbedaan info jika ada). Kutip sumber secara natural. Sertakan semua sumber menggunakan format ---sources--- di akhir. JANGAN panggil tool lagi.`
-              : `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan konfirmasi santai, ramah, dan natural (basa-basi) kepada user bahwa aksi telah berhasil dilakukan berdasarkan hasil di atas. Hindari respons seperti robot atau laporan formal. JANGAN panggil tool lagi.`;
+            const hasPythonTools = allToolCalls.some(tc => tc.name === 'run_python');
+            const pythonResults = allToolCalls.filter(tc => tc.name === 'run_python').map(tc => tc.result).join('\n');
+
+            let retryPrompt: string;
+            if (hasSearchTools) {
+              retryPrompt = `Kamu baru saja menjalankan search berikut:\n${toolSummary}\n\nBerdasarkan SEMUA hasil search di atas, berikan jawaban yang LENGKAP, DETAIL, dan KOMPREHENSIF. Target minimal 200-400 kata. Gunakan format: JUDUL, RINGKASAN, PENJELASAN LENGKAP (dengan kronologi jika relevan), FAKTA PENTING (bullet points), dan CATATAN (perbedaan info jika ada). Kutip sumber secara natural. Sertakan semua sumber menggunakan format ---sources--- di akhir. JANGAN panggil tool lagi.`;
+            } else if (hasPythonTools) {
+              retryPrompt = `Kamu baru saja menjalankan Python code dan BERHASIL mendapat output.\n\nHasil eksekusi Python:\n${pythonResults}\n\nINSTRUKSI WAJIB:\n- Output Python di atas adalah FAKTA dan source of truth. GUNAKAN hasilnya langsung.\n- Jelaskan hasil Python tersebut secara natural dan mudah dipahami ke user.\n- JANGAN bilang kamu tidak bisa menjalankan kode atau Python tidak tersedia.\n- JANGAN hitung ulang manual — hasil Python sudah benar dan akurat.\n- JANGAN panggil tool lagi.`;
+            } else {
+              retryPrompt = `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan konfirmasi santai, ramah, dan natural (basa-basi) kepada user bahwa aksi telah berhasil dilakukan berdasarkan hasil di atas. Hindari respons seperti robot atau laporan formal. JANGAN panggil tool lagi.`;
+            }
+            log('TOOL RESULT', `Re-stream prompt type: ${hasSearchTools ? 'search' : hasPythonTools ? 'python' : 'generic'}, toolCount=${allToolCalls.length}`);
             const retryMessages = [
               { role: "system", content: systemInstruction },
               ...messages.slice(-5),
@@ -1001,9 +1012,18 @@ export async function POST(req: NextRequest) {
             if (toolResults.length > 0) {
               const toolSummary = toolResults.map(tc => `${tc.name}: ${tc.result}`).join('\n');
               const hasSearchTools2 = toolResults.some(tc => tc.name === 'web_search' || tc.name === 'get_information');
-              const streamPrompt = hasSearchTools2
-                ? `Kamu baru saja menjalankan search berikut:\n${toolSummary}\n\nBerdasarkan SEMUA hasil search di atas, berikan jawaban yang LENGKAP, DETAIL, dan KOMPREHENSIF. Target minimal 200-400 kata. Gunakan format: JUDUL, RINGKASAN, PENJELASAN LENGKAP (dengan kronologi jika relevan), FAKTA PENTING (bullet points), dan CATATAN (perbedaan info jika ada). Kutip sumber secara natural. Sertakan semua sumber menggunakan format ---sources--- di akhir. JANGAN panggil tool lagi.`
-                : `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan konfirmasi santai, ramah, dan natural (basa-basi) kepada user bahwa aksi telah berhasil dilakukan berdasarkan hasil di atas. Hindari respons seperti robot atau laporan formal. JANGAN panggil tool lagi.`;
+              const hasPythonTools2 = toolResults.some(tc => tc.name === 'run_python');
+              const pythonResults2 = toolResults.filter(tc => tc.name === 'run_python').map(tc => tc.result).join('\n');
+
+              let streamPrompt: string;
+              if (hasSearchTools2) {
+                streamPrompt = `Kamu baru saja menjalankan search berikut:\n${toolSummary}\n\nBerdasarkan SEMUA hasil search di atas, berikan jawaban yang LENGKAP, DETAIL, dan KOMPREHENSIF. Target minimal 200-400 kata. Gunakan format: JUDUL, RINGKASAN, PENJELASAN LENGKAP (dengan kronologi jika relevan), FAKTA PENTING (bullet points), dan CATATAN (perbedaan info jika ada). Kutip sumber secara natural. Sertakan semua sumber menggunakan format ---sources--- di akhir. JANGAN panggil tool lagi.`;
+              } else if (hasPythonTools2) {
+                streamPrompt = `Kamu baru saja menjalankan Python code dan BERHASIL mendapat output.\n\nHasil eksekusi Python:\n${pythonResults2}\n\nINSTRUKSI WAJIB:\n- Output Python di atas adalah FAKTA dan source of truth. GUNAKAN hasilnya langsung.\n- Jelaskan hasil Python tersebut secara natural dan mudah dipahami ke user.\n- JANGAN bilang kamu tidak bisa menjalankan kode atau Python tidak tersedia.\n- JANGAN hitung ulang manual — hasil Python sudah benar dan akurat.\n- JANGAN panggil tool lagi.`;
+              } else {
+                streamPrompt = `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan konfirmasi santai, ramah, dan natural (basa-basi) kepada user bahwa aksi telah berhasil dilakukan berdasarkan hasil di atas. Hindari respons seperti robot atau laporan formal. JANGAN panggil tool lagi.`;
+              }
+              log('TOOL RESULT', `Case2 re-stream prompt type: ${hasSearchTools2 ? 'search' : hasPythonTools2 ? 'python' : 'generic'}`);
               streamMessages.push({
                 role: "user",
                 content: streamPrompt
