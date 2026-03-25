@@ -36,6 +36,13 @@ interface AssistantMessageProps {
   state: AssistantMessageState;
 }
 
+const PIPELINE_STEPS = [
+  { label: "Search" },
+  { label: "Tool call" },
+  { label: "Generate response" },
+  { label: "Final answer" },
+];
+
 // Map tool names to icons and status text
 function getToolDisplay(name: string, phase: "start" | "result"): { icon: string; text: string } {
   const map: Record<string, { icon: string; startText: string; resultText: string }> = {
@@ -239,15 +246,9 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       case "complete":
         return 3;
       default:
-        return 0;
+        return -1;
     }
   })();
-  const pipelineSteps = [
-    { label: "Search" },
-    { label: "Tool call" },
-    { label: "Generate response" },
-    { label: "Final answer" },
-  ];
 
   const timestamp = completedAt
     ? new Date(completedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
@@ -281,17 +282,21 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
               >
                 <div className="border-l border-white/[0.08] pl-3">
                   <div className="flex flex-col items-start space-y-3 text-[13px] leading-5">
-                    {pipelineSteps.map((step, index) => {
+                    {PIPELINE_STEPS.map((step, index) => {
                       const isCompleted = index < activeStepIndex;
                       const isActive = index === activeStepIndex;
+                      const circleClass = isActive ? "h-3.5 w-3.5 shrink-0 text-[hsl(217_91%_60%)]" : "h-3.5 w-3.5 shrink-0 text-white/35";
+                      const labelClass = isActive
+                        ? "opacity-80 text-[hsl(0_0%_80%)]"
+                        : "opacity-70 text-[hsl(0_0%_65%)]";
                       return (
                         <div key={step.label} className="flex items-center gap-2.5 text-left">
                           {isCompleted ? (
                             <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[hsl(217_91%_60%)]" />
                           ) : (
-                            <Circle className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-[hsl(217_91%_60%)]" : "text-white/35"}`} />
+                            <Circle className={circleClass} />
                           )}
-                          <span className={`${isActive ? "opacity-80 text-[hsl(0_0%_80%)]" : "opacity-70 text-[hsl(0_0%_65%)]"}`}>
+                          <span className={labelClass}>
                             {step.label}
                           </span>
                           {isActive && phase === "tool_executing" && toolStatus && (
