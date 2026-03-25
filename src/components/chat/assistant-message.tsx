@@ -46,6 +46,7 @@ const PIPELINE_STEPS = [
 const PIPELINE_ACTIVE_COLOR = "text-[hsl(217_91%_60%)]";
 const PIPELINE_LABEL_ACTIVE = "opacity-80 text-[hsl(0_0%_80%)]";
 const PIPELINE_LABEL_INACTIVE = "opacity-70 text-[hsl(0_0%_65%)]";
+const PIPELINE_ICON_BASE = "h-3.5 w-3.5 shrink-0";
 
 // Map tool names to icons and status text
 function getToolDisplay(name: string, phase: "start" | "result"): { icon: string; text: string } {
@@ -293,8 +294,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                     {PIPELINE_STEPS.map((step, index) => {
                       const isCompleted = index < activeStepIndex;
                       const isActive = index === activeStepIndex;
-                      const circleBaseClass = "h-3.5 w-3.5 shrink-0";
-                      const circleClass = `${circleBaseClass} ${isActive ? PIPELINE_ACTIVE_COLOR : "text-white/35"}`;
+                      const circleClass = `${PIPELINE_ICON_BASE} ${isActive ? PIPELINE_ACTIVE_COLOR : "text-white/35"}`;
                       const labelClass = isActive
                         ? PIPELINE_LABEL_ACTIVE
                         : PIPELINE_LABEL_INACTIVE;
@@ -306,7 +306,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                           aria-label={`Step ${index + 1}: ${step.label} - ${stepState}`}
                         >
                           {isCompleted ? (
-                            <CheckCircle2 className={`h-3.5 w-3.5 shrink-0 ${PIPELINE_ACTIVE_COLOR}`} />
+                            <CheckCircle2 className={`${PIPELINE_ICON_BASE} ${PIPELINE_ACTIVE_COLOR}`} />
                           ) : (
                             <Circle className={circleClass} />
                           )}
@@ -314,7 +314,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                             {step.label}
                           </span>
                           {isActive && activeToolStatusText && (
-                            <span className="text-[13px] opacity-70 text-[hsl(0_0%_60%)]">
+                            <span className="opacity-70 text-[hsl(0_0%_60%)]">
                               {activeToolStatusText}
                             </span>
                           )}
