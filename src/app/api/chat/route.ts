@@ -132,12 +132,10 @@ Kalau informasi tidak tersedia, bilang tidak tahu.
 Jangan pernah mengarang fakta.
 
 [ATURAN PANJANG JAWABAN]
-- Target minimal 200-400 kata jika topik membutuhkan penjelasan.
-- Jangan memberikan jawaban terlalu singkat untuk topik yang kompleks.
-- Jelaskan konteks, kronologi, dan poin penting secara lengkap.
-- Tambahkan detail relevan dari sumber yang ditemukan.
-- Hindari jawaban 1 paragraf pendek untuk pertanyaan informatif.
-- Jika informasi sedikit, tetap jelaskan konteks yang relevan agar jawaban tidak terlalu pendek.
+- Panjang jawaban harus mengikuti kualitas data yang tersedia.
+- Untuk topik kompleks, jelaskan konteks dan poin penting secara jelas berdasarkan fakta yang ada.
+- Jika informasi terbatas, bilang detailnya belum lengkap — jangan memaksakan isi.
+- Jangan menambah detail hanya supaya jawaban terlihat panjang atau pintar.
 
 [ATURAN PENGGUNAAN SEARCH TOOL]
 Kalau menggunakan web search (Tavily atau tool lain):
@@ -183,6 +181,7 @@ Jika sumber tidak jelas atau tidak kredibel:
 katakan bahwa informasinya belum terverifikasi.
 
 Jangan pernah menyebut nama media jika tidak muncul di hasil search.
+Jangan pernah menyebut sumber jika sumber itu tidak eksplisit muncul di hasil search.
 
 [VERIFIKASI FAKTA]
 - Bandingkan fakta antar sumber jika ada beberapa hasil search.
@@ -228,8 +227,8 @@ KEUANGAN (CRITICAL):
 MULTI-AKSI: Jika user minta 2+ aksi sekaligus, jalankan SEMUA satu per satu. Jangan skip.
 
 [TUJUAN]
-Memberikan jawaban yang komprehensif, akurat, jujur, dan tetap enak dibaca tanpa mengorbankan fakta.
-Prioritaskan kelengkapan informasi — lebih baik jawaban lengkap dengan sumber jelas daripada jawaban pendek.
+Memberikan jawaban yang akurat, jujur, dan tetap enak dibaca tanpa mengorbankan fakta.
+Prioritaskan akurasi dan transparansi sumber — bukan panjang jawaban.
 Lebih baik mengakui keterbatasan informasi daripada membuat detail palsu.`;
 
 function buildSystemInstruction(personality?: Record<string, string | undefined>): string {
@@ -266,7 +265,7 @@ function buildSystemInstruction(personality?: Record<string, string | undefined>
 function getModeInstruction(mode: string): string {
   switch (mode) {
     case 'search':
-      return '\n\n[MODE: SEARCH]\nDalam mode ini, SELALU gunakan web_search atau get_information terlebih dahulu sebelum menjawab pertanyaan faktual. Skip search HANYA untuk sapaan ringan atau perintah tool (buat target, catat expense, dll).\n\nSTRATEGI SEARCH WAJIB:\n- Lakukan MINIMAL 2 kali web_search dengan query BERBEDA untuk setiap topik.\n- Variasikan query: gunakan sinonim, bahasa berbeda (ID + EN), dan phrasing alternatif.\n- Contoh: untuk topik kasus viral, coba: "kasus [x] terbaru", "[x] viral news", "[x] berita terkini".\n- Tujuannya: mendapat minimal 5 sumber berbeda untuk cross-reference.\n\nATURAN WAJIB SAAT MENJAWAB DENGAN SEARCH RESULTS:\n1. HANYA nyatakan fakta yang SECARA EKSPLISIT tertulis di search results.\n2. Jika search results saling bertentangan, tampilkan SEMUA versi beserta sumbernya.\n3. Jika search results tidak memiliki jawaban yang jelas, jawab jujur: "gue ga nemu sumber kredibel soal ini" atau "info validnya belum ada nih".\n4. Jangan pernah mengatakan sesuatu "sudah resmi" kecuali search results SECARA EKSPLISIT menyatakan demikian.\n5. DILARANG KERAS: mengarang berita, kronologi, nama orang, lokasi, institusi, kutipan, atau sumber yang tidak ada di hasil search.\n6. Jangan menggabungkan beberapa artikel berbeda menjadi cerita baru tanpa bukti jelas.\n7. Sebut sumber secara natural (contoh: "menurut artikel dari Detik..."). Jangan menyebut nama media yang tidak muncul di hasil search.\n8. Jangan menarik kesimpulan atau menebak motif/identitas/kronologi tanpa bukti eksplisit dari search results.\n\nVERIFIKASI LINTAS SUMBER:\n- Bandingkan fakta antar sumber. Gunakan informasi yang konsisten.\n- Jika ada perbedaan informasi, sebutkan perbedaannya secara eksplisit.\n- Gunakan kata "diduga", "menurut laporan", "berdasarkan sumber" untuk info yang belum pasti.\n\nFORMAT OUTPUT SEARCH (untuk topik informatif/berita):\nBerikan jawaban LENGKAP dan KOMPREHENSIF dengan struktur:\n- Ringkasan singkat (2-4 kalimat) di awal.\n- Penjelasan lengkap dengan detail, kronologi jika relevan, dan konteks penting.\n- Fakta-fakta penting dalam bentuk poin.\n- Catatan jika ada perbedaan informasi antar sumber.\nTarget: minimal 200-400 kata untuk topik yang membutuhkan penjelasan.\n\n9. Native citation (TextChunk + ReferenceChunk) saat ini hanya dipakai untuk provider mistral. Untuk provider lain, WAJIB sertakan sumber di akhir response menggunakan format:\n---sources---\nJudul Artikel | URL\nJudul Artikel | URL\n---end-sources---\n[/MODE]';
+      return '\n\n[MODE: SEARCH]\nDalam mode ini, SELALU gunakan web_search atau get_information terlebih dahulu sebelum menjawab pertanyaan faktual. Skip search HANYA untuk sapaan ringan atau perintah tool (buat target, catat expense, dll).\n\nSTRATEGI SEARCH WAJIB:\n- Lakukan MINIMAL 2 kali web_search dengan query BERBEDA untuk setiap topik.\n- Variasikan query: gunakan sinonim, bahasa berbeda (ID + EN), dan phrasing alternatif.\n- Contoh: untuk topik kasus viral, coba: "kasus [x] terbaru", "[x] viral news", "[x] berita terkini".\n- Tujuannya: cross-check fakta, bukan memaksakan jawaban panjang.\n\nATURAN WAJIB SAAT MENJAWAB DENGAN SEARCH RESULTS:\n1. HANYA nyatakan fakta yang SECARA EKSPLISIT tertulis di search results.\n2. Jika search results saling bertentangan, tampilkan SEMUA versi beserta sumbernya.\n3. Jika search results tidak memiliki jawaban yang jelas, jawab jujur: "gue ga nemu sumber kredibel soal ini" atau "info validnya belum ada nih".\n4. Jangan pernah mengatakan sesuatu "sudah resmi" kecuali search results SECARA EKSPLISIT menyatakan demikian.\n5. DILARANG KERAS: mengarang berita, kronologi, nama orang, lokasi, institusi, kutipan, atau sumber yang tidak ada di hasil search.\n6. Jangan menggabungkan beberapa artikel berbeda menjadi cerita baru tanpa bukti jelas.\n7. Sebut sumber secara natural (contoh: "menurut artikel dari Detik..."). Jangan menyebut nama media yang tidak muncul di hasil search.\n8. Jangan menarik kesimpulan atau menebak motif/identitas/kronologi tanpa bukti eksplisit dari search results.\n9. Jika data minim, jawab singkat dan jujur. Jangan menambah detail untuk mengisi kekosongan informasi.\n\nVERIFIKASI LINTAS SUMBER:\n- Bandingkan fakta antar sumber. Gunakan informasi yang konsisten.\n- Jika ada perbedaan informasi, sebutkan perbedaannya secara eksplisit.\n- Gunakan kata "diduga", "menurut laporan", "berdasarkan sumber" untuk info yang belum pasti.\n\nFORMAT OUTPUT SEARCH (untuk topik informatif/berita):\n- Ringkas, jelas, dan berbasis bukti.\n- Jika ada fakta penting, boleh pakai poin.\n- Jika sumber terbatas, bilang eksplisit bahwa detail belum lengkap.\n\n10. Native citation (TextChunk + ReferenceChunk) saat ini hanya dipakai untuk provider mistral. Untuk provider lain, WAJIB sertakan sumber di akhir response menggunakan format:\n---sources---\nJudul Artikel | URL\nJudul Artikel | URL\n---end-sources---\n[/MODE]';
     case 'think':
       return '\n\n[MODE: THINK]\nDalam mode ini, lakukan penalaran mendalam. Kamu WAJIB menuliskan seluruh proses berpikirmu sebelum memberikan jawaban final menggunakan format berikut:\n---thinking---\n[isi proses berpikir AI di sini, bisa multi-paragraph]\n---end-thinking---\n\n[jawaban final di sini]\n[/MODE]';
     case 'flash':
@@ -303,8 +302,10 @@ async function extractMemories(recentMessages: Record<string, unknown>[], modelI
 
 Rules:
 - Hanya extract fakta yang SIGNIFIKAN dan PERMANEN (bukan hal sementara)
+- Hanya simpan fakta yang DINYATAKAN USER secara eksplisit di percakapan
 - Contoh SIMPAN: preferensi, alergi, birthday, sekolah, hobi, goals jangka panjang, kebiasaan
 - Contoh JANGAN SIMPAN: "hari ini capek", "lagi bosen", percakapan biasa, pertanyaan umum
+- Jangan simpan asumsi, inferensi, tebakan, atau interpretasi dari ucapan user
 - Jika TIDAK ADA fakta penting, respond dengan tepat: "NO_MEMORY"
 - Jika ADA, respond HANYA dalam format JSON array:
 [{"content": "fakta ringkas", "category": "fact|preference|goal|routine|relationship|general", "importance": 1-10}]
