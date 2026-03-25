@@ -95,7 +95,7 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "web_search",
-      description: "PENTING: Gunakan tool ini untuk pertanyaan faktual, info terkini, berita realtime, profil seseorang, kejadian terbaru, atau info yang tidak kamu ketahui. WAJIB kutip sumber. Dalam mode SEARCH: panggil tool ini MINIMAL 2 kali dengan query BERBEDA untuk cross-reference dan mendapat sumber lebih banyak.",
+      description: "PENTING: Gunakan tool ini untuk pertanyaan faktual, info terkini, berita realtime, profil seseorang, kejadian terbaru, atau info yang tidak kamu ketahui. WAJIB kutip sumber. Dalam mode SEARCH: panggil tool ini MINIMAL 3 kali dengan query BERBEDA untuk cross-reference dan mendapat sumber lebih banyak. Gunakan variasi: sinonim, bahasa berbeda (ID + EN), phrasing alternatif. Contoh variasi: 'kasus [x] terbaru', '[x] viral berita', '[x] news latest'. Target: dapatkan minimal 5 sumber berbeda.",
       parameters: {
         type: "object",
         properties: {

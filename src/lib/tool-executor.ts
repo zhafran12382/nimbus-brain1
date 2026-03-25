@@ -8,7 +8,7 @@ interface SearchResult {
   snippet?: string;
 }
 
-function truncateSearchResults(results: SearchResult[], maxTotalChars = 6000, maxSnippetChars = 500): { title: string; url: string; snippet: string }[] {
+function truncateSearchResults(results: SearchResult[], maxTotalChars = 10000, maxSnippetChars = 800): { title: string; url: string; snippet: string }[] {
   let totalChars = 0;
   const truncated: { title: string; url: string; snippet: string }[] = [];
 
@@ -173,7 +173,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
           body: JSON.stringify({
             api_key: apiKey,
             query,
-            max_results: 8,
+            max_results: 10,
             search_depth: 'advanced',
             include_answer: true,
           }),
@@ -184,7 +184,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
         const data = await tavilyRes.json();
         let output = `Web Search Results for "${query}":\n\n`;
         if (data.answer) {
-          output += `Answer: ${data.answer.slice(0, 1500)}\n\n`;
+          output += `Answer: ${data.answer.slice(0, 2000)}\n\n`;
         }
         if (data.results && Array.isArray(data.results)) {
           const truncated = truncateSearchResults(data.results);
@@ -215,7 +215,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
           body: JSON.stringify({
             api_key: apiKey,
             query,
-            max_results: 8,
+            max_results: 10,
             search_depth: 'advanced',
             include_answer: false,
           }),
