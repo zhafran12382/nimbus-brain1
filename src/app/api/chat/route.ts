@@ -286,6 +286,11 @@ function getModeInstruction(mode: string): string {
       return '\n\n[MODE: SEARCH]\nDalam mode ini, SELALU gunakan web_search atau get_information terlebih dahulu sebelum menjawab pertanyaan faktual. Skip search HANYA untuk sapaan ringan atau perintah tool (buat target, catat expense, dll).\n\nSTRATEGI SEARCH DINAMIS:\nSesuaikan intensitas search berdasarkan tingkat familiaritas topik:\n\nTOPIK NICHE / JARANG / TABU / TIDAK UMUM (contoh: kasus lokal, figur tidak terkenal, topik teknis spesifik, berita daerah, isu kontroversial, topik yang kamu tidak yakin):\n- Lakukan 5-7 web_search dengan query SANGAT BERVARIASI\n- Gunakan variasi: bahasa Indonesia, bahasa Inggris, nama lengkap, singkatan, sinonim, frasa berita, frasa teknis\n- Target: kumpulkan 15+ sumber berbeda\n- Contoh variasi: "kasus [x] [kota]", "[x] berita terbaru", "[x] news latest", "[x] kronologi", "[x] viral"\n\nTOPIK UMUM / TRENDING / WELL-KNOWN (contoh: berita viral nasional, tokoh sangat terkenal, topik mainstream yang sedang ramai):\n- Lakukan 2-3 web_search dengan query berbeda\n- Target: 5-10 sumber\n- Variasi bahasa (ID + EN) dan phrasing alternatif sudah cukup\n\nCARA MENENTUKAN INTENSITAS:\n- Jika kamu YAKIN topik ini umum dan well-known → intensitas rendah (2-3 search)\n- Jika kamu TIDAK YAKIN atau topik terasa niche → intensitas tinggi (5+ search)\n- Jika hasil search pertama SEDIKIT atau TIDAK RELEVAN → otomatis tingkatkan intensitas, lakukan search tambahan\n- DEFAULT ke intensitas TINGGI jika ragu\n\nATURAN WAJIB SAAT MENJAWAB DENGAN SEARCH RESULTS:\n1. HANYA nyatakan fakta yang SECARA EKSPLISIT tertulis di search results.\n2. Jika search results saling bertentangan, tampilkan SEMUA versi beserta sumbernya.\n3. Jika search results kosong, lemah, atau tidak relevan, jawab jujur: "gue ga nemu sumber kredibel soal ini" atau "info validnya belum ada nih".\n4. Jangan pernah mengatakan sesuatu "sudah resmi" kecuali search results SECARA EKSPLISIT menyatakan demikian.\n5. DILARANG KERAS: mengarang berita, kronologi, nama orang, lokasi, institusi, kutipan, atau sumber yang tidak ada di hasil search.\n6. Jangan menggabungkan beberapa artikel berbeda menjadi cerita baru tanpa bukti jelas.\n7. Sebut sumber secara natural (contoh: "menurut artikel dari Detik..."). Jangan menyebut nama media yang tidak muncul di hasil search.\n8. Jangan menarik kesimpulan atau menebak motif/identitas/kronologi tanpa bukti eksplisit dari search results.\n9. Kalau data terbatas, jelaskan bahwa detailnya belum lengkap. Jangan isi bagian yang kosong dengan tebakan.\n\nVERIFIKASI LINTAS SUMBER:\n- Bandingkan fakta antar sumber. Gunakan informasi yang konsisten.\n- Jika ada perbedaan informasi, sebutkan perbedaannya secara eksplisit.\n- Gunakan kata "diduga", "menurut laporan", "berdasarkan sumber" untuk info yang belum pasti.\n\nFORMAT OUTPUT SEARCH:\n- Jawaban harus jelas, natural, dan fokus pada fakta yang tersedia.\n- Panjang jawaban fleksibel mengikuti kelengkapan data.\n- Jangan memaksa jawaban panjang jika sumbernya tipis.\n\nATURAN CITATION:\nNative citation (TextChunk + ReferenceChunk) saat ini hanya dipakai untuk provider mistral. Untuk provider lain, WAJIB sertakan sumber di akhir response menggunakan format:\n---sources---\nJudul Artikel | URL\nJudul Artikel | URL\n---end-sources---\n[/MODE]';
     case 'think':
       return '\n\n[MODE: THINK]\nDalam mode ini, lakukan penalaran mendalam. Kamu WAJIB menuliskan seluruh proses berpikirmu sebelum memberikan jawaban final menggunakan format berikut:\n---thinking---\n[isi proses berpikir AI di sini, bisa multi-paragraph]\n---end-thinking---\n\n[jawaban final di sini]\n[/MODE]';
+    case 'search+think': {
+      const searchInst = '\n\n[MODE: SEARCH]\nDalam mode ini, SELALU gunakan web_search atau get_information terlebih dahulu sebelum menjawab pertanyaan faktual. Skip search HANYA untuk sapaan ringan atau perintah tool (buat target, catat expense, dll).\n\nSTRATEGI SEARCH DINAMIS:\nSesuaikan intensitas search berdasarkan tingkat familiaritas topik:\n\nTOPIK NICHE / JARANG / TABU / TIDAK UMUM (contoh: kasus lokal, figur tidak terkenal, topik teknis spesifik, berita daerah, isu kontroversial, topik yang kamu tidak yakin):\n- Lakukan 5-7 web_search dengan query SANGAT BERVARIASI\n- Gunakan variasi: bahasa Indonesia, bahasa Inggris, nama lengkap, singkatan, sinonim, frasa berita, frasa teknis\n- Target: kumpulkan 15+ sumber berbeda\n- Contoh variasi: "kasus [x] [kota]", "[x] berita terbaru", "[x] news latest", "[x] kronologi", "[x] viral"\n\nTOPIK UMUM / TRENDING / WELL-KNOWN (contoh: berita viral nasional, tokoh sangat terkenal, topik mainstream yang sedang ramai):\n- Lakukan 2-3 web_search dengan query berbeda\n- Target: 5-10 sumber\n- Variasi bahasa (ID + EN) dan phrasing alternatif sudah cukup\n\nCARA MENENTUKAN INTENSITAS:\n- Jika kamu YAKIN topik ini umum dan well-known → intensitas rendah (2-3 search)\n- Jika kamu TIDAK YAKIN atau topik terasa niche → intensitas tinggi (5+ search)\n- Jika hasil search pertama SEDIKIT atau TIDAK RELEVAN → otomatis tingkatkan intensitas, lakukan search tambahan\n- DEFAULT ke intensitas TINGGI jika ragu\n\nATURAN WAJIB SAAT MENJAWAB DENGAN SEARCH RESULTS:\n1. HANYA nyatakan fakta yang SECARA EKSPLISIT tertulis di search results.\n2. Jika search results saling bertentangan, tampilkan SEMUA versi beserta sumbernya.\n3. Jika search results kosong, lemah, atau tidak relevan, jawab jujur: "gue ga nemu sumber kredibel soal ini" atau "info validnya belum ada nih".\n4. Jangan pernah mengatakan sesuatu "sudah resmi" kecuali search results SECARA EKSPLISIT menyatakan demikian.\n5. DILARANG KERAS: mengarang berita, kronologi, nama orang, lokasi, institusi, kutipan, atau sumber yang tidak ada di hasil search.\n6. Jangan menggabungkan beberapa artikel berbeda menjadi cerita baru tanpa bukti jelas.\n7. Sebut sumber secara natural (contoh: "menurut artikel dari Detik..."). Jangan menyebut nama media yang tidak muncul di hasil search.\n8. Jangan menarik kesimpulan atau menebak motif/identitas/kronologi tanpa bukti eksplisit dari search results.\n9. Kalau data terbatas, jelaskan bahwa detailnya belum lengkap. Jangan isi bagian yang kosong dengan tebakan.\n\nVERIFIKASI LINTAS SUMBER:\n- Bandingkan fakta antar sumber. Gunakan informasi yang konsisten.\n- Jika ada perbedaan informasi, sebutkan perbedaannya secara eksplisit.\n- Gunakan kata "diduga", "menurut laporan", "berdasarkan sumber" untuk info yang belum pasti.\n\nFORMAT OUTPUT SEARCH:\n- Jawaban harus jelas, natural, dan fokus pada fakta yang tersedia.\n- Panjang jawaban fleksibel mengikuti kelengkapan data.\n- Jangan memaksa jawaban panjang jika sumbernya tipis.\n\nATURAN CITATION:\nNative citation (TextChunk + ReferenceChunk) saat ini hanya dipakai untuk provider mistral. Untuk provider lain, WAJIB sertakan sumber di akhir response menggunakan format:\n---sources---\nJudul Artikel | URL\nJudul Artikel | URL\n---end-sources---\n[/MODE]';
+      const thinkInst = '\n\n[MODE: THINK]\nDalam mode ini, lakukan penalaran mendalam. Kamu WAJIB menuliskan seluruh proses berpikirmu sebelum memberikan jawaban final menggunakan format berikut:\n---thinking---\n[isi proses berpikir AI di sini, bisa multi-paragraph]\n---end-thinking---\n\n[jawaban final di sini]\n[/MODE]';
+      return searchInst + thinkInst;
+    }
     case 'flash':
       return '\n\n[MODE: FLASH]\nDalam mode ini, jawab CEPAT dan SINGKAT. Langsung ke inti. Maksimal 2-3 kalimat kecuali diminta lebih. Tidak perlu intro atau outro.\n[/MODE]';
     default:
@@ -523,6 +528,7 @@ async function callProviderStream(
   onStatus?: (text: string) => void,
   citationSources?: Record<string, CitationSourceEntry>,
   _retryCount = 0,
+  mode?: string,
 ): Promise<string> {
   const provider = getProviderConfig(providerId);
   if (!provider) throw new Error(`Provider "${providerId}" not found.`);
@@ -566,7 +572,7 @@ async function callProviderStream(
       if (waitTimeSec < 150) {
         if (onStatus) onStatus(`⏳ Rate limited (${_retryCount + 1}/${MAX_RATE_LIMIT_RETRIES}). Menunggu ${waitTimeSec}s...`);
         await new Promise(resolve => setTimeout(resolve, waitTimeSec * 1000));
-        return callProviderStream(providerId, modelId, messages, onChunk, onThinkingChunk, maxTokens, temperature, signal, onRateLimit, onStatus, citationSources, _retryCount + 1);
+        return callProviderStream(providerId, modelId, messages, onChunk, onThinkingChunk, maxTokens, temperature, signal, onRateLimit, onStatus, citationSources, _retryCount + 1, mode);
       }
     }
     const err = await response.json().catch(() => ({}));
@@ -612,9 +618,10 @@ async function callProviderStream(
         }
 
         const content = parsed.choices?.[0]?.delta?.content;
-        // Some providers stream reasoning via `reasoning_content`, while others use `reasoning`.
+        // Only extract reasoning tokens when user has enabled think mode
+        const isThinkMode = mode === 'think' || mode === 'search+think';
         const reasoning = parsed.choices?.[0]?.delta?.reasoning_content || parsed.choices?.[0]?.delta?.reasoning;
-        if (typeof reasoning === 'string' && reasoning.trim()) {
+        if (isThinkMode && typeof reasoning === 'string' && reasoning.trim()) {
           accumulatedThinking += reasoning;
           onThinkingChunk?.(accumulatedThinking);
         }
@@ -715,6 +722,7 @@ export async function POST(req: NextRequest) {
 
   const useTools = model.supports_tools;
   const hasSearch = mode === 'search' || mode === 'search+think';
+  const isThinkMode = mode === 'think' || mode === 'search+think';
   const isFlash = mode === 'flash';
   const maxTokens = maxTokensMap[mode as keyof typeof maxTokensMap] || 16000;
   const memoriesContext = await fetchMemoriesContext();
@@ -725,6 +733,7 @@ export async function POST(req: NextRequest) {
   }
 
   log('SYSTEM', `instruction length=${systemInstruction.length}, useTools=${useTools}, mode=${mode}, maxTokens=${maxTokens}`);
+  log('MODE', `mode=${mode}, isThinkMode=${isThinkMode}, hasSearch=${hasSearch}, isFlash=${isFlash}, provider=${providerId}, model=${modelId}`);
   const historyLimit = isFlash ? 4 : 10;
   const targetTemperature = hasSearch ? 0.3 : 0.7;
   const apiMessages = [
@@ -973,7 +982,9 @@ export async function POST(req: NextRequest) {
               signal,
               sendRateLimit,
               (text) => send({ type: "status", text }),
-              citationSources
+              citationSources,
+              undefined,
+              mode,
             );
             streamed = true;
             log('EMPTY RESP', `Retry stream result: "${finalContent.substring(0, 100)}..."`);
@@ -1018,7 +1029,9 @@ export async function POST(req: NextRequest) {
               signal,
               sendRateLimit,
               (text) => send({ type: "status", text }),
-              citationSources
+              citationSources,
+              undefined,
+              mode,
             );
             if (streamedContent.trim()) {
               finalContent = streamedContent;
@@ -1055,7 +1068,9 @@ export async function POST(req: NextRequest) {
               signal,
               sendRateLimit,
               (text) => send({ type: "status", text }),
-              citationSources
+              citationSources,
+              undefined,
+              mode,
             );
             log('EMPTY RESP', `Direct stream result: "${finalContent.substring(0, 100)}..."`);
           } catch (retryErr) {
@@ -1095,7 +1110,7 @@ export async function POST(req: NextRequest) {
           send({ type: "chunk", content: finalContent });
         }
 
-        if ((thinkingContent || /---thinking---/i.test(finalContent)) && !/---thinking-duration-ms---/i.test(finalContent)) {
+        if (isThinkMode && (thinkingContent || /---thinking---/i.test(finalContent)) && !/---thinking-duration-ms---/i.test(finalContent)) {
           finalContent = `${finalContent}\n\n---thinking-duration-ms---\n${Date.now() - thinkingStartAt}\n---end-thinking-duration-ms---`;
         }
 
@@ -1132,8 +1147,8 @@ export async function POST(req: NextRequest) {
           tool_calls: allToolCalls.length > 0 ? allToolCalls : undefined,
           model_used: modelId,
           provider_used: providerId,
-          thinking_content: thinkingContent || undefined,
-          thinking_duration_ms: Date.now() - thinkingStartAt,
+          thinking_content: isThinkMode ? (thinkingContent || undefined) : undefined,
+          thinking_duration_ms: isThinkMode ? (Date.now() - thinkingStartAt) : undefined,
           conversationId: conversationId || undefined,
         });
 
