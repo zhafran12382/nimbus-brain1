@@ -36,12 +36,12 @@ interface AssistantMessageProps {
   state: AssistantMessageState;
 }
 
-const PIPELINE_STEPS = [
-  { label: "Search" },
-  { label: "Tool call" },
-  { label: "Generate response" },
-  { label: "Final answer" },
-];
+const BASE_PIPELINE_STEPS = [
+  { key: "search", label: "Search" },
+  { key: "tool", label: "Tool execution" },
+  { key: "generate", label: "Generate response" },
+  { key: "final", label: "Final answer" },
+] as const;
 const PIPELINE_STEP_STATE_LABEL = {
   completed: "Selesai",
   active: "Sedang diproses",
@@ -49,7 +49,7 @@ const PIPELINE_STEP_STATE_LABEL = {
 };
 
 const PIPELINE_ACTIVE_COLOR = "text-[hsl(217_91%_60%)]";
-const PIPELINE_LABEL_ACTIVE = "opacity-80 text-[hsl(0_0%_80%)]";
+const PIPELINE_LABEL_ACTIVE = "opacity-90 text-[hsl(0_0%_86%)]";
 const PIPELINE_LABEL_INACTIVE = "opacity-70 text-[hsl(0_0%_65%)]";
 const PIPELINE_ICON_BASE = "h-3.5 w-3.5 shrink-0";
 
@@ -239,26 +239,32 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
     index === self.findIndex((s) => s.domain === source.domain)
   ).slice(0, 5);
 
-  const isStatusVisible =
-    phase === "thinking" ||
+  const hasAnyToolExecution =
     phase === "tool_executing" ||
-    phase === "streaming" ||
-    phase === "complete";
-  const isContentVisible = phase === "streaming" || phase === "complete";
-  const activeStepIndex = (() => {
+    toolHistory.length > 0 ||
+    Boolean(toolStatus?.name);
+  const pipelineSteps = hasAnyToolExecution
+    ? BASE_PIPELINE_STEPS
+    : BASE_PIPELINE_STEPS.filter((step) => step.key !== "tool");
+  const pipelineActiveKey = (() => {
     switch (phase) {
       case "thinking":
-        return 0;
+        return "search";
       case "tool_executing":
-        return 1;
+        return hasAnyToolExecution ? "tool" : "search";
       case "streaming":
-        return 2;
+        return "generate";
       case "complete":
-        return 3;
+        return "final";
       default:
-        return -1;
+        return "search";
     }
   })();
+  const activeStepIndex = pipelineSteps.findIndex((step) => step.key === pipelineActiveKey);
+
+  const isStatusVisible =
+    phase === "thinking" || phase === "tool_executing" || phase === "streaming" || phase === "complete";
+  const isContentVisible = phase === "streaming" || phase === "complete";
   const activeToolStatus =
     phase === "tool_executing" && toolStatus
       ? { icon: toolStatus.icon, text: toolStatus.text }
@@ -294,9 +300,9 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                 transition={{ duration: 0.2, ease: "easeOut" }}
                 className="overflow-hidden"
               >
-                <div className="border-l border-white/[0.08] pl-3">
-                  <div className="flex flex-col items-start space-y-3 text-[13px] leading-5">
-                    {PIPELINE_STEPS.map((step, index) => {
+                <div className="border-l border-white/[0.12] pl-3.5">
+                  <div className="flex flex-col items-start space-y-2.5 text-[13px] leading-5">
+                    {pipelineSteps.map((step, index) => {
                       const isCompleted = index < activeStepIndex;
                       const isActive = index === activeStepIndex;
                       const circleClass = `${PIPELINE_ICON_BASE} ${isActive ? PIPELINE_ACTIVE_COLOR : "text-white/35"}`;
@@ -311,7 +317,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                       return (
                         <div
                           key={step.label}
-                          className="flex items-center gap-2.5 text-left"
+                          className="flex items-center gap-2 text-left"
                           aria-label={`Step ${index + 1}: ${step.label} - ${stepStateLabel}`}
                         >
                           {isCompleted ? (

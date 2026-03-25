@@ -331,6 +331,15 @@ function ChatPageContent() {
               break;
 
             case "error":
+              setStreamingState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      phase: "streaming",
+                      content: `❌ Error: ${event.message || "Terjadi kesalahan."}`,
+                    }
+                  : null
+              );
               throw new Error(event.message);
           }
         },
