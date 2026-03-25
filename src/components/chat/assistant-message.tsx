@@ -191,14 +191,14 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       const timer = setTimeout(() => setShowMetadata(true), 300);
       return () => clearTimeout(timer);
     }
-    // Reset when phase changes away from complete
     const resetTimer = setTimeout(() => setShowMetadata(false), 0);
     return () => clearTimeout(resetTimer);
   }, [phase]);
 
-  // Gather web search sources from tool history
-  const webSearchTool = toolHistory.find((t) => t.name === "web_search" && t.result);
-  const sources = webSearchTool?.result ? extractSources(webSearchTool.result) : [];
+  // Gather web search sources from ALL search tool history entries
+  const allSearchSources = toolHistory
+    .filter((t) => t.name === "web_search" && t.result)
+    .flatMap((t) => extractSources(t.result!));
 
   // Non-search tool preview (exclude memory tools)
   const previewTool = toolHistory.find(
@@ -215,19 +215,38 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
   const displayContent = parsedContent.text;
   const combinedThinking = apiThinkingContent || parsedContent.thinking;
   const combinedThinkingDurationMs = thinkingDurationMs ?? parsedContent.thinkingDurationMs ?? undefined;
-  const displaySources = [...sources, ...parsedContent.sources];
+  const displaySources = [...allSearchSources, ...parsedContent.sources];
   
   // Deduplicate sources by domain
   const uniqueSources = displaySources.filter((source, index, self) => 
     index === self.findIndex((s) => s.domain === source.domain)
-  ).slice(0, 5);
+  ).slice(0, 6);
 
-  const isStatusVisible = phase === "thinking" || phase === "tool_executing";
   const isContentVisible = phase === "streaming" || phase === "complete";
 
   const timestamp = completedAt
     ? new Date(completedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
     : null;
+
+  // Build pipeline steps for the vertical activity log
+  const pipelineSteps: { icon: string; text: string; done: boolean }[] = [];
+
+  // Completed tool history steps
+  for (const tool of toolHistory) {
+    const display = getToolDisplay(tool.name, "result");
+    pipelineSteps.push({ icon: display.icon, text: display.text, done: true });
+  }
+
+  // Currently executing tool step
+  if (phase === "tool_executing" && toolStatus) {
+    pipelineSteps.push({ icon: toolStatus.icon, text: toolStatus.text, done: false });
+  }
+
+  // Active thinking step (if no tools yet dispatched)
+  const showThinkingStep = phase === "thinking" && pipelineSteps.length === 0;
+
+  // Show pipeline when there are in-flight or completed steps
+  const showPipeline = pipelineSteps.length > 0 || showThinkingStep;
 
   return (
     <motion.div
@@ -244,110 +263,88 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       {/* Response container */}
       <div className="w-full max-w-[82%] space-y-1 flex flex-col items-start min-w-0">
         <div className="w-full min-w-[120px] px-3.5 py-3">
-          {/* Status Area (phases 2-3) */}
-          <AnimatePresence mode="wait">
-            {isStatusVisible && (
-              <motion.div
-                key="status-area"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="overflow-hidden"
-              >
-                {/* Status Line */}
-                <div className="flex items-center gap-2 py-0.5">
-                  <AnimatePresence mode="wait">
-                    {phase === "thinking" && (
-                      <motion.div
-                        key="thinking"
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
-                        className="flex items-center gap-2"
-                      >
-                        <div className="spinner-perplexity" />
-                        <span className="text-[13px] text-[hsl(0_0%_45%)] opacity-70">
-                          Thinking...
-                        </span>
-                      </motion.div>
-                    )}
-                    {phase === "tool_executing" && toolStatus && (
-                      <motion.div
-                        key={`tool-${toolStatus.name}-${toolStatus.text}`}
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
-                        className="flex items-center gap-2"
-                      >
-                        <span className="text-sm leading-none">{toolStatus.icon}</span>
-                        <span className="text-[13px] text-[hsl(0_0%_45%)] opacity-70">
-                          {toolStatus.text}
-                        </span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
 
-                {/* Source Pills (web search) */}
-                {uniqueSources.length > 0 && (
+          {/* === Vertical Pipeline (activity log style) === */}
+          <AnimatePresence>
+            {showPipeline && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="mb-3 flex flex-col border-l border-[rgba(255,255,255,0.08)] pl-3 gap-[10px]"
+              >
+                {/* Thinking step (only if no tools) */}
+                {showThinkingStep && (
                   <motion.div
-                    initial="hidden"
-                    animate="show"
-                    variants={{
-                      hidden: {},
-                      show: { transition: { staggerChildren: 0.08 } },
-                    }}
-                    className="flex flex-wrap gap-1.5 mt-2"
+                    key="pipeline-thinking"
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex items-center gap-2 text-[13px] text-[hsl(0_0%_55%)] opacity-75"
                   >
-                    {uniqueSources.map((source) => (
-                      <motion.a
-                        key={source.domain}
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        variants={{
-                          hidden: { opacity: 0, x: -8 },
-                          show: { opacity: 1, x: 0 },
-                        }}
-                        transition={{ duration: 0.15 }}
-                        className="inline-flex items-center gap-1 rounded-full bg-[hsl(0_0%_7%)] border border-[hsl(0_0%_100%_/_0.06)] px-2.5 py-1 text-[11px] text-[hsl(0_0%_45%)] hover:text-[hsl(217_91%_60%)] hover:border-[hsl(217_91%_60%_/_0.2)] transition-colors"
-                      >
-                        <span className="w-3 h-3 rounded-full bg-[hsl(0_0%_20%)] flex items-center justify-center text-[7px]">
-                          ○
-                        </span>
-                        {source.domain}
-                      </motion.a>
-                    ))}
+                    <div className="spinner-perplexity !w-3.5 !h-3.5" />
+                    <span>Thinking...</span>
                   </motion.div>
                 )}
 
-                {/* Tool Preview Card (create/update/delete results) */}
-                {toolPreview && (
+                {/* Pipeline steps */}
+                {pipelineSteps.map((step, i) => (
                   <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="mt-2 rounded-lg bg-[hsl(0_0%_7%)] border border-[hsl(0_0%_100%_/_0.06)] px-3 py-2"
+                    key={`pipeline-${i}-${step.text}`}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.15, delay: i * 0.05 }}
+                    className="flex items-center gap-2 text-[13px] text-[hsl(0_0%_55%)]"
+                    style={{ opacity: step.done ? 0.65 : 0.85 }}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{toolPreview.emoji}</span>
-                      <div>
-                        <p className="text-[12px] font-medium text-[hsl(0_0%_93%)]">
-                          {toolPreview.title}
-                        </p>
-                        {toolPreview.detail && (
-                          <p className="text-[11px] text-[hsl(0_0%_45%)]">{toolPreview.detail}</p>
-                        )}
-                      </div>
-                    </div>
+                    {step.done ? (
+                      <span className="text-xs leading-none w-3.5 text-center">{step.icon}</span>
+                    ) : (
+                      <div className="spinner-perplexity !w-3.5 !h-3.5" />
+                    )}
+                    <span>{step.text}</span>
+                  </motion.div>
+                ))}
+
+                {/* "Generating response" step while streaming */}
+                {(phase === "streaming") && (
+                  <motion.div
+                    key="pipeline-generating"
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex items-center gap-2 text-[13px] text-[hsl(0_0%_55%)] opacity-75"
+                  >
+                    <div className="spinner-perplexity !w-3.5 !h-3.5" />
+                    <span>Generating response...</span>
                   </motion.div>
                 )}
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Tool Preview Card (create/update/delete results) */}
+          {toolPreview && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="mb-3 rounded-lg bg-[hsl(0_0%_7%)] border border-[hsl(0_0%_100%_/_0.06)] px-3 py-2"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{toolPreview.emoji}</span>
+                <div>
+                  <p className="text-[12px] font-medium text-[hsl(0_0%_93%)]">
+                    {toolPreview.title}
+                  </p>
+                  {toolPreview.detail && (
+                    <p className="text-[11px] text-[hsl(0_0%_45%)]">{toolPreview.detail}</p>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           {/* Memory Save Cards */}
           {memoryTools.map((tool, i) => (
@@ -359,12 +356,12 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
 
           {/* Thinking Block (shown above answer) */}
           {combinedThinking && (
-            <div className="mt-3">
+            <div className="mb-3">
               <ThinkingBlock content={combinedThinking} durationMs={combinedThinkingDurationMs} />
             </div>
           )}
 
-          {/* Response Content (phases 4-5) */}
+          {/* Response Content */}
           {isContentVisible && displayContent && (
             <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
               <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{displayContent}</Markdown>

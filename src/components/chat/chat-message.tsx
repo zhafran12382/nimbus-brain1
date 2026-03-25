@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import { ChatMessage as ChatMessageType } from "@/types";
-import { ActionBadge } from "./action-badge";
 import { messageBubble } from "@/lib/animations";
 import { QUIZ_DATA_REGEX } from "@/lib/constants";
 import { QuizCard } from "./quiz-card";
@@ -16,6 +15,32 @@ import { chatMarkdownComponents } from "./markdown-components";
 interface ChatMessageProps {
   message: ChatMessageType;
 }
+
+// Compact tool display map for history pipeline
+const toolDisplayMap: Record<string, { icon: string; label: string }> = {
+  web_search: { icon: "🔍", label: "Search complete" },
+  get_information: { icon: "📚", label: "Sources retrieved" },
+  create_target: { icon: "🎯", label: "Target created" },
+  update_target_progress: { icon: "📈", label: "Target updated" },
+  delete_target: { icon: "🗑️", label: "Target deleted" },
+  get_targets: { icon: "📋", label: "Targets loaded" },
+  get_target_summary: { icon: "📊", label: "Summary loaded" },
+  create_expense: { icon: "💰", label: "Expense recorded" },
+  get_expenses: { icon: "📋", label: "Expenses loaded" },
+  get_expense_summary: { icon: "📊", label: "Expense summary" },
+  delete_expense: { icon: "🗑️", label: "Expense deleted" },
+  create_income: { icon: "💰", label: "Income recorded" },
+  get_incomes: { icon: "📋", label: "Income loaded" },
+  get_income_summary: { icon: "📊", label: "Income summary" },
+  delete_income: { icon: "🗑️", label: "Income deleted" },
+  get_financial_summary: { icon: "📊", label: "Financial summary" },
+  save_memory: { icon: "🧠", label: "Remembered" },
+  get_memories: { icon: "🧠", label: "Memories loaded" },
+  delete_memory: { icon: "🧠", label: "Memory deleted" },
+  create_quiz: { icon: "📝", label: "Quiz generated" },
+  get_quiz_history: { icon: "📚", label: "Quiz history loaded" },
+  get_quiz_stats: { icon: "📊", label: "Stats loaded" },
+};
 
 // Parse QUIZ_DATA:: prefix from message content
 function parseQuizData(content: string): { quizData: unknown; remainingContent: string } | null {
@@ -60,12 +85,18 @@ export function ChatMessage({ message }: ChatMessageProps) {
       )}
 
       <div className={`w-full max-w-[82%] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
-        {/* Action badges for assistant messages */}
+        {/* Vertical pipeline for tool calls (history messages) */}
         {!isUser && message.tool_calls && message.tool_calls.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-0.5">
-            {message.tool_calls.map((tc, i) => (
-              <ActionBadge key={i} toolCall={tc} />
-            ))}
+          <div className="flex flex-col border-l border-[rgba(255,255,255,0.08)] pl-3 gap-[10px] mb-1 ml-3.5">
+            {message.tool_calls.map((tc, i) => {
+              const config = toolDisplayMap[tc.name] || { icon: "\u26A1", label: tc.name.replace(/_/g, " ") };
+              return (
+                <div key={i} className="flex items-center gap-2 text-[13px] text-[hsl(0_0%_55%)]" style={{ opacity: 0.65 }}>
+                  <span className="text-xs leading-none w-3.5 text-center">{config.icon}</span>
+                  <span>{config.label}</span>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -84,7 +115,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : (
           <div
             className={isUser
-              ? "rounded-2xl rounded-br-sm bg-gradient-to-r from-blue-600 to-blue-500 px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#F3F7FF]"
+              ? "rounded-2xl rounded-br-sm bg-[rgba(255,255,255,0.06)] px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]"
               : "px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]"
             }
           >
