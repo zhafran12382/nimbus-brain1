@@ -37,7 +37,7 @@ function getPersonality(): PersonalitySettings | null {
 function getStoredMode(): ChatMode {
   if (typeof window === "undefined") return "flash";
   const stored = localStorage.getItem(MODE_KEY);
-  if (stored === "search" || stored === "think" || stored === "flash") return stored;
+  if (stored === "search" || stored === "think" || stored === "flash" || stored === "search+think") return stored;
   return "flash";
 }
 

@@ -136,4 +136,4 @@ export interface QuizWithAttempt extends Quiz {
   attempts?: QuizAttempt[];
 }
 
-export type ChatMode = 'search' | 'think' | 'flash';
+export type ChatMode = 'flash' | 'search' | 'think' | 'search+think';

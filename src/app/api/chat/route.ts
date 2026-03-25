@@ -132,9 +132,12 @@ Kalau informasi tidak tersedia, bilang tidak tahu.
 Jangan pernah mengarang fakta.
 
 [ATURAN PANJANG JAWABAN]
-- Jawab seperlunya: singkat, jelas, dan sesuai data yang tersedia.
-- Jangan memanjang-manjangkan jawaban hanya biar terlihat pintar.
-- Kalau detail dari sumber terbatas, bilang kalau detailnya belum lengkap.
+- Untuk obrolan ringan/sapaan: jawab singkat dan natural.
+- Untuk pertanyaan faktual/topik kompleks: target MINIMAL 200-400 kata.
+- Jelaskan konteks, kronologi, dan poin penting secara detail.
+- Tambahkan detail relevan dari sumber yang tersedia.
+- Hindari jawaban 1 paragraf pendek untuk topik yang butuh penjelasan.
+- Kalau detail dari sumber terbatas, bilang kalau detailnya belum lengkap tapi tetap jelaskan konteks yang relevan.
 - Jangan menambah konteks/kronologi yang tidak tertulis jelas di sumber.
 
 [ATURAN PENGGUNAAN SEARCH TOOL]
@@ -228,7 +231,13 @@ MULTI-AKSI: Jika user minta 2+ aksi sekaligus, jalankan SEMUA satu per satu. Jan
 [TUJUAN]
 Memberikan jawaban yang komprehensif, akurat, jujur, dan tetap enak dibaca tanpa mengorbankan fakta.
 Prioritaskan kelengkapan informasi — lebih baik jawaban lengkap dengan sumber jelas daripada jawaban pendek.
-Lebih baik mengakui keterbatasan informasi daripada membuat detail palsu.`;
+Lebih baik mengakui keterbatasan informasi daripada membuat detail palsu.
+
+[PARAMETER RESPONS]
+- Untuk topik kompleks/faktual: jawaban WAJIB panjang, detail, dan informatif.
+- Gunakan struktur yang jelas: heading, bullet points, kronologi jika relevan.
+- Jangan potong jawaban di tengah. Selesaikan semua poin penting.
+- Jika informasi dari sumber banyak, rangkum SEMUA yang relevan, jangan hanya sebagian.`;
 
 function buildSystemInstruction(personality?: Record<string, string | undefined>): string {
   // Dynamic date in WIB (UTC+7)
@@ -347,7 +356,7 @@ HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
   }
 }
 
-const maxTokensMap: Record<string, number> = { flash: 8000, search: 24000, think: 16000 };
+const maxTokensMap: Record<string, number> = { flash: 8000, search: 32000, think: 16000, 'search+think': 32000 };
 const GEMINI_MODEL_ID = 'gemini-2.5-flash-lite';
 
 function formatProviderError(message: string): string {
@@ -695,6 +704,8 @@ export async function POST(req: NextRequest) {
   }
 
   const useTools = model.supports_tools;
+  const hasSearch = mode === 'search' || mode === 'search+think';
+  const isFlash = mode === 'flash';
   const maxTokens = maxTokensMap[mode as keyof typeof maxTokensMap] || 16000;
   const memoriesContext = await fetchMemoriesContext();
   let systemInstruction = buildSystemInstruction(personality) + getModeInstruction(mode) + memoriesContext;
@@ -704,8 +715,8 @@ export async function POST(req: NextRequest) {
   }
 
   log('SYSTEM', `instruction length=${systemInstruction.length}, useTools=${useTools}, mode=${mode}, maxTokens=${maxTokens}`);
-  const historyLimit = mode === 'flash' ? 4 : mode === 'search' ? 8 : 10;
-  const targetTemperature = mode === 'search' ? 0.3 : 0.7;
+  const historyLimit = isFlash ? 4 : 10;
+  const targetTemperature = hasSearch ? 0.3 : 0.7;
   const apiMessages = [
     { role: "system", content: systemInstruction },
     ...messages.slice(-historyLimit),
@@ -739,8 +750,8 @@ export async function POST(req: NextRequest) {
         // --- STEP 2: Handle tool calls (agentic loop, max 5 rounds) ---
         if (assistantMsg.tool_calls && useTools) {
           const toolCallMessages: Record<string, unknown>[] = [...apiMessages];
-          // Max 5 rounds to support multi-action prompts (model may need 2-3 tool rounds + continuation check)
-          const MAX_TOOL_ROUNDS = 5;
+          // Max rounds to support multi-action prompts. Search mode needs more rounds for 3+ search queries + continuation check.
+          const MAX_TOOL_ROUNDS = hasSearch ? 8 : 5;
           let continuationChecked = false;
 
           for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -748,7 +759,7 @@ export async function POST(req: NextRequest) {
               // Model tidak mau call tool lagi
               // Tapi cek apakah kita sudah lakukan continuation check
               if (!continuationChecked && toolResults.length > 0) {
-                if (mode === 'flash') {
+                if (isFlash) {
                   // Skip continuation check — prioritize speed
                   log('TOOL LOOP', `Round ${round}: Flash mode: skipping continuation check`);
                   break;
@@ -761,9 +772,12 @@ export async function POST(req: NextRequest) {
                 toolCallMessages.push(assistantMsg);
 
                 // Ask model to check if there are remaining actions
+                const continuationPrompt = hasSearch
+                  ? "Periksa kembali pesan user sebelumnya. Apakah kamu sudah melakukan MINIMAL 3 web_search dengan query BERBEDA? Jika belum, lakukan search tambahan dengan variasi query (sinonim, bahasa berbeda). Jika sudah cukup, berikan respons final yang LENGKAP dan DETAIL berdasarkan SEMUA hasil search."
+                  : "Periksa kembali pesan user sebelumnya. Apakah ada permintaan atau aksi lain yang BELUM kamu jalankan? Jika ya, jalankan tool-nya sekarang. Jika semua sudah selesai, berikan respons final.";
                 toolCallMessages.push({
                   role: "user",
-                  content: "Periksa kembali pesan user sebelumnya. Apakah ada permintaan atau aksi lain yang BELUM kamu jalankan? Jika ya, jalankan tool-nya sekarang. Jika semua sudah selesai, berikan respons final."
+                  content: continuationPrompt
                 });
 
                 log('API CALL', `Continuation check with ${toolCallMessages.length} messages`);
@@ -916,12 +930,16 @@ export async function POST(req: NextRequest) {
 
           try {
             const toolSummary = allToolCalls.map(tc => `${tc.name}: ${tc.result}`).join('\n');
+            const hasSearchTools = allToolCalls.some(tc => tc.name === 'web_search' || tc.name === 'get_information');
+            const retryPrompt = hasSearchTools
+              ? `Kamu baru saja menjalankan search berikut:\n${toolSummary}\n\nBerdasarkan SEMUA hasil search di atas, berikan jawaban yang LENGKAP, DETAIL, dan KOMPREHENSIF. Target minimal 200-400 kata. Gunakan format: JUDUL, RINGKASAN, PENJELASAN LENGKAP (dengan kronologi jika relevan), FAKTA PENTING (bullet points), dan CATATAN (perbedaan info jika ada). Kutip sumber secara natural. Sertakan semua sumber menggunakan format ---sources--- di akhir. JANGAN panggil tool lagi.`
+              : `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan konfirmasi santai, ramah, dan natural (basa-basi) kepada user bahwa aksi telah berhasil dilakukan berdasarkan hasil di atas. Hindari respons seperti robot atau laporan formal. JANGAN panggil tool lagi.`;
             const retryMessages = [
               { role: "system", content: systemInstruction },
               ...messages.slice(-5),
               {
                 role: "user",
-                content: `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan konfirmasi santai, ramah, dan natural (basa-basi) kepada user bahwa aksi telah berhasil dilakukan berdasarkan hasil di atas. Hindari respons seperti robot atau laporan formal. JANGAN panggil tool lagi.`
+                content: retryPrompt
               }
             ];
 
@@ -961,9 +979,13 @@ export async function POST(req: NextRequest) {
             const streamMessages = [...apiMessages];
             if (toolResults.length > 0) {
               const toolSummary = toolResults.map(tc => `${tc.name}: ${tc.result}`).join('\n');
+              const hasSearchTools2 = toolResults.some(tc => tc.name === 'web_search' || tc.name === 'get_information');
+              const streamPrompt = hasSearchTools2
+                ? `Kamu baru saja menjalankan search berikut:\n${toolSummary}\n\nBerdasarkan SEMUA hasil search di atas, berikan jawaban yang LENGKAP, DETAIL, dan KOMPREHENSIF. Target minimal 200-400 kata. Gunakan format: JUDUL, RINGKASAN, PENJELASAN LENGKAP (dengan kronologi jika relevan), FAKTA PENTING (bullet points), dan CATATAN (perbedaan info jika ada). Kutip sumber secara natural. Sertakan semua sumber menggunakan format ---sources--- di akhir. JANGAN panggil tool lagi.`
+                : `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan konfirmasi santai, ramah, dan natural (basa-basi) kepada user bahwa aksi telah berhasil dilakukan berdasarkan hasil di atas. Hindari respons seperti robot atau laporan formal. JANGAN panggil tool lagi.`;
               streamMessages.push({
                 role: "user",
-                content: `Kamu baru saja menjalankan tool berikut:\n${toolSummary}\n\nBerikan konfirmasi santai, ramah, dan natural (basa-basi) kepada user bahwa aksi telah berhasil dilakukan berdasarkan hasil di atas. Hindari respons seperti robot atau laporan formal. JANGAN panggil tool lagi.`
+                content: streamPrompt
               });
             }
             const streamedContent = await callProviderStream(
