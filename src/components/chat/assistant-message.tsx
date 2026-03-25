@@ -239,11 +239,11 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
     index === self.findIndex((s) => s.domain === source.domain)
   ).slice(0, 5);
 
-  const hasAnyToolExecution =
+  const shouldShowToolStep =
     phase === "tool_executing" ||
     toolHistory.length > 0 ||
     Boolean(toolStatus?.name);
-  const pipelineSteps = hasAnyToolExecution
+  const pipelineSteps = shouldShowToolStep
     ? BASE_PIPELINE_STEPS
     : BASE_PIPELINE_STEPS.filter((step) => step.key !== "tool");
   const pipelineActiveKey = (() => {
@@ -251,7 +251,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       case "thinking":
         return "search";
       case "tool_executing":
-        return hasAnyToolExecution ? "tool" : "search";
+        return shouldShowToolStep ? "tool" : "search";
       case "streaming":
         return "generate";
       case "complete":
