@@ -356,7 +356,7 @@ HANYA JSON array atau "NO_MEMORY". Tidak ada teks lain.`
   }
 }
 
-const maxTokensMap: Record<string, number> = { flash: 8000, search: 32000, think: 16000 };
+const maxTokensMap: Record<string, number> = { flash: 8000, search: 32000, think: 16000, 'search+think': 32000 };
 const GEMINI_MODEL_ID = 'gemini-2.5-flash-lite';
 
 function formatProviderError(message: string): string {
@@ -704,6 +704,8 @@ export async function POST(req: NextRequest) {
   }
 
   const useTools = model.supports_tools;
+  const hasSearch = mode === 'search' || mode === 'search+think';
+  const isFlash = mode === 'flash';
   const maxTokens = maxTokensMap[mode as keyof typeof maxTokensMap] || 16000;
   const memoriesContext = await fetchMemoriesContext();
   let systemInstruction = buildSystemInstruction(personality) + getModeInstruction(mode) + memoriesContext;
@@ -713,8 +715,8 @@ export async function POST(req: NextRequest) {
   }
 
   log('SYSTEM', `instruction length=${systemInstruction.length}, useTools=${useTools}, mode=${mode}, maxTokens=${maxTokens}`);
-  const historyLimit = mode === 'flash' ? 4 : mode === 'search' ? 10 : 10;
-  const targetTemperature = mode === 'search' ? 0.3 : 0.7;
+  const historyLimit = isFlash ? 4 : 10;
+  const targetTemperature = hasSearch ? 0.3 : 0.7;
   const apiMessages = [
     { role: "system", content: systemInstruction },
     ...messages.slice(-historyLimit),
@@ -749,7 +751,7 @@ export async function POST(req: NextRequest) {
         if (assistantMsg.tool_calls && useTools) {
           const toolCallMessages: Record<string, unknown>[] = [...apiMessages];
           // Max rounds to support multi-action prompts. Search mode needs more rounds for 3+ search queries + continuation check.
-          const MAX_TOOL_ROUNDS = mode === 'search' ? 8 : 5;
+          const MAX_TOOL_ROUNDS = hasSearch ? 8 : 5;
           let continuationChecked = false;
 
           for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -757,7 +759,7 @@ export async function POST(req: NextRequest) {
               // Model tidak mau call tool lagi
               // Tapi cek apakah kita sudah lakukan continuation check
               if (!continuationChecked && toolResults.length > 0) {
-                if (mode === 'flash') {
+                if (isFlash) {
                   // Skip continuation check — prioritize speed
                   log('TOOL LOOP', `Round ${round}: Flash mode: skipping continuation check`);
                   break;
@@ -770,7 +772,7 @@ export async function POST(req: NextRequest) {
                 toolCallMessages.push(assistantMsg);
 
                 // Ask model to check if there are remaining actions
-                const continuationPrompt = mode === 'search'
+                const continuationPrompt = hasSearch
                   ? "Periksa kembali pesan user sebelumnya. Apakah kamu sudah melakukan MINIMAL 3 web_search dengan query BERBEDA? Jika belum, lakukan search tambahan dengan variasi query (sinonim, bahasa berbeda). Jika sudah cukup, berikan respons final yang LENGKAP dan DETAIL berdasarkan SEMUA hasil search."
                   : "Periksa kembali pesan user sebelumnya. Apakah ada permintaan atau aksi lain yang BELUM kamu jalankan? Jika ya, jalankan tool-nya sekarang. Jika semua sudah selesai, berikan respons final.";
                 toolCallMessages.push({
