@@ -43,6 +43,7 @@ const PIPELINE_STEPS = [
   { label: "Final answer" },
 ];
 
+const PIPELINE_ACTIVE_COLOR = "text-[hsl(217_91%_60%)]";
 const PIPELINE_LABEL_ACTIVE = "opacity-80 text-[hsl(0_0%_80%)]";
 const PIPELINE_LABEL_INACTIVE = "opacity-70 text-[hsl(0_0%_65%)]";
 
@@ -289,14 +290,14 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                       const isCompleted = index < activeStepIndex;
                       const isActive = index === activeStepIndex;
                       const circleBaseClass = "h-3.5 w-3.5 shrink-0";
-                      const circleClass = `${circleBaseClass} ${isActive ? "text-[hsl(217_91%_60%)]" : "text-white/35"}`;
+                      const circleClass = `${circleBaseClass} ${isActive ? PIPELINE_ACTIVE_COLOR : "text-white/35"}`;
                       const labelClass = isActive
                         ? PIPELINE_LABEL_ACTIVE
                         : PIPELINE_LABEL_INACTIVE;
                       return (
                         <div key={step.label} className="flex items-center gap-2.5 text-left">
                           {isCompleted ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[hsl(217_91%_60%)]" />
+                            <CheckCircle2 className={`h-3.5 w-3.5 shrink-0 ${PIPELINE_ACTIVE_COLOR}`} />
                           ) : (
                             <Circle className={circleClass} />
                           )}
@@ -304,7 +305,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                             {step.label}
                           </span>
                           {isActive && phase === "tool_executing" && toolStatus && (
-                            <span className="text-[12px] opacity-70 text-[hsl(0_0%_60%)]">
+                            <span className="text-[13px] opacity-70 text-[hsl(0_0%_60%)]">
                               {toolStatus.icon} {toolStatus.text}
                             </span>
                           )}
