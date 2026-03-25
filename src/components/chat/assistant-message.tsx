@@ -254,9 +254,9 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
         return -1;
     }
   })();
-  const activeToolStatusText =
+  const activeToolStatus =
     phase === "tool_executing" && toolStatus
-      ? `${toolStatus.icon} ${toolStatus.text}`
+      ? { icon: toolStatus.icon, text: toolStatus.text }
       : null;
 
   const timestamp = completedAt
@@ -298,12 +298,12 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                       const labelClass = isActive
                         ? PIPELINE_LABEL_ACTIVE
                         : PIPELINE_LABEL_INACTIVE;
-                      const stepState = isCompleted ? "Completed" : isActive ? "In progress" : "Pending";
+                      const stepStateLabel = isCompleted ? "Completed" : isActive ? "In progress" : "Pending";
                       return (
                         <div
                           key={step.label}
                           className="flex items-center gap-2.5 text-left"
-                          aria-label={`Step ${index + 1}: ${step.label} - ${stepState}`}
+                          aria-label={`Step ${index + 1}: ${step.label} - ${stepStateLabel}`}
                         >
                           {isCompleted ? (
                             <CheckCircle2 className={`${PIPELINE_ICON_BASE} ${PIPELINE_ACTIVE_COLOR}`} />
@@ -313,9 +313,10 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                           <span className={labelClass}>
                             {step.label}
                           </span>
-                          {isActive && activeToolStatusText && (
+                          {isActive && activeToolStatus && (
                             <span className="opacity-70 text-[hsl(0_0%_60%)]">
-                              {activeToolStatusText}
+                              <span aria-label="Tool status icon">{activeToolStatus.icon}</span>{" "}
+                              {activeToolStatus.text}
                             </span>
                           )}
                         </div>
