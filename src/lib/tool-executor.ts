@@ -173,7 +173,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
           body: JSON.stringify({
             api_key: apiKey,
             query,
-            max_results: 10,
+            max_results: 20,
             search_depth: 'advanced',
             include_answer: true,
           }),
@@ -215,7 +215,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
           body: JSON.stringify({
             api_key: apiKey,
             query,
-            max_results: 10,
+            max_results: 20,
             search_depth: 'advanced',
             include_answer: false,
           }),

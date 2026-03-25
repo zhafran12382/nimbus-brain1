@@ -80,7 +80,7 @@ export function ChatInput({
             />
 
             {/* Bottom Row inside input box: Mode (Left) + Image + Model (Right) */}
-            <div className="flex items-center justify-between px-2 pb-2 gap-1.5 flex-wrap">
+            <div className="flex items-center justify-between px-2 pb-2 gap-1.5 flex-nowrap">
               <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0">
                 <ModeToggle value={mode} onChange={onModeChange} />
               </div>
