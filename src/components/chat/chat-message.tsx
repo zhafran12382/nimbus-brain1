@@ -84,7 +84,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : (
           <div
             className={isUser
-              ? "rounded-2xl rounded-br-sm bg-gradient-to-r from-blue-600 to-blue-500 px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#F3F7FF]"
+              ? "rounded-xl bg-white/[0.06] px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]"
               : "px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]"
             }
           >

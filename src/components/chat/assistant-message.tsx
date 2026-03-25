@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { parseAssistantContent } from "@/lib/assistant-response";
-import { Copy, Download, Lock, RefreshCw } from "lucide-react";
+import { CheckCircle2, Circle, Copy, Download, Lock, RefreshCw } from "lucide-react";
 import { SourcesFooter } from "./sources-footer";
 import { ThinkingBlock } from "./thinking-block";
 import { chatMarkdownComponents } from "./markdown-components";
@@ -222,8 +222,19 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
     index === self.findIndex((s) => s.domain === source.domain)
   ).slice(0, 5);
 
-  const isStatusVisible = phase === "thinking" || phase === "tool_executing";
+  const isStatusVisible = true;
   const isContentVisible = phase === "streaming" || phase === "complete";
+  const activeStepIndex =
+    phase === "thinking" ? 0 :
+    phase === "tool_executing" ? 1 :
+    phase === "streaming" ? 2 :
+    3;
+  const pipelineSteps = [
+    { label: "Search" },
+    { label: "Tool call" },
+    { label: "Generate response" },
+    { label: "Final answer" },
+  ];
 
   const timestamp = completedAt
     ? new Date(completedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
@@ -244,7 +255,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       {/* Response container */}
       <div className="w-full max-w-[82%] space-y-1 flex flex-col items-start min-w-0">
         <div className="w-full min-w-[120px] px-3.5 py-3">
-          {/* Status Area (phases 2-3) */}
+          {/* Status Area (vertical pipeline) */}
           <AnimatePresence mode="wait">
             {isStatusVisible && (
               <motion.div
@@ -255,40 +266,30 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                 transition={{ duration: 0.2, ease: "easeOut" }}
                 className="overflow-hidden"
               >
-                {/* Status Line */}
-                <div className="flex items-center gap-2 py-0.5">
-                  <AnimatePresence mode="wait">
-                    {phase === "thinking" && (
-                      <motion.div
-                        key="thinking"
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
-                        className="flex items-center gap-2"
-                      >
-                        <div className="spinner-perplexity" />
-                        <span className="text-[13px] text-[hsl(0_0%_45%)] opacity-70">
-                          Thinking...
-                        </span>
-                      </motion.div>
-                    )}
-                    {phase === "tool_executing" && toolStatus && (
-                      <motion.div
-                        key={`tool-${toolStatus.name}-${toolStatus.text}`}
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
-                        className="flex items-center gap-2"
-                      >
-                        <span className="text-sm leading-none">{toolStatus.icon}</span>
-                        <span className="text-[13px] text-[hsl(0_0%_45%)] opacity-70">
-                          {toolStatus.text}
-                        </span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                <div className="border-l border-white/[0.08] pl-3">
+                  <div className="flex flex-col items-start space-y-3 text-[13px] leading-5">
+                    {pipelineSteps.map((step, index) => {
+                      const isCompleted = index < activeStepIndex;
+                      const isActive = index === activeStepIndex;
+                      return (
+                        <div key={step.label} className="flex items-center gap-2.5 text-left">
+                          {isCompleted ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[hsl(217_91%_60%)]" />
+                          ) : (
+                            <Circle className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-[hsl(217_91%_60%)]" : "text-white/35"}`} />
+                          )}
+                          <span className={`${isActive ? "opacity-80 text-[hsl(0_0%_80%)]" : "opacity-70 text-[hsl(0_0%_65%)]"}`}>
+                            {step.label}
+                          </span>
+                          {isActive && phase === "tool_executing" && toolStatus && (
+                            <span className="text-[12px] opacity-70 text-[hsl(0_0%_60%)]">
+                              {toolStatus.icon} {toolStatus.text}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Source Pills (web search) */}
