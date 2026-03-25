@@ -222,13 +222,26 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
     index === self.findIndex((s) => s.domain === source.domain)
   ).slice(0, 5);
 
-  const isStatusVisible = true;
+  const isStatusVisible =
+    phase === "thinking" ||
+    phase === "tool_executing" ||
+    phase === "streaming" ||
+    phase === "complete";
   const isContentVisible = phase === "streaming" || phase === "complete";
-  const activeStepIndex =
-    phase === "thinking" ? 0 :
-    phase === "tool_executing" ? 1 :
-    phase === "streaming" ? 2 :
-    3;
+  const activeStepIndex = (() => {
+    switch (phase) {
+      case "thinking":
+        return 0;
+      case "tool_executing":
+        return 1;
+      case "streaming":
+        return 2;
+      case "complete":
+        return 3;
+      default:
+        return 0;
+    }
+  })();
   const pipelineSteps = [
     { label: "Search" },
     { label: "Tool call" },
