@@ -10,7 +10,7 @@ import { ThinkingBlock } from "./thinking-block";
 import { PipelineTimeline } from "./pipeline-timeline";
 import type { PipelineStep } from "./pipeline-timeline";
 import { chatMarkdownComponents, chatRemarkPlugins, chatRehypePlugins } from "./markdown-components";
-import { chatMarkdownComponents } from "./markdown-components";
+
 
 // Phase state machine
 export type AssistantPhase = "thinking" | "tool_executing" | "streaming" | "complete";
