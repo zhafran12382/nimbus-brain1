@@ -36,7 +36,7 @@ export function ModeToggle({ value, onChange }: { value: ChatMode; onChange: (mo
         style={{ minHeight: "36px", touchAction: "manipulation" }}
       >
         <Atom className="h-3.5 w-3.5" />
-        <span>DeepThink</span>
+        <span className="hidden sm:inline">DeepThink</span>
       </button>
       <button
         type="button"
@@ -49,7 +49,7 @@ export function ModeToggle({ value, onChange }: { value: ChatMode; onChange: (mo
         style={{ minHeight: "36px", touchAction: "manipulation" }}
       >
         <Globe className="h-3.5 w-3.5" />
-        <span>Search</span>
+        <span className="hidden sm:inline">Search</span>
       </button>
     </div>
   );

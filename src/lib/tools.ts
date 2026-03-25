@@ -95,13 +95,28 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "web_search",
-      description: "PENTING: Gunakan tool ini untuk pertanyaan faktual, info terkini, berita realtime, profil seseorang, kejadian terbaru, atau info yang tidak kamu ketahui. WAJIB kutip sumber. Dalam mode SEARCH: panggil tool ini MINIMAL 3 kali dengan query BERBEDA untuk cross-reference dan mendapat sumber lebih banyak. Gunakan variasi: sinonim, bahasa berbeda (ID + EN), phrasing alternatif. Contoh variasi: 'kasus [x] terbaru', '[x] viral berita', '[x] news latest'. Target: dapatkan minimal 5 sumber berbeda.",
+      description: "PENTING: Gunakan tool ini untuk pertanyaan faktual, info terkini, berita realtime, profil seseorang, kejadian terbaru, atau info yang tidak kamu ketahui. WAJIB kutip sumber. STRATEGI DINAMIS: Untuk topik NICHE/JARANG/TABU → lakukan 5-7 search dengan query sangat bervariasi (target 15+ sumber). Untuk topik UMUM/TRENDING → cukup 2-3 search (target 5-10 sumber). Jika ragu, default ke intensitas tinggi. Gunakan variasi: sinonim, bahasa berbeda (ID + EN), phrasing alternatif.",
       parameters: {
         type: "object",
         properties: {
           query: { type: "string", description: "Kata kunci pencarian yang relevan" }
         },
         required: ["query"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "run_python",
+      description: "Eksekusi kode Python untuk kalkulasi matematika, analisis data, atau komputasi yang membutuhkan akurasi. Gunakan tool ini WAJIB saat user bertanya soal matematika, perhitungan, konversi, statistik, atau hal yang butuh komputasi presisi. Tulis kode Python yang bersih dan gunakan print() untuk output hasil.",
+      parameters: {
+        type: "object",
+        properties: {
+          code: { type: "string", description: "Kode Python yang akan dieksekusi. WAJIB gunakan print() untuk menampilkan hasil." },
+          description: { type: "string", description: "Deskripsi singkat apa yang dilakukan kode ini" }
+        },
+        required: ["code"]
       }
     }
   },

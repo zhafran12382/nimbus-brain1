@@ -1,18 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { ChatMessage as ChatMessageType } from "@/types";
 import { messageBubble } from "@/lib/animations";
 import { QUIZ_DATA_REGEX } from "@/lib/constants";
 import { QuizCard } from "./quiz-card";
 import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { parseAssistantContent } from "@/lib/assistant-response";
 import { ThinkingBlock } from "./thinking-block";
 import { SourcesFooter } from "./sources-footer";
-import { chatMarkdownComponents } from "./markdown-components";
-import { ChevronDown, Globe, Search } from "lucide-react";
+import { chatMarkdownComponents, chatRemarkPlugins, chatRehypePlugins } from "./markdown-components";
+import { PipelineTimeline } from "./pipeline-timeline";
+import type { PipelineStep } from "./pipeline-timeline";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -42,6 +41,7 @@ const toolDisplayMap: Record<string, { icon: string; label: string }> = {
   create_quiz: { icon: "📝", label: "Quiz generated" },
   get_quiz_history: { icon: "📚", label: "Quiz history loaded" },
   get_quiz_stats: { icon: "📊", label: "Stats loaded" },
+  run_python: { icon: "🐍", label: "Python executed" },
 };
 
 // Parse QUIZ_DATA:: prefix from message content
@@ -63,7 +63,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
   const parsedAssistant = !isUser ? parseAssistantContent(message.content) : null;
   const assistantText = !isUser ? (parsedAssistant?.text ?? "") : message.content;
-  const [searchExpanded, setSearchExpanded] = useState(false);
 
   const timestamp = new Date(message.created_at).toLocaleTimeString("id-ID", {
     hour: "2-digit",
@@ -118,80 +117,51 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div className={`w-full max-w-[82%] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
         {/* Grouped pipeline for tool calls (history messages) */}
         {!isUser && toolCalls.length > 0 && (
-          <div className="flex flex-col gap-2 mb-1 ml-3.5 w-full">
-            {/* Search group block */}
-            {searchToolCalls.length > 0 && (
-              <div className="rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)] max-w-[300px]">
-                <button
-                  onClick={() => setSearchExpanded(prev => !prev)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-[hsl(0_0%_65%)] hover:text-[hsl(0_0%_80%)] transition-colors"
-                >
-                  <Globe className="w-3.5 h-3.5 shrink-0 text-blue-400" />
-                  <span className="flex-1 text-left">
-                    Searched {searchToolCalls.length} source{searchToolCalls.length > 1 ? 's' : ''}
-                  </span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${searchExpanded ? 'rotate-0' : '-rotate-90'}`}
-                  />
-                </button>
-                <AnimatePresence>
-                  {searchExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-3 pb-2.5 flex flex-col gap-1.5">
-                        {searchQueries.map((query, i) => (
-                          <div key={i} className="flex items-center gap-2 text-[12px] text-[hsl(0_0%_50%)]">
-                            <Search className="w-3 h-3 shrink-0 opacity-50" />
-                            <span className="truncate">&quot;{query}&quot;</span>
-                          </div>
-                        ))}
-                        {searchSourceDomains.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                            {searchSourceDomains.slice(0, 4).map((src, i) => (
-                              <a
-                                key={i}
-                                href={src.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 rounded-md bg-[rgba(255,255,255,0.04)] px-2 py-1 text-[11px] text-[hsl(0_0%_55%)] hover:text-[hsl(0_0%_80%)] hover:bg-[rgba(255,255,255,0.08)] transition-colors"
-                              >
-                                <img
-                                  src={`https://www.google.com/s2/favicons?domain=${src.domain}&sz=16`}
-                                  alt=""
-                                  className="w-3 h-3 rounded-sm"
-                                />
-                                <span className="truncate max-w-[100px]">{src.domain}</span>
-                              </a>
-                            ))}
-                            {searchSourceDomains.length > 4 && (
-                              <span className="text-[11px] text-[hsl(0_0%_45%)] px-1">
-                                +{searchSourceDomains.length - 4} more
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
+          <div className="mb-1 ml-3.5 w-full">
+            <PipelineTimeline
+              steps={(() => {
+                const pSteps: PipelineStep[] = [];
 
-            {/* Non-search tools rendered individually */}
-            {nonSearchToolCalls.map((tc, i) => {
-              const config = toolDisplayMap[tc.name] || { icon: "\u26A1", label: tc.name.replace(/_/g, " ") };
-              return (
-                <div key={i} className="flex items-center gap-2 text-[13px] text-[hsl(0_0%_55%)] pl-1" style={{ opacity: 0.65 }}>
-                  <span className="text-xs leading-none w-3.5 text-center">{config.icon}</span>
-                  <span>{config.label}</span>
-                </div>
-              );
-            })}
+                if (searchToolCalls.length > 0) {
+                  pSteps.push({
+                    id: "search-group",
+                    type: "search",
+                    icon: <span>{"🔍"}</span>,
+                    label: `Searched ${searchToolCalls.length} source${searchToolCalls.length > 1 ? "s" : ""}`,
+                    status: "done",
+                  });
+                }
+
+                for (const tc of nonSearchToolCalls) {
+                  const config = toolDisplayMap[tc.name] || { icon: "\u26A1", label: tc.name.replace(/_/g, " ") };
+                  const isCodeExec = tc.name === "run_python";
+                  pSteps.push({
+                    id: `tool-${tc.name}-${pSteps.length}`,
+                    type: isCodeExec ? "code_execution" : "tool",
+                    icon: <span>{config.icon}</span>,
+                    label: config.label,
+                    status: "done",
+                  });
+                }
+
+                return pSteps;
+              })()}
+              sources={searchSourceDomains}
+              searchQueries={searchQueries}
+              isCurrentlySearching={false}
+              totalSearchSteps={searchToolCalls.length}
+              isCollapsible={true}
+              defaultExpanded={false}
+              codeBlocks={(() => {
+                const pythonTools = toolCalls.filter(tc => tc.name === "run_python");
+                return pythonTools.map(t => {
+                  const code = typeof t.args === "string" ? "" : (t.args?.code as string) || "";
+                  const resultText = t.result || "";
+                  const outputMatch = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
+                  return { code, output: outputMatch?.[1] };
+                });
+              })()}
+            />
           </div>
         )}
 
@@ -202,7 +172,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {quizParsed.remainingContent && (
               <div className="mt-2 px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]">
                 <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                  <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{quizParsed.remainingContent}</Markdown>
+                  <Markdown remarkPlugins={chatRemarkPlugins} rehypePlugins={chatRehypePlugins} components={chatMarkdownComponents}>{quizParsed.remainingContent}</Markdown>
                 </div>
               </div>
             )}
@@ -229,7 +199,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                   </div>
                 )}
                 <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                  <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{assistantText}</Markdown>
+                  <Markdown remarkPlugins={chatRemarkPlugins} rehypePlugins={chatRehypePlugins} components={chatMarkdownComponents}>{assistantText}</Markdown>
                 </div>
                 {parsedAssistant?.sources && parsedAssistant.sources.length > 0 && (
                   <div className="mt-3">

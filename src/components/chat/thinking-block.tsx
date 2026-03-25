@@ -4,8 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Atom } from "lucide-react";
 import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { chatMarkdownComponents } from "./markdown-components";
+import { chatMarkdownComponents, chatRemarkPlugins, chatRehypePlugins } from "./markdown-components";
 
 interface ThinkingBlockProps {
   content: string;
@@ -46,7 +45,7 @@ export function ThinkingBlock({ content, durationMs }: ThinkingBlockProps) {
           >
             <div className="mt-3 pl-4 border-l-2 border-[hsl(0_0%_100%_/_0.1)] text-[13px] leading-relaxed text-[hsl(0_0%_70%)]">
               <div className="chat-markdown prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{content}</Markdown>
+                <Markdown remarkPlugins={chatRemarkPlugins} rehypePlugins={chatRehypePlugins} components={chatMarkdownComponents}>{content}</Markdown>
               </div>
             </div>
           </motion.div>
