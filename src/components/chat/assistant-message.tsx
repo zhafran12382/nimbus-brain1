@@ -377,8 +377,8 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       </div>
 
       {/* Response container */}
-      <div className="w-full max-w-[82%] space-y-1 flex flex-col items-start min-w-0">
-        <div className="w-full min-w-[120px] px-3.5 py-3">
+      <div className="w-full max-w-[82%] sm:max-w-[82%] max-sm:max-w-full space-y-1 flex flex-col items-start min-w-0 overflow-hidden">
+        <div className="w-full px-3.5 py-3 max-sm:px-1 overflow-hidden">
           {/* Reasoning Pipeline — clean vertical activity log */}
           {showPipeline && (
             <ReasoningPipeline nodes={pipelineNodes} />
@@ -460,7 +460,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.15 }}
-              className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+              className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 overflow-hidden"
             >
               <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{displayContent}</Markdown>
               {phase === "streaming" && (

@@ -59,7 +59,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
       )}
 
-      <div className={`w-full max-w-[82%] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
+      <div className={`w-full max-w-[82%] sm:max-w-[82%] max-sm:max-w-full min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col overflow-hidden`}>
         {/* Action badges for assistant messages */}
         {!isUser && message.tool_calls && message.tool_calls.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-0.5">
@@ -103,7 +103,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     />
                   </div>
                 )}
-                <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 overflow-hidden">
                   <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{assistantText}</Markdown>
                 </div>
                 {parsedAssistant?.sources && parsedAssistant.sources.length > 0 && (

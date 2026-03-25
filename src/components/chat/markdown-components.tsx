@@ -2,6 +2,26 @@ import type { Components } from "react-markdown";
 import { cn } from "@/lib/utils";
 
 export const chatMarkdownComponents: Components = {
+  a({ children, href, ...props }) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ overflowWrap: "break-word", wordBreak: "break-all" }}
+        {...props}
+      >
+        {children}
+      </a>
+    );
+  },
+  p({ children, ...props }) {
+    return (
+      <p style={{ overflowWrap: "break-word", wordBreak: "break-word" }} {...props}>
+        {children}
+      </p>
+    );
+  },
   table({ children, ...props }) {
     return (
       <div className="chat-markdown-table-wrap">

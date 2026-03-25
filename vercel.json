@@ -1,8 +1,0 @@
-{
-  "framework": "nextjs",
-  "functions": {
-    "src/app/api/**/*.ts": {
-      "maxDuration": 180
-    }
-  }
-}
