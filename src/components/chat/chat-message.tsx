@@ -13,6 +13,15 @@ import { chatMarkdownComponents, chatRemarkPlugins, chatRehypePlugins } from "./
 import { PipelineTimeline } from "./pipeline-timeline";
 import type { PipelineStep } from "./pipeline-timeline";
 
+// Minimal terminal icon for code execution (monochrome SVG, matches pipeline design)
+const TerminalIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="inline-block">
+    <rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.3" fill="none" />
+    <path d="M4.5 6L7 8.5L4.5 11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="9" y1="11" x2="11.5" y2="11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+  </svg>
+);
+
 interface ChatMessageProps {
   message: ChatMessageType;
 }
@@ -41,7 +50,7 @@ const toolDisplayMap: Record<string, { icon: string; label: string }> = {
   create_quiz: { icon: "📝", label: "Quiz generated" },
   get_quiz_history: { icon: "📚", label: "Quiz history loaded" },
   get_quiz_stats: { icon: "📊", label: "Stats loaded" },
-  run_python: { icon: "🐍", label: "Python executed" },
+  run_python: { icon: "terminal", label: "Python executed" },
 };
 
 // Parse QUIZ_DATA:: prefix from message content
@@ -138,7 +147,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                   pSteps.push({
                     id: `tool-${tc.name}-${pSteps.length}`,
                     type: isCodeExec ? "code_execution" : "tool",
-                    icon: <span>{config.icon}</span>,
+                    icon: config.icon === "terminal" ? <TerminalIcon /> : <span>{config.icon}</span>,
                     label: config.label,
                     status: "done",
                   });
