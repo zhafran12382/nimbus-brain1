@@ -245,6 +245,59 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       }
     }
 
+    case 'run_python': {
+      const code = String(args.code);
+      const description = args.description ? String(args.description) : '';
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+
+        const pistonRes = await fetch('https://emkc.org/api/v2/piston/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            language: 'python',
+            version: '3.10.0',
+            files: [{ name: 'main.py', content: code }],
+            stdin: '',
+            args: [],
+            compile_timeout: 10000,
+            run_timeout: 10000,
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (!pistonRes.ok) {
+          return `Error: Python execution failed (status ${pistonRes.status}).`;
+        }
+
+        const data = await pistonRes.json();
+        const stdout = data.run?.stdout?.trim() || '';
+        const stderr = data.run?.stderr?.trim() || '';
+
+        if (stderr && !stdout) {
+          return `Python Error:\n\`\`\`\n${stderr.slice(0, 2000)}\n\`\`\``;
+        }
+
+        let output = '';
+        if (description) output += `${description}\n\n`;
+        output += `Code:\n\`\`\`python\n${code}\n\`\`\`\n\n`;
+        output += `Output:\n\`\`\`\n${stdout.slice(0, 5000)}\n\`\`\``;
+        if (stderr) output += `\n\nWarnings:\n\`\`\`\n${stderr.slice(0, 1000)}\n\`\`\``;
+
+        return output;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return 'Error: Python execution timed out (15s limit).';
+        }
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        return `Error executing Python: ${msg}`;
+      }
+    }
+
     case 'create_expense': {
       const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase

@@ -272,6 +272,29 @@ body {
   animation: spin-smooth 0.8s linear infinite;
 }
 
+/* ── Pipeline Timeline ── */
+.pipeline-line {
+  position: absolute;
+  left: 5px;
+  top: 12px;
+  bottom: 4px;
+  width: 1.5px;
+  background: hsl(0 0% 100% / 0.06);
+  border-radius: 1px;
+}
+
+.source-chips-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.source-chips-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 /* ── Progress bar animation ── */
 .progress-fill {
   transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);

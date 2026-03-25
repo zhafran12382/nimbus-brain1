@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { parseAssistantContent } from "@/lib/assistant-response";
-import { Copy, Download, Lock, RefreshCw, ChevronDown, Globe, Search } from "lucide-react";
+import { Copy, Download, Lock, RefreshCw } from "lucide-react";
 import { SourcesFooter } from "./sources-footer";
 import { ThinkingBlock } from "./thinking-block";
+import { PipelineTimeline } from "./pipeline-timeline";
+import type { PipelineStep } from "./pipeline-timeline";
+import { chatMarkdownComponents, chatRemarkPlugins, chatRehypePlugins } from "./markdown-components";
 import { chatMarkdownComponents } from "./markdown-components";
 
 // Phase state machine
@@ -55,6 +57,7 @@ function getToolDisplay(name: string, phase: "start" | "result"): { icon: string
     create_quiz: { icon: "📝", startText: "Generating quiz...", resultText: "Quiz ready!" },
     get_quiz_history: { icon: "📚", startText: "Fetching quiz history...", resultText: "History loaded" },
     get_quiz_stats: { icon: "📊", startText: "Analyzing study stats...", resultText: "Stats loaded" },
+    run_python: { icon: "🐍", startText: "Running Python code...", resultText: "Code executed" },
   };
   const config = map[name] || { icon: "⚡", startText: `Executing ${name}...`, resultText: `${name} complete` };
   return {
@@ -275,7 +278,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       <div className="w-full max-w-[82%] space-y-1 flex flex-col items-start min-w-0">
         <div className="w-full min-w-[120px] px-3.5 py-3">
 
-          {/* === Perplexity-style Grouped Pipeline === */}
+          {/* === Perplexity-style Pipeline Timeline === */}
           <AnimatePresence>
             {showPipeline && (
               <motion.div
@@ -283,142 +286,79 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="mb-3 flex flex-col gap-2"
               >
-                {/* Thinking step (only if no tools) */}
-                {showThinkingStep && (
-                  <motion.div
-                    key="pipeline-thinking"
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex items-center gap-2 text-[13px] text-[hsl(0_0%_55%)]"
-                  >
-                    <div className="spinner-perplexity !w-3.5 !h-3.5" />
-                    <span>Thinking...</span>
-                  </motion.div>
-                )}
+                <PipelineTimeline
+                  steps={(() => {
+                    const pSteps: PipelineStep[] = [];
 
-                {/* Search group block */}
-                {hasSearchGroup && (
-                  <motion.div
-                    key="search-group"
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="rounded-xl border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.02)]"
-                  >
-                    {/* Collapsible header */}
-                    <button
-                      onClick={() => setPipelineExpanded(prev => !prev)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-[hsl(0_0%_65%)] hover:text-[hsl(0_0%_80%)] transition-colors"
-                    >
-                      {isCurrentlySearching ? (
-                        <div className="spinner-perplexity !w-3.5 !h-3.5 shrink-0" />
-                      ) : (
-                        <Globe className="w-3.5 h-3.5 shrink-0 text-blue-400" />
-                      )}
-                      <span className="flex-1 text-left">
-                        {isCurrentlySearching
-                          ? `Searching...`
-                          : `Searched ${totalSearchSteps} source${totalSearchSteps > 1 ? 's' : ''}`
-                        }
-                      </span>
-                      <ChevronDown
-                        className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${pipelineExpanded ? 'rotate-0' : '-rotate-90'}`}
-                      />
-                    </button>
+                    if (showThinkingStep) {
+                      pSteps.push({
+                        id: "thinking",
+                        type: "thinking",
+                        icon: <span className="text-blue-400">{"✦"}</span>,
+                        label: "Thinking...",
+                        status: "active",
+                      });
+                    }
 
-                    {/* Expanded content */}
-                    <AnimatePresence>
-                      {pipelineExpanded && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="px-3 pb-2.5 flex flex-col gap-1.5">
-                            {/* Search queries */}
-                            {searchQueries.map((query, i) => (
-                              <div key={`q-${i}`} className="flex items-center gap-2 text-[12px] text-[hsl(0_0%_50%)]">
-                                <Search className="w-3 h-3 shrink-0 opacity-50" />
-                                <span className="truncate">&quot;{query}&quot;</span>
-                              </div>
-                            ))}
-                            {currentSearchQuery && (
-                              <div className="flex items-center gap-2 text-[12px] text-[hsl(0_0%_50%)]">
-                                <div className="spinner-perplexity !w-3 !h-3 shrink-0" />
-                                <span className="truncate">&quot;{currentSearchQuery}&quot;</span>
-                              </div>
-                            )}
+                    if (hasSearchGroup) {
+                      pSteps.push({
+                        id: "search-group",
+                        type: "search",
+                        icon: <span>{"🔍"}</span>,
+                        label: isCurrentlySearching
+                          ? "Searching..."
+                          : `Searched ${totalSearchSteps} source${totalSearchSteps > 1 ? "s" : ""}`,
+                        status: isCurrentlySearching ? "active" : "done",
+                      });
+                    }
 
-                            {/* Source favicons */}
-                            {uniqueSources.length > 0 && (
-                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                {uniqueSources.slice(0, 4).map((src, i) => (
-                                  <a
-                                    key={i}
-                                    href={src.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 rounded-md bg-[rgba(255,255,255,0.04)] px-2 py-1 text-[11px] text-[hsl(0_0%_55%)] hover:text-[hsl(0_0%_80%)] hover:bg-[rgba(255,255,255,0.08)] transition-colors"
-                                  >
-                                    <img
-                                      src={`https://www.google.com/s2/favicons?domain=${src.domain}&sz=16`}
-                                      alt=""
-                                      className="w-3 h-3 rounded-sm"
-                                    />
-                                    <span className="truncate max-w-[100px]">{src.domain}</span>
-                                  </a>
-                                ))}
-                                {uniqueSources.length > 4 && (
-                                  <span className="text-[11px] text-[hsl(0_0%_45%)] px-1">
-                                    +{uniqueSources.length - 4} more
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
+                    for (const step of nonSearchSteps) {
+                      const isCodeExec = step.text.includes("Python") || step.text.includes("Code");
+                      pSteps.push({
+                        id: `tool-${step.text}`,
+                        type: isCodeExec ? "code_execution" : "tool",
+                        icon: <span>{step.icon}</span>,
+                        label: step.text,
+                        status: step.done ? "done" : "active",
+                      });
+                    }
 
-                {/* Non-search tool steps (rendered individually) */}
-                {nonSearchSteps.map((step, i) => (
-                  <motion.div
-                    key={`ns-${i}-${step.text}`}
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.15, delay: i * 0.05 }}
-                    className="flex items-center gap-2 text-[13px] text-[hsl(0_0%_55%)] pl-1"
-                    style={{ opacity: step.done ? 0.65 : 0.85 }}
-                  >
-                    {step.done ? (
-                      <span className="text-xs leading-none w-3.5 text-center">{step.icon}</span>
-                    ) : (
-                      <div className="spinner-perplexity !w-3.5 !h-3.5" />
-                    )}
-                    <span>{step.text}</span>
-                  </motion.div>
-                ))}
+                    if (phase === "streaming") {
+                      pSteps.push({
+                        id: "generating",
+                        type: "generating",
+                        icon: <span>{"✨"}</span>,
+                        label: "Generating response...",
+                        status: "active",
+                      });
+                    }
 
-                {/* "Generating response" step while streaming */}
-                {(phase === "streaming") && (
-                  <motion.div
-                    key="pipeline-generating"
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex items-center gap-2 text-[13px] text-[hsl(0_0%_55%)] opacity-75 pl-1"
-                  >
-                    <div className="spinner-perplexity !w-3.5 !h-3.5" />
-                    <span>Generating response...</span>
-                  </motion.div>
-                )}
+                    return pSteps;
+                  })()}
+                  sources={uniqueSources}
+                  searchQueries={searchQueries}
+                  currentSearchQuery={currentSearchQuery || undefined}
+                  isCurrentlySearching={isCurrentlySearching}
+                  totalSearchSteps={totalSearchSteps}
+                  isCollapsible={true}
+                  defaultExpanded={pipelineExpanded}
+                  codeBlocks={(() => {
+                    const pythonTools = toolHistory.filter(t => t.name === "run_python");
+                    const activePython = phase === "tool_executing" && toolStatus?.name === "run_python";
+                    const blocks: { code: string; output?: string }[] = [];
+                    for (const t of pythonTools) {
+                      const code = (t.args?.code as string) || "";
+                      const resultText = t.result || "";
+                      const outputMatch = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
+                      blocks.push({ code, output: outputMatch?.[1] });
+                    }
+                    if (activePython && toolStatus?.args?.code) {
+                      blocks.push({ code: toolStatus.args.code as string });
+                    }
+                    return blocks;
+                  })()}
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -463,7 +403,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
           {/* Response Content */}
           {isContentVisible && displayContent && (
             <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-              <Markdown remarkPlugins={[remarkGfm]} components={chatMarkdownComponents}>{displayContent}</Markdown>
+              <Markdown remarkPlugins={chatRemarkPlugins} rehypePlugins={chatRehypePlugins} components={chatMarkdownComponents}>{displayContent}</Markdown>
               {phase === "streaming" && (
                 <span className="streaming-cursor" />
               )}

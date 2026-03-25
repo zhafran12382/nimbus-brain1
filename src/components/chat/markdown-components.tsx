@@ -1,5 +1,12 @@
 import type { Components } from "react-markdown";
 import { cn } from "@/lib/utils";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import type { PluggableList } from "unified";
+
+export const chatRemarkPlugins: PluggableList = [remarkGfm, remarkMath];
+export const chatRehypePlugins: PluggableList = [rehypeKatex];
 
 export const chatMarkdownComponents: Components = {
   table({ children, ...props }) {
