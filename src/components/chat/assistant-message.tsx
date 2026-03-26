@@ -38,6 +38,18 @@ interface AssistantMessageProps {
   state: AssistantMessageState;
 }
 
+// Random warm-up messages shown while the model is thinking
+const WARMUP_MESSAGES = [
+  "Spinning up the model",
+  "Warming up the model",
+  "Booting the model",
+  "Firing up the model",
+  "Bringing the model online",
+];
+function getRandomWarmup(): string {
+  return WARMUP_MESSAGES[Math.floor(Math.random() * WARMUP_MESSAGES.length)];
+}
+
 // Minimal terminal icon for code execution (monochrome SVG, matches pipeline design)
 const TerminalIcon = () => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="inline-block">
@@ -197,6 +209,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
   const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs, thinkingContent: apiThinkingContent } = state;
   const [showMetadata, setShowMetadata] = useState(false);
   const [pipelineExpanded, setPipelineExpanded] = useState(true);
+  const [warmupLabel] = useState(() => getRandomWarmup());
 
   // Show metadata with delay after completion
   useEffect(() => {
@@ -267,7 +280,8 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
   }
 
   const hasSearchGroup = totalSearchSteps > 0;
-  const showPipeline = hasSearchGroup || nonSearchSteps.length > 0;
+  const showWarmupStep = phase === "thinking" || phase === "tool_executing" || phase === "streaming";
+  const showPipeline = showWarmupStep || hasSearchGroup || nonSearchSteps.length > 0;
 
   // Collect Python execution results for prominent display
   const pythonResults = toolHistory
@@ -277,7 +291,15 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       const resultText = t.result || "";
       const outputMatch = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
       const stderrMatch = resultText.match(/(?:Python Error|Warnings):\n```\n([\s\S]*?)\n```/);
-      return { code, output: outputMatch?.[1], error: stderrMatch?.[1] };
+      // Fallback: if no regex match, extract everything after "Output:" as raw output
+      let output = outputMatch?.[1];
+      if (!output && !stderrMatch) {
+        const afterCode = resultText.replace(/Code:\n```python\n[\s\S]*?\n```\n*/g, '').trim();
+        if (afterCode && !afterCode.startsWith('Error')) {
+          output = afterCode;
+        }
+      }
+      return { code, output, error: stderrMatch?.[1] || (resultText.startsWith('Error') ? resultText : undefined) };
     });
   const activePython = phase === "tool_executing" && toolStatus?.name === "run_python";
   const activePythonCode = activePython ? (toolStatus?.args?.code as string) : null;
@@ -311,6 +333,18 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                   steps={(() => {
                     const pSteps: PipelineStep[] = [];
 
+                    // Warm-up step (always first — shows random model boot message)
+                    {
+                      const warmupDone = phase !== "thinking" || nonSearchSteps.length > 0 || hasSearchGroup;
+                      pSteps.push({
+                        id: "warmup",
+                        type: "thinking",
+                        icon: <span className="text-blue-400">{"✦"}</span>,
+                        label: warmupLabel,
+                        status: warmupDone ? "done" : "active",
+                      });
+                    }
+
                     if (hasSearchGroup) {
                       pSteps.push({
                         id: "search-group",
@@ -339,7 +373,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                         id: "generating",
                         type: "generating",
                         icon: <span>{"✨"}</span>,
-                        label: "Generating response...",
+                        label: "Generate response",
                         status: "active",
                       });
                     }
@@ -385,12 +419,14 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                   className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden"
                 >
                   <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)]">
-                    <span className="text-xs">🐍</span>
+                    <span className="text-[hsl(0_0%_50%)]"><TerminalIcon /></span>
                     <span className="text-[11px] font-medium text-[hsl(0_0%_50%)]">Python</span>
                   </div>
+                  {py.code && (
                   <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
                     <code>{py.code}</code>
                   </pre>
+                  )}
                   {py.output && (
                     <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(140_50%_5%)]">
                       <div className="flex items-center gap-1.5 mb-1">

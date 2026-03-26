@@ -116,7 +116,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
     const resultText = tc.result || "";
     const outputMatch = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
     const stderrMatch = resultText.match(/(?:Python Error|Warnings):\n```\n([\s\S]*?)\n```/);
-    return { code, output: outputMatch?.[1], error: stderrMatch?.[1] };
+    let output = outputMatch?.[1];
+    if (!output && !stderrMatch) {
+      const afterCode = resultText.replace(/Code:\n```python\n[\s\S]*?\n```\n*/g, '').trim();
+      if (afterCode && !afterCode.startsWith('Error')) {
+        output = afterCode;
+      }
+    }
+    return { code, output, error: stderrMatch?.[1] || (resultText.startsWith('Error') ? resultText : undefined) };
   });
 
   return (
@@ -193,12 +200,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden"
               >
                 <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)]">
-                  <span className="text-xs">🐍</span>
+                  <span className="text-[hsl(0_0%_50%)]"><TerminalIcon /></span>
                   <span className="text-[11px] font-medium text-[hsl(0_0%_50%)]">Python</span>
                 </div>
+                {py.code && (
                 <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
                   <code>{py.code}</code>
                 </pre>
+                )}
                 {py.output && (
                   <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(140_50%_5%)]">
                     <div className="flex items-center gap-1.5 mb-1">
