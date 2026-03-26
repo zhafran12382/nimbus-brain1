@@ -26,6 +26,10 @@ interface PipelineTimelineProps {
   isCollapsible?: boolean;
   defaultExpanded?: boolean;
   onToggle?: (expanded: boolean) => void;
+  // Header-only label (shown in collapsible button, not as a timeline step)
+  headerLabel?: string;
+  headerIcon?: React.ReactNode;
+  headerActive?: boolean;
   // Search-specific props for the grouped search card
   searchQueries?: string[];
   currentSearchQuery?: string;
@@ -77,6 +81,9 @@ export function PipelineTimeline({
   sources = [],
   isCollapsible = true,
   defaultExpanded = true,
+  headerLabel,
+  headerIcon,
+  headerActive = false,
   searchQueries = [],
   currentSearchQuery,
   isCurrentlySearching = false,
@@ -92,7 +99,20 @@ export function PipelineTimeline({
       : `Searched ${totalSearchSteps} source${totalSearchSteps !== 1 ? "s" : ""}`
     : steps.length > 0
       ? steps[steps.length - 1].label
-      : "Processing...";
+      : headerLabel || "Processing...";
+
+  // Header icon: spinner when searching or headerActive, Globe for search, else headerIcon or first step icon
+  const headerIconNode = isCurrentlySearching
+    ? <div className="spinner-perplexity !w-3.5 !h-3.5 shrink-0" />
+    : hasSearch
+      ? <Globe className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+      : headerActive && steps.length === 0
+        ? <div className="spinner-perplexity !w-3.5 !h-3.5 shrink-0" />
+        : steps.length > 0
+          ? <span className="text-xs shrink-0">{steps[0]?.icon}</span>
+          : headerIcon
+            ? <span className="text-xs shrink-0">{headerIcon}</span>
+            : <span className="text-xs shrink-0">{"✦"}</span>;
 
   return (
     <div className="mb-3">
@@ -102,13 +122,7 @@ export function PipelineTimeline({
           onClick={() => setExpanded((prev) => !prev)}
           className="w-full flex items-center gap-2.5 py-1.5 text-[13px] text-[hsl(0_0%_65%)] hover:text-[hsl(0_0%_80%)] transition-colors"
         >
-          {isCurrentlySearching ? (
-            <div className="spinner-perplexity !w-3.5 !h-3.5 shrink-0" />
-          ) : hasSearch ? (
-            <Globe className="w-3.5 h-3.5 shrink-0 text-blue-400" />
-          ) : (
-            <span className="text-xs shrink-0">{steps[0]?.icon}</span>
-          )}
+          {headerIconNode}
           <span className="flex-1 text-left font-medium">{summaryLabel}</span>
           <ChevronDown
             className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${

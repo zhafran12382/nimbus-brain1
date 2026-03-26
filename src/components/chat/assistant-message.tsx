@@ -330,20 +330,11 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                 transition={{ duration: 0.2 }}
               >
                 <PipelineTimeline
+                  headerLabel={warmupLabel}
+                  headerIcon={<span className="text-blue-400">{"✦"}</span>}
+                  headerActive={phase === "thinking" && nonSearchSteps.length === 0 && !hasSearchGroup}
                   steps={(() => {
                     const pSteps: PipelineStep[] = [];
-
-                    // Warm-up step (always first — shows random model boot message)
-                    {
-                      const warmupDone = phase !== "thinking" || nonSearchSteps.length > 0 || hasSearchGroup;
-                      pSteps.push({
-                        id: "warmup",
-                        type: "thinking",
-                        icon: <span className="text-blue-400">{"✦"}</span>,
-                        label: warmupLabel,
-                        status: warmupDone ? "done" : "active",
-                      });
-                    }
 
                     if (hasSearchGroup) {
                       pSteps.push({
