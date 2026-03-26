@@ -109,6 +109,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
     }
   }
 
+  // Python execution results for prominent display
+  const pythonToolCalls = toolCalls.filter(tc => tc.name === "run_python");
+  const pythonResults = pythonToolCalls.map(tc => {
+    const code = typeof tc.args === "string" ? "" : (tc.args?.code as string) || "";
+    const resultText = tc.result || "";
+    const outputMatch = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
+    const stderrMatch = resultText.match(/(?:Python Error|Warnings):\n```\n([\s\S]*?)\n```/);
+    return { code, output: outputMatch?.[1], error: stderrMatch?.[1] };
+  });
+
   return (
     <motion.div
       initial={messageBubble.initial}
@@ -171,6 +181,46 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 });
               })()}
             />
+          </div>
+        )}
+
+        {/* Python Runtime Output (history) */}
+        {!isUser && pythonResults.length > 0 && (
+          <div className="mb-2 ml-3.5 w-full space-y-2">
+            {pythonResults.map((py, i) => (
+              <div
+                key={`python-hist-${i}`}
+                className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden"
+              >
+                <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)]">
+                  <span className="text-xs">🐍</span>
+                  <span className="text-[11px] font-medium text-[hsl(0_0%_50%)]">Python</span>
+                </div>
+                <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
+                  <code>{py.code}</code>
+                </pre>
+                {py.output && (
+                  <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(140_50%_5%)]">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] text-green-400/70 font-medium uppercase tracking-wider">Output</span>
+                    </div>
+                    <pre className="text-[12px] font-mono text-green-300/90 whitespace-pre-wrap leading-relaxed">
+                      {py.output}
+                    </pre>
+                  </div>
+                )}
+                {py.error && (
+                  <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(0_50%_5%)]">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] text-red-400/70 font-medium uppercase tracking-wider">Error</span>
+                    </div>
+                    <pre className="text-[12px] font-mono text-red-300/90 whitespace-pre-wrap leading-relaxed">
+                      {py.error}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 

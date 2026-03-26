@@ -266,10 +266,21 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
     nonSearchSteps.push({ icon: toolStatus.icon, text: toolStatus.text, done: false });
   }
 
-  // Active thinking step (if no tools yet dispatched)
-  const showThinkingStep = phase === "thinking" && searchTools.length === 0 && nonSearchSteps.length === 0;
   const hasSearchGroup = totalSearchSteps > 0;
-  const showPipeline = hasSearchGroup || nonSearchSteps.length > 0 || showThinkingStep;
+  const showPipeline = hasSearchGroup || nonSearchSteps.length > 0;
+
+  // Collect Python execution results for prominent display
+  const pythonResults = toolHistory
+    .filter(t => t.name === "run_python" && t.result)
+    .map(t => {
+      const code = (t.args?.code as string) || "";
+      const resultText = t.result || "";
+      const outputMatch = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
+      const stderrMatch = resultText.match(/(?:Python Error|Warnings):\n```\n([\s\S]*?)\n```/);
+      return { code, output: outputMatch?.[1], error: stderrMatch?.[1] };
+    });
+  const activePython = phase === "tool_executing" && toolStatus?.name === "run_python";
+  const activePythonCode = activePython ? (toolStatus?.args?.code as string) : null;
 
   return (
     <motion.div
@@ -299,16 +310,6 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                 <PipelineTimeline
                   steps={(() => {
                     const pSteps: PipelineStep[] = [];
-
-                    if (showThinkingStep) {
-                      pSteps.push({
-                        id: "thinking",
-                        type: "thinking",
-                        icon: <span className="text-blue-400">{"✦"}</span>,
-                        label: "Thinking...",
-                        status: "active",
-                      });
-                    }
 
                     if (hasSearchGroup) {
                       pSteps.push({
@@ -371,6 +372,65 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* === Python Runtime Output === */}
+          {(pythonResults.length > 0 || activePythonCode) && (
+            <div className="mb-3 space-y-2">
+              {pythonResults.map((py, i) => (
+                <motion.div
+                  key={`python-${i}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden"
+                >
+                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)]">
+                    <span className="text-xs">🐍</span>
+                    <span className="text-[11px] font-medium text-[hsl(0_0%_50%)]">Python</span>
+                  </div>
+                  <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
+                    <code>{py.code}</code>
+                  </pre>
+                  {py.output && (
+                    <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(140_50%_5%)]">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[10px] text-green-400/70 font-medium uppercase tracking-wider">Output</span>
+                      </div>
+                      <pre className="text-[12px] font-mono text-green-300/90 whitespace-pre-wrap leading-relaxed">
+                        {py.output}
+                      </pre>
+                    </div>
+                  )}
+                  {py.error && (
+                    <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(0_50%_5%)]">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[10px] text-red-400/70 font-medium uppercase tracking-wider">Error</span>
+                      </div>
+                      <pre className="text-[12px] font-mono text-red-300/90 whitespace-pre-wrap leading-relaxed">
+                        {py.error}
+                      </pre>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+              {activePythonCode && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden"
+                >
+                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)]">
+                    <div className="spinner-perplexity !w-3 !h-3 shrink-0" />
+                    <span className="text-[11px] font-medium text-[hsl(0_0%_50%)]">Running Python...</span>
+                  </div>
+                  <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
+                    <code>{activePythonCode}</code>
+                  </pre>
+                </motion.div>
+              )}
+            </div>
+          )}
 
           {/* Tool Preview Card (create/update/delete results) */}
           {toolPreview && (
