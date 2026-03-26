@@ -61,41 +61,41 @@ const TerminalIcon = () => (
 );
 
 /**
- * Robustly extract code, output, and error from the tool-executor's run_python result string.
- * Handles multiple markdown formats: fenced (```), Output:/Warnings:/Error: prefixed blocks,
- * and raw text fallback for when the runtime returns a simple string.
+ * Robustly extract code, output, and error from run_python result string.
+ * The tool-executor produces: Code:\n```python\n{code}\n```\n\nOutput:\n```\n{stdout}\n```
  */
 function parsePythonResult(code: string, resultText: string): { code: string; output?: string; error?: string } {
-  // Pattern 1: standard fenced format from tool-executor
-  //   Output:\n```\n{stdout}\n```
-  const stdoutFenced = resultText.match(/Output:\n```\n?([\s\S]*?)\n?```/);
-  const stderrFenced = resultText.match(/(?:Python Error|Warnings|Stderr):\n```\n?([\s\S]*?)\n?```/);
-
-  // Pattern 2: "Output:" followed by non-fenced text (simple one-line output)
-  const stdoutPlain = resultText.match(/Output:\s*\n([^\n`][\s\S]*?)(?:\n\n|$)/);
-
-  // Pattern 3: result starts with "Error" (runtime config error)
-  const isRawError = resultText.startsWith("Error") || resultText.startsWith("❌");
-
-  let output = stdoutFenced?.[1]?.trim() || stdoutPlain?.[1]?.trim() || undefined;
-
-  // Fallback: after stripping the Code block, whatever remains that isn't an error
-  if (!output && !stderrFenced && !isRawError) {
-    const stripped = resultText
-      .replace(/Code:\n```python\n[\s\S]*?\n```\n*/g, '')
-      .replace(/Output:\n```\n*```/g, '') // empty Output fences
-      .trim();
-    if (stripped && stripped !== '(empty)') {
-      output = stripped;
-    }
+  let finalCode = code;
+  if (!finalCode) {
+    const codeFromResult = resultText.match(/Code:\n```python\n([\s\S]*?)\n```/);
+    finalCode = codeFromResult?.[1] || "";
   }
 
-  // Treat empty strings as undefined
+  const stdoutFenced = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
+  const emptyFenced = /Output:\n```\n```/.test(resultText);
+  const stdoutPlain = resultText.match(/Output:\s*\n([^\n`][\s\S]*?)(?:\n\n|$)/);
+  const stderrFenced = resultText.match(/(?:Python Error|Warnings|Stderr):\n```\n([\s\S]*?)\n```/);
+  const isRawError = resultText.startsWith("Error") || resultText.startsWith("❌");
+
+  let output: string | undefined;
+  if (stdoutFenced && !emptyFenced) {
+    output = stdoutFenced[1]?.trim() || undefined;
+  } else if (stdoutPlain) {
+    output = stdoutPlain[1]?.trim() || undefined;
+  }
+
+  if (!output && !emptyFenced && !stderrFenced && !isRawError) {
+    const stripped = resultText
+      .replace(/Code:\n```python\n[\s\S]*?\n```\n*/g, '')
+      .replace(/Output:\n```\n*```/g, '')
+      .replace(/^\s*$/gm, '')
+      .trim();
+    if (stripped && stripped !== '(empty)') output = stripped;
+  }
   if (output === '') output = undefined;
 
   const error = stderrFenced?.[1]?.trim() || (isRawError ? resultText : undefined);
-
-  return { code, output, error };
+  return { code: finalCode, output, error };
 }
 
 // Map tool names to icons and status text
@@ -479,21 +479,6 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                   totalSearchSteps={totalSearchSteps}
                   isCollapsible={true}
                   defaultExpanded={pipelineExpanded}
-                  codeBlocks={(() => {
-                    const pythonTools = toolHistory.filter(t => t.name === "run_python");
-                    const activePython = phase === "tool_executing" && toolStatus?.name === "run_python";
-                    const blocks: { code: string; output?: string }[] = [];
-                    for (const t of pythonTools) {
-                      const code = (t.args?.code as string) || "";
-                      const resultText = t.result || "";
-                      const outputMatch = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
-                      blocks.push({ code, output: outputMatch?.[1] });
-                    }
-                    if (activePython && toolStatus?.args?.code) {
-                      blocks.push({ code: toolStatus.args.code as string });
-                    }
-                    return blocks;
-                  })()}
                 />
               </motion.div>
             )}

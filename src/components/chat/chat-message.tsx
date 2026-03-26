@@ -26,31 +26,55 @@ const TerminalIcon = () => (
 
 /**
  * Robustly extract code, output, and error from run_python result string.
+ * The tool-executor produces: Code:\n```python\n{code}\n```\n\nOutput:\n```\n{stdout}\n```
  */
 function parsePythonResult(code: string, resultText: string): { code: string; output?: string; error?: string } {
-  const stdoutFenced = resultText.match(/Output:\n```\n?([\s\S]*?)\n?```/);
-  const stderrFenced = resultText.match(/(?:Python Error|Warnings|Stderr):\n```\n?([\s\S]*?)\n?```/);
+  // Extract code from args first; fallback: extract from result text
+  let finalCode = code;
+  if (!finalCode) {
+    const codeFromResult = resultText.match(/Code:\n```python\n([\s\S]*?)\n```/);
+    finalCode = codeFromResult?.[1] || "";
+  }
+
+  // Extract stdout: try multiple patterns
+  // Pattern 1: Output:\n```\n{text}\n``` (standard fenced)
+  const stdoutFenced = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
+  // Pattern 2: Output:\n```\n``` (empty fenced — no content)
+  const emptyFenced = /Output:\n```\n```/.test(resultText);
+  // Pattern 3: simple text after Output:
   const stdoutPlain = resultText.match(/Output:\s*\n([^\n`][\s\S]*?)(?:\n\n|$)/);
+
+  // Error patterns
+  const stderrFenced = resultText.match(/(?:Python Error|Warnings|Stderr):\n```\n([\s\S]*?)\n```/);
   const isRawError = resultText.startsWith("Error") || resultText.startsWith("❌");
 
-  let output = stdoutFenced?.[1]?.trim() || stdoutPlain?.[1]?.trim() || undefined;
+  let output: string | undefined;
 
-  if (!output && !stderrFenced && !isRawError) {
+  if (stdoutFenced && !emptyFenced) {
+    output = stdoutFenced[1]?.trim() || undefined;
+  } else if (stdoutPlain) {
+    output = stdoutPlain[1]?.trim() || undefined;
+  }
+
+  // Fallback: strip known blocks and use whatever remains
+  if (!output && !emptyFenced && !stderrFenced && !isRawError) {
     const stripped = resultText
       .replace(/Code:\n```python\n[\s\S]*?\n```\n*/g, '')
       .replace(/Output:\n```\n*```/g, '')
+      .replace(/^\s*$/gm, '')
       .trim();
     if (stripped && stripped !== '(empty)') output = stripped;
   }
+
   if (output === '') output = undefined;
 
   const error = stderrFenced?.[1]?.trim() || (isRawError ? resultText : undefined);
-  return { code, output, error };
+  return { code: finalCode, output, error };
 }
 
 // Collapsible Python output card for history
 function PythonCardHistory({ py }: { py: { code: string; output?: string; error?: string } }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const hasBody = !!(py.code || py.output || py.error);
 
   return (
@@ -233,10 +257,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
                 for (const tc of nonSearchToolCalls) {
                   const config = toolDisplayMap[tc.name] || { icon: "\u26A1", label: tc.name.replace(/_/g, " ") };
-                  const isCodeExec = tc.name === "run_python";
                   pSteps.push({
                     id: `tool-${tc.name}-${pSteps.length}`,
-                    type: isCodeExec ? "code_execution" : "tool",
+                    type: "tool",
                     icon: config.icon === "terminal" ? <TerminalIcon /> : <span>{config.icon}</span>,
                     label: config.label,
                     status: "done",
@@ -251,15 +274,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
               totalSearchSteps={searchToolCalls.length}
               isCollapsible={true}
               defaultExpanded={false}
-              codeBlocks={(() => {
-                const pythonTools = toolCalls.filter(tc => tc.name === "run_python");
-                return pythonTools.map(t => {
-                  const code = typeof t.args === "string" ? "" : (t.args?.code as string) || "";
-                  const resultText = t.result || "";
-                  const outputMatch = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
-                  return { code, output: outputMatch?.[1] };
-                });
-              })()}
             />
           </div>
         )}
