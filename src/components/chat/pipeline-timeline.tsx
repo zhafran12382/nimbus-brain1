@@ -54,10 +54,11 @@ function SourceChip({ domain, url }: { domain: string; url: string }) {
   );
 }
 
-/** Solid blue dot — no animation */
+/** Solid colored dot — no animation */
 function NodeDot({ active }: { active: boolean }) {
   return (
-    <div className="w-[9px] h-[9px] rounded-full shrink-0 transition-colors duration-200"
+    <div
+      className="w-[9px] h-[9px] rounded-full shrink-0 transition-colors duration-200"
       style={{
         background: active ? "hsl(217 91% 60%)" : "hsl(0 0% 25%)",
         boxShadow: active ? "0 0 7px hsl(217 91% 60% / 0.55)" : "none",
@@ -72,7 +73,6 @@ export function PipelineTimeline({
   isCollapsible = true,
   defaultExpanded = true,
   headerLabel,
-  headerIcon,
   headerActive = false,
   searchQueries = [],
   currentSearchQuery,
@@ -82,69 +82,74 @@ export function PipelineTimeline({
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   const hasSearch = steps.some((s) => s.type === "search");
+  const hasSteps = steps.length > 0;
   const summaryLabel = hasSearch
     ? isCurrentlySearching
       ? "Searching..."
       : `Searched ${totalSearchSteps} source${totalSearchSteps !== 1 ? "s" : ""}`
-    : steps.length > 0
+    : hasSteps
       ? steps[steps.length - 1].label
       : headerLabel || "Processing...";
 
-  const headerIsActive = isCurrentlySearching || (headerActive && steps.length === 0);
-  // When collapsed and search is done, show Globe; otherwise show node dot
-  const headerLeftIcon = !hasSearch || isCurrentlySearching
-    ? null
-    : <Globe className="w-3.5 h-3.5 shrink-0 text-blue-400" />;
+  const headerIsActive = isCurrentlySearching || (headerActive && !hasSteps);
+
+  // Only show collapse controls when there are actual steps to collapse
+  const canCollapse = isCollapsible && hasSteps;
+
+  // Header left: Globe for completed search, dot for everything else
+  const showGlobe = hasSearch && !isCurrentlySearching;
 
   return (
     <div className="mb-3">
-      {/* Everything lives inside the same left-rail container */}
       <div className="relative pl-[18px]">
 
         {/* ── Vertical connecting rail ──
-            Runs from just below the header dot down through all steps.
-            Hidden when collapsed (no steps visible). */}
-        {isCollapsible && expanded && steps.length > 0 && (
-          <div
-            className="absolute left-[3.5px] top-[16px] bottom-2 w-[1.5px] rounded-full"
-            style={{ background: "hsl(217 91% 60% / 0.18)" }}
-          />
-        )}
-        {/* Non-collapsible: always show rail if there are steps */}
-        {!isCollapsible && steps.length > 0 && (
-          <div
-            className="absolute left-[3.5px] top-[8px] bottom-2 w-[1.5px] rounded-full"
-            style={{ background: "hsl(0 0% 100% / 0.07)" }}
-          />
-        )}
+            ALWAYS visible when there's a header dot — extends downward.
+            Acts as a visual "loading track" even before steps appear. */}
+        <div
+          className="absolute left-[3.5px] w-[1.5px] rounded-full transition-all duration-300"
+          style={{
+            // Start just below center of header dot
+            top: "16px",
+            // If steps visible & expanded: stretch to bottom. Otherwise: short stub.
+            bottom: hasSteps && (expanded || !isCollapsible) ? "4px" : "auto",
+            height: hasSteps && (expanded || !isCollapsible) ? "auto" : "16px",
+            background: headerIsActive
+              ? "hsl(217 91% 60% / 0.22)"
+              : "hsl(0 0% 100% / 0.07)",
+          }}
+        />
 
         {/* ── Header row ── */}
-        {isCollapsible ? (
-          <div>
-            <button
-              onClick={() => setExpanded((prev) => !prev)}
-              className="relative w-full flex items-center gap-2.5 py-1.5 text-[13px] text-[hsl(0_0%_65%)] hover:text-[hsl(0_0%_80%)] transition-colors"
-            >
-              {/* Header node dot */}
-              <div className="absolute -left-[18px] top-1/2 -translate-y-1/2">
-                {headerLeftIcon ?? <NodeDot active={headerIsActive} />}
-              </div>
+        {isCollapsible && (
+          <div
+            className="relative flex items-center gap-2.5 py-1.5 text-[13px] text-[hsl(0_0%_65%)] hover:text-[hsl(0_0%_80%)] transition-colors cursor-pointer"
+            onClick={() => canCollapse && setExpanded((prev) => !prev)}
+          >
+            {/* Header node dot */}
+            <div className="absolute -left-[18px] top-1/2 -translate-y-1/2">
+              {showGlobe
+                ? <Globe className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+                : <NodeDot active={headerIsActive} />
+              }
+            </div>
 
-              <span className="flex-1 text-left font-medium">{summaryLabel}</span>
+            <span className="flex-1 text-left font-medium">{summaryLabel}</span>
+
+            {/* Chevron: only when there are steps to toggle */}
+            {canCollapse && (
               <ChevronDown
                 className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
                   expanded ? "rotate-0" : "-rotate-90"
                 }`}
               />
-            </button>
-            {/* Separator under header */}
-            <div className="h-px bg-[hsl(0_0%_100%_/_0.06)] mb-0.5" />
+            )}
           </div>
-        ) : null}
+        )}
 
         {/* ── Expanded steps ── */}
         <AnimatePresence initial={false}>
-          {(expanded || !isCollapsible) && (
+          {(expanded || !isCollapsible) && hasSteps && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}

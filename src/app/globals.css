@@ -112,6 +112,11 @@ body {
   color: hsl(0 0% 75%);
 }
 
+/* Hide horizontal rules — LLMs often emit --- which produces distracting lines */
+.chat-markdown hr {
+  display: none;
+}
+
 .chat-markdown-table-wrap {
   width: 100%;
   max-width: 100%;
