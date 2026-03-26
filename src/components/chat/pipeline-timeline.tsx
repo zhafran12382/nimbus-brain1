@@ -118,18 +118,22 @@ export function PipelineTimeline({
     <div className="mb-3">
       {/* Collapsible header */}
       {isCollapsible && (
-        <button
-          onClick={() => setExpanded((prev) => !prev)}
-          className="w-full flex items-center gap-2.5 py-1.5 text-[13px] text-[hsl(0_0%_65%)] hover:text-[hsl(0_0%_80%)] transition-colors"
-        >
-          {headerIconNode}
-          <span className="flex-1 text-left font-medium">{summaryLabel}</span>
-          <ChevronDown
-            className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
-              expanded ? "rotate-0" : "-rotate-90"
-            }`}
-          />
-        </button>
+        <div>
+          <button
+            onClick={() => setExpanded((prev) => !prev)}
+            className="w-full flex items-center gap-2.5 py-1.5 text-[13px] text-[hsl(0_0%_65%)] hover:text-[hsl(0_0%_80%)] transition-colors"
+          >
+            {headerIconNode}
+            <span className="flex-1 text-left font-medium">{summaryLabel}</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                expanded ? "rotate-0" : "-rotate-90"
+              }`}
+            />
+          </button>
+          {/* Separator line under header */}
+          <div className="h-px bg-[hsl(0_0%_100%_/_0.06)] mt-0.5" />
+        </div>
       )}
 
       {/* Expanded timeline */}

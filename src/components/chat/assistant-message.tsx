@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import Markdown from "react-markdown";
 import { parseAssistantContent } from "@/lib/assistant-response";
 import { Copy, Download, Lock, RefreshCw } from "lucide-react";
@@ -58,6 +59,44 @@ const TerminalIcon = () => (
     <line x1="9" y1="11" x2="11.5" y2="11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
   </svg>
 );
+
+/**
+ * Robustly extract code, output, and error from the tool-executor's run_python result string.
+ * Handles multiple markdown formats: fenced (```), Output:/Warnings:/Error: prefixed blocks,
+ * and raw text fallback for when the runtime returns a simple string.
+ */
+function parsePythonResult(code: string, resultText: string): { code: string; output?: string; error?: string } {
+  // Pattern 1: standard fenced format from tool-executor
+  //   Output:\n```\n{stdout}\n```
+  const stdoutFenced = resultText.match(/Output:\n```\n?([\s\S]*?)\n?```/);
+  const stderrFenced = resultText.match(/(?:Python Error|Warnings|Stderr):\n```\n?([\s\S]*?)\n?```/);
+
+  // Pattern 2: "Output:" followed by non-fenced text (simple one-line output)
+  const stdoutPlain = resultText.match(/Output:\s*\n([^\n`][\s\S]*?)(?:\n\n|$)/);
+
+  // Pattern 3: result starts with "Error" (runtime config error)
+  const isRawError = resultText.startsWith("Error") || resultText.startsWith("❌");
+
+  let output = stdoutFenced?.[1]?.trim() || stdoutPlain?.[1]?.trim() || undefined;
+
+  // Fallback: after stripping the Code block, whatever remains that isn't an error
+  if (!output && !stderrFenced && !isRawError) {
+    const stripped = resultText
+      .replace(/Code:\n```python\n[\s\S]*?\n```\n*/g, '')
+      .replace(/Output:\n```\n*```/g, '') // empty Output fences
+      .trim();
+    if (stripped && stripped !== '(empty)') {
+      output = stripped;
+    }
+  }
+
+  // Treat empty strings as undefined
+  if (output === '') output = undefined;
+
+  const error = stderrFenced?.[1]?.trim() || (isRawError ? resultText : undefined);
+
+  return { code, output, error };
+}
 
 // Map tool names to icons and status text
 function getToolDisplay(name: string, phase: "start" | "result"): { icon: string; text: string } {
@@ -205,6 +244,78 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
   );
 }
 
+// Collapsible Python output card
+function PythonCard({ py }: { py: { code: string; output?: string; error?: string } }) {
+  const [expanded, setExpanded] = useState(true);
+  const hasBody = !!(py.code || py.output || py.error);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden"
+    >
+      {/* Header — clickable to toggle */}
+      <button
+        onClick={() => hasBody && setExpanded(prev => !prev)}
+        className="w-full flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)] hover:bg-[hsl(0_0%_10%)] transition-colors"
+      >
+        <span className="text-[hsl(0_0%_50%)]"><TerminalIcon /></span>
+        <span className="text-[11px] font-medium text-[hsl(0_0%_50%)] flex-1 text-left">Python</span>
+        {py.output && (
+          <span className="text-[10px] text-green-400/60 font-medium">OUTPUT</span>
+        )}
+        {py.error && (
+          <span className="text-[10px] text-red-400/60 font-medium">ERROR</span>
+        )}
+        {hasBody && (
+          <ChevronDown className={`w-3 h-3 text-[hsl(0_0%_40%)] transition-transform duration-200 ${expanded ? "rotate-0" : "-rotate-90"}`} />
+        )}
+      </button>
+
+      {/* Collapsible body */}
+      <AnimatePresence initial={false}>
+        {expanded && hasBody && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            {py.code && (
+              <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
+                <code>{py.code}</code>
+              </pre>
+            )}
+            {py.output && (
+              <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(140_50%_5%)]">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] text-green-400/70 font-medium uppercase tracking-wider">Output</span>
+                </div>
+                <pre className="text-[12px] font-mono text-green-300/90 whitespace-pre-wrap leading-relaxed">
+                  {py.output}
+                </pre>
+              </div>
+            )}
+            {py.error && (
+              <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(0_50%_5%)]">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] text-red-400/70 font-medium uppercase tracking-wider">Error</span>
+                </div>
+                <pre className="text-[12px] font-mono text-red-300/90 whitespace-pre-wrap leading-relaxed">
+                  {py.error}
+                </pre>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 export function AssistantMessage({ state }: AssistantMessageProps) {
   const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs, thinkingContent: apiThinkingContent } = state;
   const [showMetadata, setShowMetadata] = useState(false);
@@ -289,17 +400,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
     .map(t => {
       const code = (t.args?.code as string) || "";
       const resultText = t.result || "";
-      const outputMatch = resultText.match(/Output:\n```\n([\s\S]*?)\n```/);
-      const stderrMatch = resultText.match(/(?:Python Error|Warnings):\n```\n([\s\S]*?)\n```/);
-      // Fallback: if no regex match, extract everything after "Output:" as raw output
-      let output = outputMatch?.[1];
-      if (!output && !stderrMatch) {
-        const afterCode = resultText.replace(/Code:\n```python\n[\s\S]*?\n```\n*/g, '').trim();
-        if (afterCode && !afterCode.startsWith('Error')) {
-          output = afterCode;
-        }
-      }
-      return { code, output, error: stderrMatch?.[1] || (resultText.startsWith('Error') ? resultText : undefined) };
+      return parsePythonResult(code, resultText);
     });
   const activePython = phase === "tool_executing" && toolStatus?.name === "run_python";
   const activePythonCode = activePython ? (toolStatus?.args?.code as string) : null;
@@ -398,47 +499,11 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
             )}
           </AnimatePresence>
 
-          {/* === Python Runtime Output === */}
+          {/* === Python Runtime Output (collapsible) === */}
           {(pythonResults.length > 0 || activePythonCode) && (
             <div className="mb-3 space-y-2">
               {pythonResults.map((py, i) => (
-                <motion.div
-                  key={`python-${i}`}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden"
-                >
-                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)]">
-                    <span className="text-[hsl(0_0%_50%)]"><TerminalIcon /></span>
-                    <span className="text-[11px] font-medium text-[hsl(0_0%_50%)]">Python</span>
-                  </div>
-                  {py.code && (
-                  <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
-                    <code>{py.code}</code>
-                  </pre>
-                  )}
-                  {py.output && (
-                    <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(140_50%_5%)]">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] text-green-400/70 font-medium uppercase tracking-wider">Output</span>
-                      </div>
-                      <pre className="text-[12px] font-mono text-green-300/90 whitespace-pre-wrap leading-relaxed">
-                        {py.output}
-                      </pre>
-                    </div>
-                  )}
-                  {py.error && (
-                    <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(0_50%_5%)]">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] text-red-400/70 font-medium uppercase tracking-wider">Error</span>
-                      </div>
-                      <pre className="text-[12px] font-mono text-red-300/90 whitespace-pre-wrap leading-relaxed">
-                        {py.error}
-                      </pre>
-                    </div>
-                  )}
-                </motion.div>
+                <PythonCard key={`python-${i}`} py={py} />
               ))}
               {activePythonCode && (
                 <motion.div
