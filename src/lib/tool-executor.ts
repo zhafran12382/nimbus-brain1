@@ -249,53 +249,80 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       const code = String(args.code);
       const description = args.description ? String(args.description) : '';
 
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
+      const endpoint = process.env.PYTHON_RUNTIME_ENDPOINT;
+      const apiKey = process.env.PYTHON_RUNTIME_API_KEY;
 
-        const pistonRes = await fetch('https://emkc.org/api/v2/piston/execute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            language: 'python',
-            version: '3.10.0',
-            files: [{ name: 'main.py', content: code }],
-            stdin: '',
-            args: [],
-            compile_timeout: 10000,
-            run_timeout: 10000,
-          }),
-          signal: controller.signal,
-        });
+      console.log('[PYTHON] env loaded:', !!apiKey);
+      console.log('[PYTHON] endpoint:', endpoint);
 
-        clearTimeout(timeout);
-
-        if (!pistonRes.ok) {
-          return `Error: Python execution failed (status ${pistonRes.status}).`;
-        }
-
-        const data = await pistonRes.json();
-        const stdout = data.run?.stdout?.trim() || '';
-        const stderr = data.run?.stderr?.trim() || '';
-
-        if (stderr && !stdout) {
-          return `Python Error:\n\`\`\`\n${stderr.slice(0, 2000)}\n\`\`\``;
-        }
-
-        let output = '';
-        if (description) output += `${description}\n\n`;
-        output += `Code:\n\`\`\`python\n${code}\n\`\`\`\n\n`;
-        output += `Output:\n\`\`\`\n${stdout.slice(0, 5000)}\n\`\`\``;
-        if (stderr) output += `\n\nWarnings:\n\`\`\`\n${stderr.slice(0, 1000)}\n\`\`\``;
-
-        return output;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          return 'Error: Python execution timed out (15s limit).';
-        }
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        return `Error executing Python: ${msg}`;
+      if (!endpoint || !apiKey) {
+        return 'Error: Python runtime belum dikonfigurasi (PYTHON_RUNTIME_ENDPOINT / PYTHON_RUNTIME_API_KEY tidak tersedia).';
       }
+
+      const MAX_ATTEMPTS = 2;
+      let lastError = '';
+
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        console.log('[PYTHON] attempt:', attempt);
+
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 15000);
+
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': apiKey,
+            },
+            body: JSON.stringify({ code }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeout);
+          console.log('[PYTHON] status:', res.status);
+
+          if (res.status === 401) {
+            console.log('[PYTHON] 401 unauthorized — terminal error, no retry');
+            return 'Error: Python runtime unauthorized (401). Periksa PYTHON_RUNTIME_API_KEY.';
+          }
+
+          if (!res.ok) {
+            return `Error: Python execution failed (status ${res.status}).`;
+          }
+
+          const data = await res.json();
+          const stdout = data.run?.stdout?.trim() || data.stdout?.trim() || '';
+          const stderr = data.run?.stderr?.trim() || data.stderr?.trim() || '';
+
+          console.log('[PYTHON] output injected:', !!stdout);
+
+          if (stderr && !stdout) {
+            return `Python Error:\n\`\`\`\n${stderr.slice(0, 2000)}\n\`\`\``;
+          }
+
+          let output = '';
+          if (description) output += `${description}\n\n`;
+          output += `Code:\n\`\`\`python\n${code}\n\`\`\`\n\n`;
+          output += `Output:\n\`\`\`\n${stdout.slice(0, 5000)}\n\`\`\``;
+          if (stderr) output += `\n\nWarnings:\n\`\`\`\n${stderr.slice(0, 1000)}\n\`\`\``;
+
+          return output;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            lastError = 'Python execution timed out (15s limit).';
+          } else {
+            lastError = error instanceof Error ? error.message : 'Unknown error';
+          }
+          console.log('[PYTHON] retry:', attempt, 'error:', lastError);
+
+          if (attempt < MAX_ATTEMPTS) {
+            continue;
+          }
+        }
+      }
+
+      return `Error executing Python: ${lastError}`;
     }
 
     case 'create_expense': {

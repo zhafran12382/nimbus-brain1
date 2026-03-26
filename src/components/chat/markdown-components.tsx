@@ -5,8 +5,13 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import type { PluggableList } from "unified";
 
-export const chatRemarkPlugins: PluggableList = [remarkGfm, remarkMath];
-export const chatRehypePlugins: PluggableList = [rehypeKatex];
+export const chatRemarkPlugins: PluggableList = [
+  remarkGfm,
+  [remarkMath, { singleDollarTextMath: true }],
+];
+export const chatRehypePlugins: PluggableList = [
+  [rehypeKatex, { throwOnError: false, output: 'htmlAndMathml' }],
+];
 
 export const chatMarkdownComponents: Components = {
   table({ children, ...props }) {

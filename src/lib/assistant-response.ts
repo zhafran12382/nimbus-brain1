@@ -61,6 +61,7 @@ export function parseAssistantContent(content: string): ParsedAssistantContent {
   }
 
   text = sanitizeAssistantContent(text);
+  text = normalizeLatex(text);
 
   return {
     text: text.trim(),
@@ -68,6 +69,16 @@ export function parseAssistantContent(content: string): ParsedAssistantContent {
     thinkingDurationMs,
     sources
   };
+}
+
+export function normalizeLatex(text: string): string {
+  // Fix double-escaped backslashes inside LaTeX delimiters.
+  // LLM output often arrives with \\frac instead of \frac because of JSON serialization layers.
+  // We scan for $...$ and $$...$$ spans and collapse \\\\ → \\ only inside them.
+  return text.replace(
+    /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\]|\\.)*\$)/g,
+    (match) => match.replace(/\\\\/g, '\\')
+  );
 }
 
 export function sanitizeAssistantContent(content: string): string {
