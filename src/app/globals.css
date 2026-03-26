@@ -170,11 +170,12 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.5rem 0;
-  margin: 0.5rem 0;
+  margin: 0.75rem 0;
 }
 
 .chat-markdown .katex {
   font-size: 1.1em;
+  color: inherit;
 }
 
 .chat-markdown .katex-display > .katex {
@@ -183,6 +184,15 @@ body {
 
 .chat-markdown .katex .base {
   display: inline;
+}
+
+/* Prevent KaTeX error text from showing red — inherit surrounding color */
+.chat-markdown .katex .katex-html,
+.chat-markdown .katex .mord,
+.chat-markdown .katex .mord.text,
+.chat-markdown .katex .mord.mathnormal,
+.chat-markdown .katex-error {
+  color: inherit;
 }
 
 /* ── Glass Level 1 — Subtle (sidebar, header) ── */

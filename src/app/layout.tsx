@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import "katex/dist/katex.min.css";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 

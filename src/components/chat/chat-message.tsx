@@ -1,6 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import { ChatMessage as ChatMessageType } from "@/types";
 import { messageBubble } from "@/lib/animations";
 import { QUIZ_DATA_REGEX } from "@/lib/constants";
@@ -21,6 +23,86 @@ const TerminalIcon = () => (
     <line x1="9" y1="11" x2="11.5" y2="11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
   </svg>
 );
+
+/**
+ * Robustly extract code, output, and error from run_python result string.
+ */
+function parsePythonResult(code: string, resultText: string): { code: string; output?: string; error?: string } {
+  const stdoutFenced = resultText.match(/Output:\n```\n?([\s\S]*?)\n?```/);
+  const stderrFenced = resultText.match(/(?:Python Error|Warnings|Stderr):\n```\n?([\s\S]*?)\n?```/);
+  const stdoutPlain = resultText.match(/Output:\s*\n([^\n`][\s\S]*?)(?:\n\n|$)/);
+  const isRawError = resultText.startsWith("Error") || resultText.startsWith("❌");
+
+  let output = stdoutFenced?.[1]?.trim() || stdoutPlain?.[1]?.trim() || undefined;
+
+  if (!output && !stderrFenced && !isRawError) {
+    const stripped = resultText
+      .replace(/Code:\n```python\n[\s\S]*?\n```\n*/g, '')
+      .replace(/Output:\n```\n*```/g, '')
+      .trim();
+    if (stripped && stripped !== '(empty)') output = stripped;
+  }
+  if (output === '') output = undefined;
+
+  const error = stderrFenced?.[1]?.trim() || (isRawError ? resultText : undefined);
+  return { code, output, error };
+}
+
+// Collapsible Python output card for history
+function PythonCardHistory({ py }: { py: { code: string; output?: string; error?: string } }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasBody = !!(py.code || py.output || py.error);
+
+  return (
+    <div className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden">
+      <button
+        onClick={() => hasBody && setExpanded(prev => !prev)}
+        className="w-full flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)] hover:bg-[hsl(0_0%_10%)] transition-colors"
+      >
+        <span className="text-[hsl(0_0%_50%)]"><TerminalIcon /></span>
+        <span className="text-[11px] font-medium text-[hsl(0_0%_50%)] flex-1 text-left">Python</span>
+        {py.output && <span className="text-[10px] text-green-400/60 font-medium">OUTPUT</span>}
+        {py.error && <span className="text-[10px] text-red-400/60 font-medium">ERROR</span>}
+        {hasBody && (
+          <ChevronDown className={`w-3 h-3 text-[hsl(0_0%_40%)] transition-transform duration-200 ${expanded ? "rotate-0" : "-rotate-90"}`} />
+        )}
+      </button>
+      <AnimatePresence initial={false}>
+        {expanded && hasBody && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            {py.code && (
+              <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
+                <code>{py.code}</code>
+              </pre>
+            )}
+            {py.output && (
+              <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(140_50%_5%)]">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] text-green-400/70 font-medium uppercase tracking-wider">Output</span>
+                </div>
+                <pre className="text-[12px] font-mono text-green-300/90 whitespace-pre-wrap leading-relaxed">{py.output}</pre>
+              </div>
+            )}
+            {py.error && (
+              <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(0_50%_5%)]">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] text-red-400/70 font-medium uppercase tracking-wider">Error</span>
+                </div>
+                <pre className="text-[12px] font-mono text-red-300/90 whitespace-pre-wrap leading-relaxed">{py.error}</pre>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -109,6 +191,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
     }
   }
 
+  // Python execution results for prominent display
+  const pythonToolCalls = toolCalls.filter(tc => tc.name === "run_python");
+  const pythonResults = pythonToolCalls.map(tc => {
+    const code = typeof tc.args === "string" ? "" : (tc.args?.code as string) || "";
+    const resultText = tc.result || "";
+    return parsePythonResult(code, resultText);
+  });
+
   return (
     <motion.div
       initial={messageBubble.initial}
@@ -171,6 +261,15 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 });
               })()}
             />
+          </div>
+        )}
+
+        {/* Python Runtime Output (history — collapsible) */}
+        {!isUser && pythonResults.length > 0 && (
+          <div className="mb-2 ml-3.5 w-full space-y-2">
+            {pythonResults.map((py, i) => (
+              <PythonCardHistory key={`python-hist-${i}`} py={py} />
+            ))}
           </div>
         )}
 
