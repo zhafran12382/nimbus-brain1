@@ -38,6 +38,15 @@ interface AssistantMessageProps {
   state: AssistantMessageState;
 }
 
+// Minimal terminal icon for code execution (monochrome SVG, matches pipeline design)
+const TerminalIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="inline-block">
+    <rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.3" fill="none" />
+    <path d="M4.5 6L7 8.5L4.5 11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="9" y1="11" x2="11.5" y2="11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+  </svg>
+);
+
 // Map tool names to icons and status text
 function getToolDisplay(name: string, phase: "start" | "result"): { icon: string; text: string } {
   const map: Record<string, { icon: string; startText: string; resultText: string }> = {
@@ -57,7 +66,7 @@ function getToolDisplay(name: string, phase: "start" | "result"): { icon: string
     create_quiz: { icon: "📝", startText: "Generating quiz...", resultText: "Quiz ready!" },
     get_quiz_history: { icon: "📚", startText: "Fetching quiz history...", resultText: "History loaded" },
     get_quiz_stats: { icon: "📊", startText: "Analyzing study stats...", resultText: "Stats loaded" },
-    run_python: { icon: "🐍", startText: "Running Python code...", resultText: "Code executed" },
+    run_python: { icon: "terminal", startText: "Running Python code...", resultText: "Code executed" },
   };
   const config = map[name] || { icon: "⚡", startText: `Executing ${name}...`, resultText: `${name} complete` };
   return {
@@ -318,7 +327,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                       pSteps.push({
                         id: `tool-${step.text}`,
                         type: isCodeExec ? "code_execution" : "tool",
-                        icon: <span>{step.icon}</span>,
+                        icon: step.icon === "terminal" ? <TerminalIcon /> : <span>{step.icon}</span>,
                         label: step.text,
                         status: step.done ? "done" : "active",
                       });

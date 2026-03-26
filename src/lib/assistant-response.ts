@@ -5,6 +5,48 @@ export interface ParsedAssistantContent {
   sources: { title: string; url: string; domain: string }[];
 }
 
+/**
+ * Normalize LaTeX math expressions in model output so that remark-math can parse them.
+ * Handles common model quirks: unwrapped \frac, stray braces, mid-paragraph $$, etc.
+ */
+export function normalizeMathContent(text: string): string {
+  let result = text;
+
+  // 1. Protect existing fenced code blocks from being modified
+  const codeBlocks: string[] = [];
+  result = result.replace(/```[\s\S]*?```/g, (match) => {
+    codeBlocks.push(match);
+    return `%%CODEBLOCK_${codeBlocks.length - 1}%%`;
+  });
+  const inlineCodeBlocks: string[] = [];
+  result = result.replace(/`[^`\n]+`/g, (match) => {
+    inlineCodeBlocks.push(match);
+    return `%%INLINECODE_${inlineCodeBlocks.length - 1}%%`;
+  });
+
+  // 2. Normalize \( ... \) to $...$ and \[ ... \] to $$...$$
+  result = result.replace(/\\\(\s*([\s\S]*?)\s*\\\)/g, (_, math) => `$${math.trim()}$`);
+  result = result.replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (_, math) => `$$\n${math.trim()}\n$$`);
+
+  // 3. Wrap bare LaTeX commands (outside of $) in inline math delimiters
+  //    Matches things like \frac{...}{...}, \sum_{...}^{...}, \sqrt{...} etc when not inside $
+
+  // Simple approach: find bare latex commands not inside $ delimiters
+  result = result.replace(/((?:^|[^$]))(\\(?:frac|sum|prod|int|lim|sqrt|binom)\{[\s\S]*?\}(?:\{[\s\S]*?\})?(?:[_^]\{[^}]*\})*)/g, (match, prefix, latex) => {
+    // Check if we're inside a math context by counting $ before this position
+    const beforeMatch = result.substring(0, result.indexOf(match));
+    const singleDollars = (beforeMatch.match(/(?<!\$)\$(?!\$)/g) || []).length;
+    if (singleDollars % 2 === 1) return match; // inside inline math
+    return `${prefix}$${latex}$`;
+  });
+
+  // 4. Restore code blocks
+  result = result.replace(/%%INLINECODE_(\d+)%%/g, (_, i) => inlineCodeBlocks[Number(i)]);
+  result = result.replace(/%%CODEBLOCK_(\d+)%%/g, (_, i) => codeBlocks[Number(i)]);
+
+  return result;
+}
+
 export function parseAssistantContent(content: string): ParsedAssistantContent {
   let text = typeof content === "string" ? content : "";
   let thinking: string | null = null;
@@ -62,6 +104,7 @@ export function parseAssistantContent(content: string): ParsedAssistantContent {
 
   text = sanitizeAssistantContent(text);
   text = normalizeLatex(text);
+  text = normalizeMathContent(text);
 
   return {
     text: text.trim(),

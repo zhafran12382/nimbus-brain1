@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "katex/dist/katex.min.css";
 
 /* ── Premium Dark Theme — Vercel × Linear × Arc ── */
 :root {
@@ -162,6 +163,26 @@ body {
   background: hsl(0 0% 100% / 0.08);
   padding: 0.125rem 0.375rem;
   font-size: 0.8em;
+}
+
+/* ── KaTeX Math Rendering ── */
+.chat-markdown .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5rem 0;
+  margin: 0.5rem 0;
+}
+
+.chat-markdown .katex {
+  font-size: 1.1em;
+}
+
+.chat-markdown .katex-display > .katex {
+  white-space: normal;
+}
+
+.chat-markdown .katex .base {
+  display: inline;
 }
 
 /* ── Glass Level 1 — Subtle (sidebar, header) ── */
