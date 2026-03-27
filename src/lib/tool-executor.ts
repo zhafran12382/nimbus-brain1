@@ -855,37 +855,11 @@ JSON ARRAY ONLY. NO other text before or after.`;
       }
 
       const taskName = String(args.name).trim();
-      const encodedName = encodeURIComponent(taskName);
-      const schedulerUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://nimbus-brain.vercel.app'}/api/scheduler?task=${encodedName}`;
 
-      // Call EasyCron API
-      let easycronId: string | null = null;
-      try {
-        const easycronRes = await fetch('https://www.easycron.com/rest/add', {
-          method: 'POST',
-          headers: {
-            'X-API-Key': process.env.EASYCRON_API_KEY || '',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: schedulerUrl,
-            cron_expression: cronExp,
-          }),
-        });
-        const easycronData = await easycronRes.json();
-        if (easycronData.status === 'success' && easycronData.cron_job_id) {
-          easycronId = String(easycronData.cron_job_id);
-        } else {
-          return `❌ EasyCron error: ${easycronData.error || JSON.stringify(easycronData)}`;
-        }
-      } catch (err) {
-        return `❌ Gagal menghubungi EasyCron: ${err instanceof Error ? err.message : 'Unknown error'}`;
-      }
-
+      // 1. Save to database first
       const { data, error } = await supabase
         .from('scheduled_tasks')
         .insert({
-          easycron_id: easycronId,
           name: taskName,
           prompt: args.prompt,
           cron_expression: cronExp,
@@ -893,7 +867,39 @@ JSON ARRAY ONLY. NO other text before or after.`;
         .select()
         .single();
       if (error) return `Error menyimpan ke database: ${error.message}`;
-      return `📅 Task "${data.name}" berhasil dibuat! Cron: ${cronExp} | ID: ${data.id}`;
+
+      // 2. Call EasyCron API with x-www-form-urlencoded
+      const schedulerUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://nimbus-brain.vercel.app'}/api/scheduler?task=${encodeURIComponent(taskName)}`;
+      try {
+        const body = new URLSearchParams();
+        body.append('token', process.env.EASYCRON_API_KEY || '');
+        body.append('url', schedulerUrl);
+        body.append('cron_expression', cronExp);
+
+        const easycronRes = await fetch('https://www.easycron.com/rest/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        });
+        const easycronData = await easycronRes.json();
+
+        if (easycronData.status === 'success' && easycronData.cron_job_id) {
+          // 3. Store cron_job_id back to database
+          await supabase
+            .from('scheduled_tasks')
+            .update({ easycron_id: String(easycronData.cron_job_id) })
+            .eq('id', data.id);
+          return `📅 Task "${data.name}" berhasil dibuat! Cron: ${cronExp} | EasyCron ID: ${easycronData.cron_job_id} | DB ID: ${data.id}`;
+        } else {
+          // DB saved but EasyCron failed — clean up
+          await supabase.from('scheduled_tasks').delete().eq('id', data.id);
+          return `❌ EasyCron error: ${easycronData.error || easycronData.message || JSON.stringify(easycronData)}`;
+        }
+      } catch (err) {
+        // DB saved but EasyCron unreachable — clean up
+        await supabase.from('scheduled_tasks').delete().eq('id', data.id);
+        return `❌ Gagal menghubungi EasyCron: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      }
     }
 
     case 'get_scheduled_tasks': {
@@ -904,8 +910,8 @@ JSON ARRAY ONLY. NO other text before or after.`;
       if (error) return `Error: ${error.message}`;
       if (!data?.length) return 'Belum ada scheduled tasks.';
 
-      return data.map((t: { id: string; name: string; status: string; prompt: string; cron_expression: string }) => {
-        return `• ${t.name} [${t.status}] — "${t.prompt}" | Cron: ${t.cron_expression} | ID: ${t.id}`;
+      return data.map((t: { id: string; name: string; status: string; prompt: string; cron_expression: string; easycron_id: string | null }) => {
+        return `• ${t.name} [${t.status}] — "${t.prompt}" | Cron: ${t.cron_expression} | ID: ${t.id}${t.easycron_id ? ` | EasyCron: ${t.easycron_id}` : ''}`;
       }).join('\n');
     }
 
@@ -926,20 +932,19 @@ JSON ARRAY ONLY. NO other text before or after.`;
       // Update EasyCron
       if (task.easycron_id) {
         try {
+          const body = new URLSearchParams();
+          body.append('token', process.env.EASYCRON_API_KEY || '');
+          body.append('cron_job_id', task.easycron_id);
+          body.append('cron_expression', newCron);
+
           const easycronRes = await fetch('https://www.easycron.com/rest/edit', {
             method: 'POST',
-            headers: {
-              'X-API-Key': process.env.EASYCRON_API_KEY || '',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              cron_job_id: task.easycron_id,
-              cron_expression: newCron,
-            }),
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
           });
           const easycronData = await easycronRes.json();
           if (easycronData.status !== 'success') {
-            return `❌ EasyCron error: ${easycronData.error || JSON.stringify(easycronData)}`;
+            return `❌ EasyCron error: ${easycronData.error || easycronData.message || JSON.stringify(easycronData)}`;
           }
         } catch (err) {
           return `❌ Gagal menghubungi EasyCron: ${err instanceof Error ? err.message : 'Unknown error'}`;
@@ -969,15 +974,14 @@ JSON ARRAY ONLY. NO other text before or after.`;
       // Delete from EasyCron
       if (task.easycron_id) {
         try {
+          const body = new URLSearchParams();
+          body.append('token', process.env.EASYCRON_API_KEY || '');
+          body.append('cron_job_id', task.easycron_id);
+
           const easycronRes = await fetch('https://www.easycron.com/rest/delete', {
             method: 'POST',
-            headers: {
-              'X-API-Key': process.env.EASYCRON_API_KEY || '',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              cron_job_id: task.easycron_id,
-            }),
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
           });
           const easycronData = await easycronRes.json();
           if (easycronData.status !== 'success') {
