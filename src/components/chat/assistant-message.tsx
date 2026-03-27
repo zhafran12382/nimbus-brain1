@@ -457,7 +457,7 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
       </div>
 
       {/* Response container */}
-      <div className="w-full max-w-[82%] space-y-1 flex flex-col items-start min-w-0">
+      <div className="w-full max-w-[82%] sm:max-w-[82%] max-sm:max-w-[90%] space-y-1 flex flex-col items-start min-w-0 overflow-x-hidden">
         <div className="w-full min-w-[120px] px-3.5 py-3">
 
           {/* === Perplexity-style Pipeline Timeline === */}

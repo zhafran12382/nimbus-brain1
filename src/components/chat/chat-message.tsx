@@ -237,7 +237,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
       )}
 
-      <div className={`w-full max-w-[82%] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col`}>
+      <div className={`w-full max-w-[82%] sm:max-w-[82%] max-sm:max-w-[90%] min-w-0 space-y-1 ${isUser ? "items-end" : "items-start"} flex flex-col overflow-x-hidden`}>
         {/* Grouped pipeline for tool calls (history messages) */}
         {!isUser && toolCalls.length > 0 && (
           <div className="mb-1 ml-3.5 w-full">

@@ -369,4 +369,9 @@ body {
   .chat-markdown td {
     padding: 0.375rem 0.5rem;
   }
+
+  .source-chips-scroll {
+    flex-wrap: wrap;
+    overflow-x: hidden;
+  }
 }

@@ -188,7 +188,7 @@ export function PipelineTimeline({
 
                       {/* Search step: queries + source chips */}
                       {step.type === "search" && (
-                        <div className="pl-5 flex flex-col gap-1.5 mt-0.5">
+                        <div className="pl-5 flex flex-col gap-1.5 mt-0.5 min-w-0 overflow-hidden">
                           {searchQueries.map((query, i) => (
                             <div
                               key={`sq-${i}`}
