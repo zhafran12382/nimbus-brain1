@@ -374,5 +374,115 @@ export const tools = [
         properties: {}
       }
     }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "send_notification",
+      description: "Kirim notifikasi ke user. Gunakan untuk menginformasikan sesuatu yang penting, konfirmasi aksi, atau peringatan.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Judul notifikasi (singkat)" },
+          message: { type: "string", description: "Isi pesan notifikasi" },
+          type: {
+            type: "string",
+            enum: ["info", "success", "warning", "error"],
+            description: "Tipe notifikasi. Default: info"
+          }
+        },
+        required: ["title", "message"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_scheduled_task",
+      description: "Buat scheduled task baru menggunakan EasyCron. Konversi jadwal user ke format cron expression. Contoh: harian jam 7 pagi = '0 7 * * *', setiap Senin jam 9 = '0 9 * * 1'.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Nama task (unik, untuk identifikasi)" },
+          prompt: { type: "string", description: "Prompt/perintah yang akan dieksekusi saat waktunya tiba" },
+          cron_expression: { type: "string", description: "Cron expression (5 field: menit jam tanggal bulan hari). Contoh: '0 7 * * *' = setiap hari jam 7:00, '*/30 * * * *' = setiap 30 menit" }
+        },
+        required: ["name", "prompt", "cron_expression"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_scheduled_tasks",
+      description: "Ambil daftar scheduled tasks.",
+      parameters: {
+        type: "object",
+        properties: {
+          status: {
+            type: "string",
+            enum: ["active", "paused", "completed", "all"],
+            description: "Filter status. Default: all"
+          }
+        }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "update_scheduled_task",
+      description: "Update jadwal scheduled task yang sudah ada di EasyCron.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: { type: "string", description: "ID task (UUID dari database)" },
+          cron_expression: { type: "string", description: "Cron expression baru (5 field: menit jam tanggal bulan hari)" }
+        },
+        required: ["task_id", "cron_expression"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "delete_scheduled_task",
+      description: "Hapus scheduled task dari EasyCron dan database.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: { type: "string", description: "ID task (UUID dari database)" }
+        },
+        required: ["task_id"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "reset_finance",
+      description: "BAHAYA: Hapus SEMUA data keuangan (expenses + incomes). Gunakan HANYA jika user secara eksplisit dan tegas meminta reset seluruh data keuangan. WAJIB confirm: true.",
+      parameters: {
+        type: "object",
+        properties: {
+          confirm: { type: "boolean", description: "WAJIB true untuk konfirmasi. Tanpa ini, reset tidak akan dijalankan." }
+        },
+        required: ["confirm"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "delete_all_threads",
+      description: "BAHAYA: Hapus SEMUA percakapan dan pesan chat. Gunakan HANYA jika user secara eksplisit dan tegas meminta hapus semua thread. WAJIB confirm: true. TIDAK BISA di-undo.",
+      parameters: {
+        type: "object",
+        properties: {
+          confirm: { type: "boolean", description: "WAJIB true untuk konfirmasi. Tanpa ini, penghapusan tidak akan dijalankan." }
+        },
+        required: ["confirm"]
+      }
+    }
   }
 ];

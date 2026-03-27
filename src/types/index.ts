@@ -137,3 +137,22 @@ export interface QuizWithAttempt extends Quiz {
 }
 
 export type ChatMode = 'flash' | 'search' | 'think' | 'search+think';
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface ScheduledTask {
+  id: string;
+  easycron_id: string | null;
+  name: string;
+  prompt: string;
+  cron_expression: string;
+  status: 'active' | 'paused' | 'completed';
+  created_at: string;
+}

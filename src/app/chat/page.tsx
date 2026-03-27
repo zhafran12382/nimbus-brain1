@@ -14,6 +14,7 @@ import { Menu, LogOut } from "lucide-react";
 import { useModelSelection } from "@/hooks/useModelSelection";
 import { useLockedIn } from "@/components/study/locked-in-context";
 import { useRouter } from "next/navigation";
+import { NotificationBell } from "@/components/notifications/notification-panel";
 
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
 const PERSONALITY_KEY = "nimbus-brain-personality";
@@ -423,6 +424,9 @@ function ChatPageContent() {
 
           {/* Spacer */}
           <div className="min-w-0 flex-1" />
+
+          {/* Notification Bell */}
+          <NotificationBell />
 
           {/* Logout button */}
           <button

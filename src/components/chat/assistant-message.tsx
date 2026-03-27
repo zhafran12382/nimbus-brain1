@@ -118,6 +118,17 @@ function getToolDisplay(name: string, phase: "start" | "result"): { icon: string
     get_quiz_history: { icon: "📚", startText: "Fetching quiz history...", resultText: "History loaded" },
     get_quiz_stats: { icon: "📊", startText: "Analyzing study stats...", resultText: "Stats loaded" },
     run_python: { icon: "terminal", startText: "Running Python code...", resultText: "Code executed" },
+    send_notification: { icon: "🔔", startText: "Sending notification...", resultText: "Notification sent" },
+    create_task: { icon: "📅", startText: "Creating task...", resultText: "Task created" },
+    get_tasks: { icon: "📋", startText: "Fetching tasks...", resultText: "Tasks loaded" },
+    update_task: { icon: "🔄", startText: "Updating task...", resultText: "Task updated" },
+    delete_task: { icon: "🗑️", startText: "Deleting task...", resultText: "Task deleted" },
+    create_scheduled_task: { icon: "📅", startText: "Creating scheduled task...", resultText: "Task scheduled" },
+    get_scheduled_tasks: { icon: "📋", startText: "Fetching tasks...", resultText: "Tasks loaded" },
+    update_scheduled_task: { icon: "🔄", startText: "Updating schedule...", resultText: "Schedule updated" },
+    delete_scheduled_task: { icon: "🗑️", startText: "Deleting task...", resultText: "Task deleted" },
+    reset_finance: { icon: "🗑️", startText: "Resetting finance...", resultText: "Finance reset" },
+    delete_all_threads: { icon: "🗑️", startText: "Deleting threads...", resultText: "Threads deleted" },
   };
   const config = map[name] || { icon: "⚡", startText: `Executing ${name}...`, resultText: `${name} complete` };
   return {
@@ -178,6 +189,34 @@ function getToolPreview(tool: ToolStatus): { emoji: string; title: string; detai
       emoji: "🗑️",
       title: "Deleted",
       detail: tool.result.includes("✅") ? "Success" : tool.result.slice(0, 40),
+    };
+  }
+  if (name === "send_notification") {
+    return {
+      emoji: "🔔",
+      title: tool.args?.title as string || "Notification",
+      detail: tool.args?.type ? `Type: ${tool.args.type}` : "",
+    };
+  }
+  if (name === "create_scheduled_task") {
+    return {
+      emoji: "📅",
+      title: tool.args?.name as string || "Task",
+      detail: tool.args?.cron_expression ? `Cron: ${tool.args.cron_expression}` : "",
+    };
+  }
+  if (name === "reset_finance") {
+    return {
+      emoji: "🗑️",
+      title: "Finance Reset",
+      detail: tool.result.includes("berhasil") ? "Success" : tool.result.slice(0, 40),
+    };
+  }
+  if (name === "delete_all_threads") {
+    return {
+      emoji: "🗑️",
+      title: "Threads Deleted",
+      detail: tool.result.includes("berhasil") ? "Success" : tool.result.slice(0, 40),
     };
   }
   // Memory tools are handled separately (MemoryCard)
