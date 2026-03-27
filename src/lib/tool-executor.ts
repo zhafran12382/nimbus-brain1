@@ -848,24 +848,55 @@ JSON ARRAY ONLY. NO other text before or after.`;
       return `🔔 Notifikasi terkirim: "${args.title}"`;
     }
 
-    case 'create_task': {
-      const scheduleTime = new Date(String(args.schedule_time));
+    case 'create_scheduled_task': {
+      const cronExp = String(args.cron_expression).trim();
+      if (!/^(\S+\s+){4}\S+$/.test(cronExp)) {
+        return '❌ Format cron expression tidak valid. Gunakan 5 field: menit jam tanggal bulan hari. Contoh: "0 7 * * *"';
+      }
+
+      const taskName = String(args.name).trim();
+      const encodedName = encodeURIComponent(taskName);
+      const schedulerUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://nimbus-brain.vercel.app'}/api/scheduler?task=${encodedName}`;
+
+      // Call EasyCron API
+      let easycronId: string | null = null;
+      try {
+        const easycronRes = await fetch('https://www.easycron.com/rest/add', {
+          method: 'POST',
+          headers: {
+            'X-API-Key': process.env.EASYCRON_API_KEY || '',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: schedulerUrl,
+            cron_expression: cronExp,
+          }),
+        });
+        const easycronData = await easycronRes.json();
+        if (easycronData.status === 'success' && easycronData.cron_job_id) {
+          easycronId = String(easycronData.cron_job_id);
+        } else {
+          return `❌ EasyCron error: ${easycronData.error || JSON.stringify(easycronData)}`;
+        }
+      } catch (err) {
+        return `❌ Gagal menghubungi EasyCron: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      }
+
       const { data, error } = await supabase
         .from('scheduled_tasks')
         .insert({
-          name: args.name,
+          easycron_id: easycronId,
+          name: taskName,
           prompt: args.prompt,
-          schedule_time: scheduleTime.toISOString(),
-          repeat: args.repeat || 'none',
-          next_run_at: scheduleTime.toISOString(),
+          cron_expression: cronExp,
         })
         .select()
         .single();
-      if (error) return `Error: ${error.message}`;
-      return `📅 Task "${data.name}" dijadwalkan pada ${scheduleTime.toLocaleString('id-ID')}${data.repeat !== 'none' ? ` (repeat: ${data.repeat})` : ''}`;
+      if (error) return `Error menyimpan ke database: ${error.message}`;
+      return `📅 Task "${data.name}" berhasil dibuat! Cron: ${cronExp} | ID: ${data.id}`;
     }
 
-    case 'get_tasks': {
+    case 'get_scheduled_tasks': {
       let query = supabase.from('scheduled_tasks').select('*').order('created_at', { ascending: false });
       if (args.status && args.status !== 'all') query = query.eq('status', args.status as string);
 
@@ -873,53 +904,93 @@ JSON ARRAY ONLY. NO other text before or after.`;
       if (error) return `Error: ${error.message}`;
       if (!data?.length) return 'Belum ada scheduled tasks.';
 
-      return data.map((t: { name: string; status: string; prompt: string; schedule_time: string; repeat: string; last_run_at: string | null }) => {
-        const schedTime = new Date(t.schedule_time).toLocaleString('id-ID');
-        return `• ${t.name} [${t.status}] — "${t.prompt}" | Jadwal: ${schedTime}${t.repeat !== 'none' ? ` | Repeat: ${t.repeat}` : ''}${t.last_run_at ? ` | Terakhir: ${new Date(t.last_run_at).toLocaleString('id-ID')}` : ''}`;
+      return data.map((t: { id: string; name: string; status: string; prompt: string; cron_expression: string }) => {
+        return `• ${t.name} [${t.status}] — "${t.prompt}" | Cron: ${t.cron_expression} | ID: ${t.id}`;
       }).join('\n');
     }
 
-    case 'update_task': {
-      const { data: tasks } = await supabase
+    case 'update_scheduled_task': {
+      const taskId = String(args.task_id);
+      const newCron = String(args.cron_expression).trim();
+      if (!/^(\S+\s+){4}\S+$/.test(newCron)) {
+        return '❌ Format cron expression tidak valid. Gunakan 5 field: menit jam tanggal bulan hari.';
+      }
+
+      const { data: task, error: findErr } = await supabase
         .from('scheduled_tasks')
         .select('*')
-        .ilike('name', `%${String(args.name)}%`)
-        .limit(1);
+        .eq('id', taskId)
+        .single();
+      if (findErr || !task) return `Task dengan ID "${taskId}" tidak ditemukan.`;
 
-      if (!tasks?.length) return `Task "${args.name}" tidak ditemukan.`;
-
-      const updateData: Record<string, unknown> = {};
-      if (args.new_name) updateData.name = args.new_name;
-      if (args.prompt) updateData.prompt = args.prompt;
-      if (args.schedule_time) {
-        updateData.schedule_time = new Date(String(args.schedule_time)).toISOString();
-        updateData.next_run_at = updateData.schedule_time;
+      // Update EasyCron
+      if (task.easycron_id) {
+        try {
+          const easycronRes = await fetch('https://www.easycron.com/rest/edit', {
+            method: 'POST',
+            headers: {
+              'X-API-Key': process.env.EASYCRON_API_KEY || '',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              cron_job_id: task.easycron_id,
+              cron_expression: newCron,
+            }),
+          });
+          const easycronData = await easycronRes.json();
+          if (easycronData.status !== 'success') {
+            return `❌ EasyCron error: ${easycronData.error || JSON.stringify(easycronData)}`;
+          }
+        } catch (err) {
+          return `❌ Gagal menghubungi EasyCron: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        }
       }
-      if (args.repeat) updateData.repeat = args.repeat;
-      if (args.status) updateData.status = args.status;
 
       const { data, error } = await supabase
         .from('scheduled_tasks')
-        .update(updateData)
-        .eq('id', tasks[0].id)
+        .update({ cron_expression: newCron })
+        .eq('id', taskId)
         .select()
         .single();
       if (error) return `Error: ${error.message}`;
-      return `📅 Task "${data.name}" berhasil diupdate. Status: ${data.status}`;
+      return `📅 Task "${data.name}" berhasil diupdate. Cron baru: ${newCron}`;
     }
 
-    case 'delete_task': {
-      const { data: tasks } = await supabase
+    case 'delete_scheduled_task': {
+      const taskId = String(args.task_id);
+
+      const { data: task, error: findErr } = await supabase
         .from('scheduled_tasks')
         .select('*')
-        .ilike('name', `%${String(args.name)}%`)
-        .limit(1);
+        .eq('id', taskId)
+        .single();
+      if (findErr || !task) return `Task dengan ID "${taskId}" tidak ditemukan.`;
 
-      if (!tasks?.length) return `Task "${args.name}" tidak ditemukan.`;
+      // Delete from EasyCron
+      if (task.easycron_id) {
+        try {
+          const easycronRes = await fetch('https://www.easycron.com/rest/delete', {
+            method: 'POST',
+            headers: {
+              'X-API-Key': process.env.EASYCRON_API_KEY || '',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              cron_job_id: task.easycron_id,
+            }),
+          });
+          const easycronData = await easycronRes.json();
+          if (easycronData.status !== 'success') {
+            console.error('[EASYCRON] Delete failed:', easycronData);
+          }
+        } catch (err) {
+          console.error('[EASYCRON] Delete request failed:', err);
+        }
+      }
 
-      const { error } = await supabase.from('scheduled_tasks').delete().eq('id', tasks[0].id);
+      const { error } = await supabase.from('scheduled_tasks').delete().eq('id', taskId);
       if (error) return `Error: ${error.message}`;
-      return `🗑️ Task "${tasks[0].name}" berhasil dihapus.`;
+      return `🗑️ Task "${task.name}" berhasil dihapus dari EasyCron dan database.`;
     }
 
     case 'reset_finance': {

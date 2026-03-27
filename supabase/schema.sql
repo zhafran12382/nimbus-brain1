@@ -100,16 +100,14 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 10. Scheduled Tasks table
+-- 10. Scheduled Tasks table (EasyCron-based)
 CREATE TABLE IF NOT EXISTS scheduled_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  easycron_id TEXT,
   name TEXT NOT NULL,
   prompt TEXT NOT NULL,
-  schedule_time TIMESTAMPTZ NOT NULL,
-  repeat TEXT NOT NULL DEFAULT 'none' CHECK (repeat IN ('none', 'daily', 'weekly', 'monthly')),
+  cron_expression TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed')),
-  last_run_at TIMESTAMPTZ,
-  next_run_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -135,7 +133,7 @@ CREATE INDEX IF NOT EXISTS idx_quiz_attempts_completed ON quiz_attempts(complete
 CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_status ON scheduled_tasks(status);
-CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_next_run ON scheduled_tasks(next_run_at);
+CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_easycron ON scheduled_tasks(easycron_id);
 
 -- ========================================
 -- RLS Policies (allow all for simplicity)

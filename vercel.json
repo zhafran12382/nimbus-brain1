@@ -4,11 +4,5 @@
     "src/app/api/**/*.ts": {
       "maxDuration": 180
     }
-  },
-  "crons": [
-    {
-      "path": "/api/tasks/run",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  }
 }

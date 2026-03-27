@@ -149,12 +149,10 @@ export interface Notification {
 
 export interface ScheduledTask {
   id: string;
+  easycron_id: string | null;
   name: string;
   prompt: string;
-  schedule_time: string;
-  repeat: 'none' | 'daily' | 'weekly' | 'monthly';
+  cron_expression: string;
   status: 'active' | 'paused' | 'completed';
-  last_run_at: string | null;
-  next_run_at: string | null;
   created_at: string;
 }

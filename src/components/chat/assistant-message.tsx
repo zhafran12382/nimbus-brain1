@@ -123,6 +123,10 @@ function getToolDisplay(name: string, phase: "start" | "result"): { icon: string
     get_tasks: { icon: "📋", startText: "Fetching tasks...", resultText: "Tasks loaded" },
     update_task: { icon: "🔄", startText: "Updating task...", resultText: "Task updated" },
     delete_task: { icon: "🗑️", startText: "Deleting task...", resultText: "Task deleted" },
+    create_scheduled_task: { icon: "📅", startText: "Creating scheduled task...", resultText: "Task scheduled" },
+    get_scheduled_tasks: { icon: "📋", startText: "Fetching tasks...", resultText: "Tasks loaded" },
+    update_scheduled_task: { icon: "🔄", startText: "Updating schedule...", resultText: "Schedule updated" },
+    delete_scheduled_task: { icon: "🗑️", startText: "Deleting task...", resultText: "Task deleted" },
     reset_finance: { icon: "🗑️", startText: "Resetting finance...", resultText: "Finance reset" },
     delete_all_threads: { icon: "🗑️", startText: "Deleting threads...", resultText: "Threads deleted" },
   };
@@ -194,11 +198,11 @@ function getToolPreview(tool: ToolStatus): { emoji: string; title: string; detai
       detail: tool.args?.type ? `Type: ${tool.args.type}` : "",
     };
   }
-  if (name === "create_task") {
+  if (name === "create_scheduled_task") {
     return {
       emoji: "📅",
       title: tool.args?.name as string || "Task",
-      detail: tool.args?.schedule_time ? `Jadwal: ${new Date(tool.args.schedule_time as string).toLocaleString("id-ID")}` : "",
+      detail: tool.args?.cron_expression ? `Cron: ${tool.args.cron_expression}` : "",
     };
   }
   if (name === "reset_finance") {

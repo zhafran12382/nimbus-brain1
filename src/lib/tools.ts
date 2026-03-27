@@ -398,28 +398,23 @@ export const tools = [
   {
     type: "function" as const,
     function: {
-      name: "create_task",
-      description: "Buat jadwal task baru. Gunakan saat user ingin menjadwalkan prompt/aksi untuk dijalankan di waktu tertentu.",
+      name: "create_scheduled_task",
+      description: "Buat scheduled task baru menggunakan EasyCron. Konversi jadwal user ke format cron expression. Contoh: harian jam 7 pagi = '0 7 * * *', setiap Senin jam 9 = '0 9 * * 1'.",
       parameters: {
         type: "object",
         properties: {
-          name: { type: "string", description: "Nama task" },
+          name: { type: "string", description: "Nama task (unik, untuk identifikasi)" },
           prompt: { type: "string", description: "Prompt/perintah yang akan dieksekusi saat waktunya tiba" },
-          schedule_time: { type: "string", description: "Waktu jadwal format ISO 8601 (YYYY-MM-DDTHH:mm:ssZ)" },
-          repeat: {
-            type: "string",
-            enum: ["none", "daily", "weekly", "monthly"],
-            description: "Pengulangan. Default: none"
-          }
+          cron_expression: { type: "string", description: "Cron expression (5 field: menit jam tanggal bulan hari). Contoh: '0 7 * * *' = setiap hari jam 7:00, '*/30 * * * *' = setiap 30 menit" }
         },
-        required: ["name", "prompt", "schedule_time"]
+        required: ["name", "prompt", "cron_expression"]
       }
     }
   },
   {
     type: "function" as const,
     function: {
-      name: "get_tasks",
+      name: "get_scheduled_tasks",
       description: "Ambil daftar scheduled tasks.",
       parameters: {
         type: "object",
@@ -436,33 +431,29 @@ export const tools = [
   {
     type: "function" as const,
     function: {
-      name: "update_task",
-      description: "Update scheduled task yang sudah ada.",
+      name: "update_scheduled_task",
+      description: "Update jadwal scheduled task yang sudah ada di EasyCron.",
       parameters: {
         type: "object",
         properties: {
-          name: { type: "string", description: "Nama task (partial match)" },
-          new_name: { type: "string", description: "Nama baru (opsional)" },
-          prompt: { type: "string", description: "Prompt baru (opsional)" },
-          schedule_time: { type: "string", description: "Waktu jadwal baru (opsional)" },
-          repeat: { type: "string", enum: ["none", "daily", "weekly", "monthly"], description: "Pengulangan baru (opsional)" },
-          status: { type: "string", enum: ["active", "paused", "completed"], description: "Status baru (opsional)" }
+          task_id: { type: "string", description: "ID task (UUID dari database)" },
+          cron_expression: { type: "string", description: "Cron expression baru (5 field: menit jam tanggal bulan hari)" }
         },
-        required: ["name"]
+        required: ["task_id", "cron_expression"]
       }
     }
   },
   {
     type: "function" as const,
     function: {
-      name: "delete_task",
-      description: "Hapus scheduled task.",
+      name: "delete_scheduled_task",
+      description: "Hapus scheduled task dari EasyCron dan database.",
       parameters: {
         type: "object",
         properties: {
-          name: { type: "string", description: "Nama task yang dihapus (partial match)" }
+          task_id: { type: "string", description: "ID task (UUID dari database)" }
         },
-        required: ["name"]
+        required: ["task_id"]
       }
     }
   },

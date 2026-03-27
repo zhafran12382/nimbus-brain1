@@ -49,6 +49,10 @@ const toolLabels: Record<string, string> = {
   get_tasks: "📋 Fetching tasks...",
   update_task: "🔄 Updating task...",
   delete_task: "🗑️ Deleting task...",
+  create_scheduled_task: "📅 Creating scheduled task...",
+  get_scheduled_tasks: "📋 Fetching tasks...",
+  update_scheduled_task: "🔄 Updating task schedule...",
+  delete_scheduled_task: "🗑️ Deleting scheduled task...",
   reset_finance: "🗑️ Resetting finance data...",
   delete_all_threads: "🗑️ Deleting all threads...",
 };
