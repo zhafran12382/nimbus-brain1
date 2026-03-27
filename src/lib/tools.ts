@@ -374,5 +374,124 @@ export const tools = [
         properties: {}
       }
     }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "send_notification",
+      description: "Kirim notifikasi ke user. Gunakan untuk menginformasikan sesuatu yang penting, konfirmasi aksi, atau peringatan.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Judul notifikasi (singkat)" },
+          message: { type: "string", description: "Isi pesan notifikasi" },
+          type: {
+            type: "string",
+            enum: ["info", "success", "warning", "error"],
+            description: "Tipe notifikasi. Default: info"
+          }
+        },
+        required: ["title", "message"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_task",
+      description: "Buat jadwal task baru. Gunakan saat user ingin menjadwalkan prompt/aksi untuk dijalankan di waktu tertentu.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Nama task" },
+          prompt: { type: "string", description: "Prompt/perintah yang akan dieksekusi saat waktunya tiba" },
+          schedule_time: { type: "string", description: "Waktu jadwal format ISO 8601 (YYYY-MM-DDTHH:mm:ssZ)" },
+          repeat: {
+            type: "string",
+            enum: ["none", "daily", "weekly", "monthly"],
+            description: "Pengulangan. Default: none"
+          }
+        },
+        required: ["name", "prompt", "schedule_time"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_tasks",
+      description: "Ambil daftar scheduled tasks.",
+      parameters: {
+        type: "object",
+        properties: {
+          status: {
+            type: "string",
+            enum: ["active", "paused", "completed", "all"],
+            description: "Filter status. Default: all"
+          }
+        }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "update_task",
+      description: "Update scheduled task yang sudah ada.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Nama task (partial match)" },
+          new_name: { type: "string", description: "Nama baru (opsional)" },
+          prompt: { type: "string", description: "Prompt baru (opsional)" },
+          schedule_time: { type: "string", description: "Waktu jadwal baru (opsional)" },
+          repeat: { type: "string", enum: ["none", "daily", "weekly", "monthly"], description: "Pengulangan baru (opsional)" },
+          status: { type: "string", enum: ["active", "paused", "completed"], description: "Status baru (opsional)" }
+        },
+        required: ["name"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "delete_task",
+      description: "Hapus scheduled task.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Nama task yang dihapus (partial match)" }
+        },
+        required: ["name"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "reset_finance",
+      description: "BAHAYA: Hapus SEMUA data keuangan (expenses + incomes). Gunakan HANYA jika user secara eksplisit dan tegas meminta reset seluruh data keuangan. WAJIB confirm: true.",
+      parameters: {
+        type: "object",
+        properties: {
+          confirm: { type: "boolean", description: "WAJIB true untuk konfirmasi. Tanpa ini, reset tidak akan dijalankan." }
+        },
+        required: ["confirm"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "delete_all_threads",
+      description: "BAHAYA: Hapus SEMUA percakapan dan pesan chat. Gunakan HANYA jika user secara eksplisit dan tegas meminta hapus semua thread. WAJIB confirm: true. TIDAK BISA di-undo.",
+      parameters: {
+        type: "object",
+        properties: {
+          confirm: { type: "boolean", description: "WAJIB true untuk konfirmasi. Tanpa ini, penghapusan tidak akan dijalankan." }
+        },
+        required: ["confirm"]
+      }
+    }
   }
 ];

@@ -137,3 +137,24 @@ export interface QuizWithAttempt extends Quiz {
 }
 
 export type ChatMode = 'flash' | 'search' | 'think' | 'search+think';
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface ScheduledTask {
+  id: string;
+  name: string;
+  prompt: string;
+  schedule_time: string;
+  repeat: 'none' | 'daily' | 'weekly' | 'monthly';
+  status: 'active' | 'paused' | 'completed';
+  last_run_at: string | null;
+  next_run_at: string | null;
+  created_at: string;
+}

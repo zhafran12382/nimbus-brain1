@@ -60,6 +60,10 @@ function getPeriodDateRange(period: string): { startDate: string | null; endDate
   return { startDate, endDate, periodLabel };
 }
 
+async function insertNotification(title: string, message: string, type: string = 'info'): Promise<void> {
+  await supabase.from('notifications').insert({ title, message, type });
+}
+
 export async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
   switch (name) {
     case 'create_target': {
@@ -830,6 +834,137 @@ JSON ARRAY ONLY. NO other text before or after.`;
       }
 
       return output.trim();
+    }
+
+    case 'send_notification': {
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          title: args.title,
+          message: args.message,
+          type: args.type || 'info',
+        });
+      if (error) return `Error: ${error.message}`;
+      return `🔔 Notifikasi terkirim: "${args.title}"`;
+    }
+
+    case 'create_task': {
+      const scheduleTime = new Date(String(args.schedule_time));
+      const { data, error } = await supabase
+        .from('scheduled_tasks')
+        .insert({
+          name: args.name,
+          prompt: args.prompt,
+          schedule_time: scheduleTime.toISOString(),
+          repeat: args.repeat || 'none',
+          next_run_at: scheduleTime.toISOString(),
+        })
+        .select()
+        .single();
+      if (error) return `Error: ${error.message}`;
+      return `📅 Task "${data.name}" dijadwalkan pada ${scheduleTime.toLocaleString('id-ID')}${data.repeat !== 'none' ? ` (repeat: ${data.repeat})` : ''}`;
+    }
+
+    case 'get_tasks': {
+      let query = supabase.from('scheduled_tasks').select('*').order('created_at', { ascending: false });
+      if (args.status && args.status !== 'all') query = query.eq('status', args.status as string);
+
+      const { data, error } = await query;
+      if (error) return `Error: ${error.message}`;
+      if (!data?.length) return 'Belum ada scheduled tasks.';
+
+      return data.map((t: { name: string; status: string; prompt: string; schedule_time: string; repeat: string; last_run_at: string | null }) => {
+        const schedTime = new Date(t.schedule_time).toLocaleString('id-ID');
+        return `• ${t.name} [${t.status}] — "${t.prompt}" | Jadwal: ${schedTime}${t.repeat !== 'none' ? ` | Repeat: ${t.repeat}` : ''}${t.last_run_at ? ` | Terakhir: ${new Date(t.last_run_at).toLocaleString('id-ID')}` : ''}`;
+      }).join('\n');
+    }
+
+    case 'update_task': {
+      const { data: tasks } = await supabase
+        .from('scheduled_tasks')
+        .select('*')
+        .ilike('name', `%${String(args.name)}%`)
+        .limit(1);
+
+      if (!tasks?.length) return `Task "${args.name}" tidak ditemukan.`;
+
+      const updateData: Record<string, unknown> = {};
+      if (args.new_name) updateData.name = args.new_name;
+      if (args.prompt) updateData.prompt = args.prompt;
+      if (args.schedule_time) {
+        updateData.schedule_time = new Date(String(args.schedule_time)).toISOString();
+        updateData.next_run_at = updateData.schedule_time;
+      }
+      if (args.repeat) updateData.repeat = args.repeat;
+      if (args.status) updateData.status = args.status;
+
+      const { data, error } = await supabase
+        .from('scheduled_tasks')
+        .update(updateData)
+        .eq('id', tasks[0].id)
+        .select()
+        .single();
+      if (error) return `Error: ${error.message}`;
+      return `📅 Task "${data.name}" berhasil diupdate. Status: ${data.status}`;
+    }
+
+    case 'delete_task': {
+      const { data: tasks } = await supabase
+        .from('scheduled_tasks')
+        .select('*')
+        .ilike('name', `%${String(args.name)}%`)
+        .limit(1);
+
+      if (!tasks?.length) return `Task "${args.name}" tidak ditemukan.`;
+
+      const { error } = await supabase.from('scheduled_tasks').delete().eq('id', tasks[0].id);
+      if (error) return `Error: ${error.message}`;
+      return `🗑️ Task "${tasks[0].name}" berhasil dihapus.`;
+    }
+
+    case 'reset_finance': {
+      if (args.confirm !== true) {
+        return '⚠️ Reset keuangan membutuhkan konfirmasi. Kirim dengan confirm: true untuk melanjutkan.';
+      }
+
+      const { data: expData } = await supabase.from('expenses').select('id');
+      const { data: incData } = await supabase.from('incomes').select('id');
+      const expCount = expData?.length || 0;
+      const incCount = incData?.length || 0;
+
+      const { error: expError } = await supabase.from('expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (expError) return `Error menghapus expenses: ${expError.message}`;
+
+      const { error: incError } = await supabase.from('incomes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (incError) return `Error menghapus incomes: ${incError.message}`;
+
+      await insertNotification(
+        'Data Keuangan Direset',
+        `${expCount} pengeluaran dan ${incCount} pemasukan telah dihapus.`,
+        'warning'
+      );
+
+      return `🗑️ Data keuangan berhasil direset. ${expCount} pengeluaran dan ${incCount} pemasukan dihapus.`;
+    }
+
+    case 'delete_all_threads': {
+      if (args.confirm !== true) {
+        return '⚠️ Hapus semua thread membutuhkan konfirmasi. Kirim dengan confirm: true untuk melanjutkan.';
+      }
+
+      const { data: convData } = await supabase.from('conversations').select('id');
+      const convCount = convData?.length || 0;
+
+      const { error } = await supabase.from('conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error) return `Error: ${error.message}`;
+
+      await insertNotification(
+        'Semua Thread Dihapus',
+        `${convCount} percakapan beserta semua pesannya telah dihapus.`,
+        'warning'
+      );
+
+      return `🗑️ ${convCount} percakapan beserta semua pesan berhasil dihapus.`;
     }
 
     default:

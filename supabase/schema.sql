@@ -90,6 +90,29 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 9. Notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'info' CHECK (type IN ('info', 'success', 'warning', 'error')),
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 10. Scheduled Tasks table
+CREATE TABLE IF NOT EXISTS scheduled_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  schedule_time TIMESTAMPTZ NOT NULL,
+  repeat TEXT NOT NULL DEFAULT 'none' CHECK (repeat IN ('none', 'daily', 'weekly', 'monthly')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed')),
+  last_run_at TIMESTAMPTZ,
+  next_run_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ========================================
 -- Indexes
 -- ========================================
@@ -109,6 +132,10 @@ CREATE INDEX IF NOT EXISTS idx_quizzes_topic ON quizzes(topic);
 CREATE INDEX IF NOT EXISTS idx_quizzes_created ON quizzes(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz ON quiz_attempts(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_completed ON quiz_attempts(completed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_status ON scheduled_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_next_run ON scheduled_tasks(next_run_at);
 
 -- ========================================
 -- RLS Policies (allow all for simplicity)
@@ -122,6 +149,8 @@ DO $$ BEGIN
   ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
   ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
   ALTER TABLE quiz_attempts ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE scheduled_tasks ENABLE ROW LEVEL SECURITY;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
@@ -162,6 +191,16 @@ END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Allow all on quiz_attempts" ON quiz_attempts FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow all on notifications" ON notifications FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow all on scheduled_tasks" ON scheduled_tasks FOR ALL USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

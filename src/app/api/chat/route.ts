@@ -44,6 +44,13 @@ const toolLabels: Record<string, string> = {
   get_quiz_history: "📚 Fetching quiz history...",
   get_quiz_stats: "📊 Analyzing study stats...",
   run_python: "⏳ Running Python code...",
+  send_notification: "🔔 Sending notification...",
+  create_task: "📅 Creating scheduled task...",
+  get_tasks: "📋 Fetching tasks...",
+  update_task: "🔄 Updating task...",
+  delete_task: "🗑️ Deleting task...",
+  reset_finance: "🗑️ Resetting finance data...",
+  delete_all_threads: "🗑️ Deleting all threads...",
 };
 
 interface CitationSourceEntry {
