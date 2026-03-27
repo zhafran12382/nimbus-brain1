@@ -19,6 +19,7 @@ import { NotificationBell } from "@/components/notifications/notification-panel"
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
 const PERSONALITY_KEY = "nimbus-brain-personality";
 const MODE_KEY = "nimbus-brain-chat-mode";
+const AGENT_SETTINGS_KEY = "nimbus-brain-agent-settings";
 
 function getStoredConvId(): string | null {
   if (typeof window === "undefined") return null;
@@ -32,6 +33,16 @@ function getPersonality(): PersonalitySettings | null {
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
+  }
+}
+
+function getAgentSettings(): { maxThinkTokens?: number; searchSourceLimit?: number } | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = localStorage.getItem(AGENT_SETTINGS_KEY);
+    return raw ? JSON.parse(raw) : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -232,6 +243,7 @@ function ChatPageContent() {
       let returnedConvId = conversationId;
 
       const personality = getPersonality();
+      const agentSettings = getAgentSettings();
 
       await sendChatStream(
         chatHistory,
@@ -311,6 +323,7 @@ function ChatPageContent() {
                       ...prev,
                       thinkingContent: event.thinking_content ?? prev.thinkingContent,
                       thinkingDurationMs: event.thinking_duration_ms ?? prev.thinkingDurationMs,
+                      usage: event.usage ?? prev.usage,
                     }
                   : null
               );
@@ -340,6 +353,7 @@ function ChatPageContent() {
         controller.signal,
         chatMode,
         providerId,
+        agentSettings,
       );
 
       if (controller.signal.aborted) return;

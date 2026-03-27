@@ -64,7 +64,7 @@ async function insertNotification(title: string, message: string, type: string =
   await supabase.from('notifications').insert({ title, message, type });
 }
 
-export async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
+export async function executeTool(name: string, args: Record<string, unknown>, options?: { searchSourceLimit?: number }): Promise<string> {
   switch (name) {
     case 'create_target': {
       const { data, error } = await supabase
@@ -177,7 +177,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
           body: JSON.stringify({
             api_key: apiKey,
             query,
-            max_results: 20,
+            max_results: options?.searchSourceLimit || 20,
             search_depth: 'advanced',
             include_answer: true,
           }),
@@ -219,7 +219,7 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
           body: JSON.stringify({
             api_key: apiKey,
             query,
-            max_results: 20,
+            max_results: options?.searchSourceLimit || 20,
             search_depth: 'advanced',
             include_answer: false,
           }),

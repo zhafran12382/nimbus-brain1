@@ -689,7 +689,7 @@ async function callProviderStream(
 }
 
 export async function POST(req: NextRequest) {
-  const { messages, model: modelId = DEFAULT_MODEL_ID, personality, conversationId: incomingConvId, mode = 'flash', provider: incomingProvider } = await req.json();
+  const { messages, model: modelId = DEFAULT_MODEL_ID, personality, conversationId: incomingConvId, mode = 'flash', provider: incomingProvider, maxThinkTokens, searchSourceLimit } = await req.json();
   const signal = req.signal;
 
   // === PROVIDER RESOLUTION: prefer frontend provider, validate match ===
@@ -769,7 +769,9 @@ export async function POST(req: NextRequest) {
   const hasSearch = mode === 'search' || mode === 'search+think';
   const isThinkMode = mode === 'think' || mode === 'search+think';
   const isFlash = mode === 'flash';
-  const maxTokens = maxTokensMap[mode as keyof typeof maxTokensMap] || 16000;
+  const baseMaxTokens = maxTokensMap[mode as keyof typeof maxTokensMap] || 16000;
+  const maxTokens = isThinkMode && maxThinkTokens ? Math.min(Math.max(Number(maxThinkTokens), 1000), 32000) : baseMaxTokens;
+  const effectiveSearchLimit = searchSourceLimit ? Math.min(Math.max(Number(searchSourceLimit), 1), 20) : 5;
   const memoriesContext = await fetchMemoriesContext();
   let systemInstruction = buildSystemInstruction(personality) + getModeInstruction(mode) + memoriesContext;
   
@@ -803,8 +805,16 @@ export async function POST(req: NextRequest) {
         let thinkingContent = "";
         send({ type: "status", text: "Thinking..." });
 
+        // Token usage tracking
+        let totalPromptTokens = 0;
+        let totalCompletionTokens = 0;
+
         log('API CALL', `provider=${providerId}, Sending ${apiMessages.length} messages, useTools=${useTools}`);
         const data = await callProvider(providerId, modelId, apiMessages, useTools, maxTokens, targetTemperature, signal, sendRateLimit, (text) => send({ type: "status", text }));
+        if (data.usage) {
+          totalPromptTokens += data.usage.prompt_tokens || 0;
+          totalCompletionTokens += data.usage.completion_tokens || 0;
+        }
         let assistantMsg = data.choices[0].message;
         log('API RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
 
@@ -846,6 +856,10 @@ export async function POST(req: NextRequest) {
 
                 log('API CALL', `Continuation check with ${toolCallMessages.length} messages`);
                 const checkData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, targetTemperature, signal, sendRateLimit, (text) => send({ type: "status", text }));
+                if (checkData.usage) {
+                  totalPromptTokens += checkData.usage.prompt_tokens || 0;
+                  totalCompletionTokens += checkData.usage.completion_tokens || 0;
+                }
                 assistantMsg = checkData.choices[0].message;
 
                 log('TOOL LOOP', `Continuation check result: ${assistantMsg.tool_calls ? 'More tools needed' : 'All done'}`);
@@ -893,7 +907,7 @@ export async function POST(req: NextRequest) {
               });
 
               try {
-                const result = await executeTool(fnName, fnArgs);
+                const result = await executeTool(fnName, fnArgs, { searchSourceLimit: effectiveSearchLimit });
                 log('TOOL EXEC', `${fnName} result:`, result.substring(0, 200));
                 log('TOOL STATE', `${fnName} success=true, resultLength=${result.length}`);
 
@@ -931,6 +945,10 @@ export async function POST(req: NextRequest) {
 
             try {
               const nextData = await callProvider(providerId, modelId, toolCallMessages, useTools, maxTokens, targetTemperature, signal, sendRateLimit, (text) => send({ type: "status", text }));
+              if (nextData.usage) {
+                totalPromptTokens += nextData.usage.prompt_tokens || 0;
+                totalCompletionTokens += nextData.usage.completion_tokens || 0;
+              }
               assistantMsg = nextData.choices[0].message;
               log('API RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
             } catch (apiErr) {
@@ -965,7 +983,7 @@ export async function POST(req: NextRequest) {
                     args: fnArgs,
                     text: toolLabels[fnName] || `🔧 Executing ${fnName}...`,
                   });
-                  const result = await executeTool(fnName, fnArgs);
+                  const result = await executeTool(fnName, fnArgs, { searchSourceLimit: effectiveSearchLimit });
                   parsedActions.push({ name: fnName, args: fnArgs, result });
                   send({ type: "tool_result", name: fnName, result });
                   
@@ -1214,6 +1232,7 @@ export async function POST(req: NextRequest) {
           thinking_content: isThinkMode ? (thinkingContent || undefined) : undefined,
           thinking_duration_ms: isThinkMode ? (Date.now() - thinkingStartAt) : undefined,
           conversationId: conversationId || undefined,
+          usage: { prompt_tokens: totalPromptTokens, completion_tokens: totalCompletionTokens },
         });
 
         // --- STEP 7: Auto-extract memories (background, non-blocking) ---

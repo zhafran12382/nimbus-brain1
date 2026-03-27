@@ -33,6 +33,7 @@ export interface AssistantMessageState {
   completedAt?: string;
   thinkingContent?: string;
   thinkingDurationMs?: number;
+  usage?: { prompt_tokens: number; completion_tokens: number };
 }
 
 interface AssistantMessageProps {
@@ -356,7 +357,7 @@ function PythonCard({ py }: { py: { code: string; output?: string; error?: strin
 }
 
 export function AssistantMessage({ state }: AssistantMessageProps) {
-  const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs, thinkingContent: apiThinkingContent } = state;
+  const { phase, toolStatus, toolHistory, content, modelUsed, completedAt, thinkingDurationMs, thinkingContent: apiThinkingContent, usage } = state;
   const [showMetadata, setShowMetadata] = useState(false);
   const [pipelineExpanded, setPipelineExpanded] = useState(true);
   const [warmupLabel] = useState(() => getRandomWarmup());
@@ -610,8 +611,20 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
               transition={{ duration: 0.3 }}
               className="mt-4 pt-4 border-t border-[hsl(0_0%_100%_/_0.06)] flex flex-col gap-3"
             >
-              <div className="text-[12px] font-medium text-[hsl(0_0%_60%)]">
-                Prepared using {modelUsed}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[hsl(0_0%_50%)]">
+                {completedAt && (
+                  <span className="text-[hsl(0_0%_40%)]">{new Date(completedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
+                )}
+                <span className="font-medium text-[hsl(0_0%_60%)]">{modelUsed}</span>
+                {usage && (usage.prompt_tokens > 0 || usage.completion_tokens > 0) && (
+                  <>
+                    <span title="Input tokens">↑ {usage.prompt_tokens.toLocaleString()}</span>
+                    <span title="Output tokens">↓ {usage.completion_tokens.toLocaleString()}</span>
+                  </>
+                )}
+                {uniqueSources.length > 0 && (
+                  <span className="text-blue-400">{uniqueSources.length} sources</span>
+                )}
               </div>
               <div className="flex items-center gap-3 text-[hsl(0_0%_50%)]">
                 <button className="hover:text-[hsl(0_0%_80%)] transition-colors">

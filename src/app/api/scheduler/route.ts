@@ -33,19 +33,26 @@ export async function GET(request: NextRequest) {
 
   log('SCHEDULER', `Executing task: "${task.name}" — prompt: "${task.prompt}"`);
 
-  // Send notification about the executed task
-  await supabase.from('notifications').insert({
+  // Create notification linked to task_id
+  const { error: notifError } = await supabase.from('notifications').insert({
     title: `⏰ Task: ${task.name}`,
     message: task.prompt,
     type: 'info',
+    task_id: task.id,
   });
 
-  log('SCHEDULER', `Task "${task.name}" executed, notification sent.`);
+  if (notifError) {
+    log('SCHEDULER', `Failed to create notification: ${notifError.message}`);
+  } else {
+    log('SCHEDULER', `Notification created for task "${task.name}" (task_id: ${task.id})`);
+  }
 
   return NextResponse.json({
     status: 'ok',
     task: task.name,
+    task_id: task.id,
     prompt: task.prompt,
+    notification_created: !notifError,
     executed_at: new Date().toISOString(),
   });
 }

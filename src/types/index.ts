@@ -144,6 +144,7 @@ export interface Notification {
   message: string;
   type: 'info' | 'success' | 'warning' | 'error';
   is_read: boolean;
+  task_id: string | null;
   created_at: string;
 }
 

@@ -15,6 +15,7 @@ export interface StreamEvent {
   rate_limit?: GroqRateLimit;
   thinking_content?: string;
   thinking_duration_ms?: number;
+  usage?: { prompt_tokens: number; completion_tokens: number };
 }
 
 export async function sendChatStream(
@@ -26,6 +27,7 @@ export async function sendChatStream(
   signal?: AbortSignal,
   mode?: string,
   provider?: string,
+  agentSettings?: { maxThinkTokens?: number; searchSourceLimit?: number },
 ): Promise<void> {
   const body: Record<string, unknown> = { messages, model };
   if (personality) body.personality = personality;
@@ -34,6 +36,10 @@ export async function sendChatStream(
   // Provider MUST always be sent — prevents backend from guessing via getModelById()
   // which can return wrong provider for duplicate model IDs
   body.provider = provider;
+  if (agentSettings) {
+    if (agentSettings.maxThinkTokens) body.maxThinkTokens = agentSettings.maxThinkTokens;
+    if (agentSettings.searchSourceLimit) body.searchSourceLimit = agentSettings.searchSourceLimit;
+  }
 
   const response = await fetch('/api/chat', {
     method: 'POST',
