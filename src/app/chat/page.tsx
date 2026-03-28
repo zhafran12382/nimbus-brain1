@@ -226,6 +226,8 @@ function ChatPageContent() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
+    let returnedConvId = conversationId;
+
     try {
       const chatHistory = newMessages.map((m) => ({
         role: m.role,
@@ -240,7 +242,6 @@ function ChatPageContent() {
       }[] = [];
       let finalModelUsed = "";
       let finalProviderUsed = providerId;
-      let returnedConvId = conversationId;
       let finalUsage: { prompt_tokens: number; completion_tokens: number } | undefined;
 
       const personality = getPersonality();
