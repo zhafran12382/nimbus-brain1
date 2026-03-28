@@ -873,7 +873,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
       if (error) return `Error menyimpan ke database: ${error.message}`;
 
       // 2. Call EasyCron API with x-www-form-urlencoded
-      const schedulerUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://nimbus-brain.vercel.app'}/api/scheduler?task=${encodeURIComponent(taskName)}`;
+      const schedulerUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://nimbus-brain.vercel.app'}/api/scheduler?id=${data.id}`;
       try {
         const body = new URLSearchParams();
         body.append('token', process.env.EASYCRON_API_KEY || '');

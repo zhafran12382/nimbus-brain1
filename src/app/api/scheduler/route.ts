@@ -119,25 +119,28 @@ function fallbackNotification(taskName: string, prompt: string): NotificationCon
 }
 
 export async function GET(request: NextRequest) {
+  // Support lookup by ID (new) or by name (legacy fallback)
+  const taskId = request.nextUrl.searchParams.get('id');
   const taskName = request.nextUrl.searchParams.get('task');
 
-  if (!taskName) {
-    return NextResponse.json({ error: 'Missing task parameter' }, { status: 400 });
+  if (!taskId && !taskName) {
+    return NextResponse.json({ error: 'Missing id or task parameter' }, { status: 400 });
   }
 
-  log('SCHEDULER', `Received trigger for task: "${taskName}"`);
+  log('SCHEDULER', `Received trigger — id: "${taskId}", name: "${taskName}"`);
 
   // Find matching task in database
-  const { data: task, error } = await supabase
-    .from('scheduled_tasks')
-    .select('*')
-    .eq('name', taskName)
-    .eq('status', 'active')
-    .single();
+  let query = supabase.from('scheduled_tasks').select('*').eq('status', 'active');
+  if (taskId) {
+    query = query.eq('id', taskId);
+  } else {
+    query = query.eq('name', taskName!);
+  }
+  const { data: task, error } = await query.single();
 
   if (error || !task) {
-    log('SCHEDULER', `Task not found or inactive: "${taskName}"`);
-    return NextResponse.json({ error: `Task "${taskName}" not found or inactive` }, { status: 404 });
+    log('SCHEDULER', `Task not found or inactive — id: "${taskId}", name: "${taskName}"`);
+    return NextResponse.json({ error: `Task not found or inactive` }, { status: 404 });
   }
 
   log('SCHEDULER', `Executing task: "${task.name}" — prompt: "${task.prompt}" — run_once: ${task.run_once}`);
