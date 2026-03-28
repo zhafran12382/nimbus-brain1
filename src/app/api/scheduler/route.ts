@@ -129,8 +129,8 @@ export async function GET(request: NextRequest) {
 
   log('SCHEDULER', `Received trigger — id: "${taskId}", name: "${taskName}"`);
 
-  // Find matching task in database
-  let query = supabase.from('scheduled_tasks').select('*').eq('status', 'active');
+  // Find matching task in database (no status filter — task may be pending/scheduled/active)
+  let query = supabase.from('scheduled_tasks').select('*');
   if (taskId) {
     query = query.eq('id', taskId);
   } else {
@@ -139,11 +139,16 @@ export async function GET(request: NextRequest) {
   const { data: task, error } = await query.single();
 
   if (error || !task) {
-    log('SCHEDULER', `Task not found or inactive — id: "${taskId}", name: "${taskName}"`);
-    return NextResponse.json({ error: `Task not found or inactive` }, { status: 404 });
+    log('SCHEDULER', `Task not found — id: "${taskId}", name: "${taskName}"`);
+    return NextResponse.json({ error: `Task not found` }, { status: 404 });
   }
 
-  log('SCHEDULER', `Executing task: "${task.name}" — prompt: "${task.prompt}" — run_once: ${task.run_once}`);
+  if (task.status === 'completed') {
+    log('SCHEDULER', `Task already completed — "${task.name}" (${task.id}), skipping`);
+    return NextResponse.json({ status: 'skipped', reason: 'already completed', task: task.name, task_id: task.id });
+  }
+
+  log('SCHEDULER', `Executing task: "${task.name}" — status: ${task.status} — prompt: "${task.prompt}" — run_once: ${task.run_once}`);
 
   // --- Generate notification content via AI ---
   const taskModelId: string = task.model_used || DEFAULT_MODEL_ID;
