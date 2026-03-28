@@ -1251,6 +1251,7 @@ export async function POST(req: NextRequest) {
         send({
           type: "error",
           message,
+          conversationId: conversationId || undefined,
         });
       }
 

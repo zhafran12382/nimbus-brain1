@@ -347,6 +347,9 @@ function ChatPageContent() {
               break;
 
             case "error":
+              if (event.conversationId) {
+                returnedConvId = event.conversationId;
+              }
               throw new Error(event.message);
           }
         },
@@ -400,6 +403,12 @@ function ChatPageContent() {
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
+
+      // Preserve conversationId even on error so history isn't lost
+      if (returnedConvId && returnedConvId !== activeConversationId) {
+        setActiveConversationId(returnedConvId);
+        setRefreshKey((k) => k + 1);
+      }
     } finally {
       setIsLoading(false);
       setStreamingState(null);
