@@ -58,16 +58,16 @@ function NotificationDetail({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center"
       style={{ backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", background: "rgba(0,0,0,0.5)" }}
     >
       <motion.div
         ref={detailRef}
-        initial={{ opacity: 0, scale: 0.92, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.92, y: 12 }}
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className="w-full max-w-sm rounded-2xl border border-[hsl(0_0%_100%_/_0.08)] bg-[hsl(0_0%_8%)] shadow-2xl overflow-hidden"
+        className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-[hsl(0_0%_100%_/_0.08)] border-b-0 sm:border-b bg-[hsl(0_0%_8%)] shadow-2xl overflow-hidden max-h-[85dvh] overflow-y-auto sm:m-4"
       >
         {/* Close button */}
         <div className="flex justify-end px-4 pt-3">
@@ -80,7 +80,7 @@ function NotificationDetail({
         </div>
 
         {/* Content */}
-        <div className="px-5 pb-5 space-y-3">
+        <div className="px-5 pb-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] space-y-3">
           {/* Icon + label */}
           <div className="flex items-center gap-3">
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${config.bg}`}>
