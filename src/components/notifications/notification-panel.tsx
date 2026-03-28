@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Info, AlertTriangle, XCircle, CheckCircle, X, Check, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -331,17 +332,21 @@ export function NotificationBell() {
         </AnimatePresence>
       </div>
 
-      {/* Floating detail popup — rendered outside the dropdown */}
-      <AnimatePresence>
-        {selectedNotification && (
-          <NotificationDetail
-            notification={selectedNotification}
-            onClose={() => setSelectedNotification(null)}
-            onMarkDone={handleMarkDone}
-            onRemindAgain={handleRemindAgain}
-          />
+      {/* Floating detail popup — portaled to body to escape parent overflow/transform */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {selectedNotification && (
+              <NotificationDetail
+                notification={selectedNotification}
+                onClose={() => setSelectedNotification(null)}
+                onMarkDone={handleMarkDone}
+                onRemindAgain={handleRemindAgain}
+              />
+            )}
+          </AnimatePresence>,
+          document.body
         )}
-      </AnimatePresence>
     </>
   );
 }
