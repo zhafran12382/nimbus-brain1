@@ -97,9 +97,20 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
   name TEXT NOT NULL,
   prompt TEXT NOT NULL,
   cron_expression TEXT NOT NULL,
+  run_once BOOLEAN NOT NULL DEFAULT FALSE,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Add run_once column if table already existed without it
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'scheduled_tasks' AND column_name = 'run_once'
+  ) THEN
+    ALTER TABLE scheduled_tasks ADD COLUMN run_once BOOLEAN NOT NULL DEFAULT FALSE;
+  END IF;
+END $$;
 
 -- 10. Notifications table
 CREATE TABLE IF NOT EXISTS notifications (

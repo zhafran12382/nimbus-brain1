@@ -155,6 +155,7 @@ export interface ScheduledTask {
   name: string;
   prompt: string;
   cron_expression: string;
+  run_once: boolean;
   status: 'active' | 'paused' | 'completed';
   created_at: string;
 }

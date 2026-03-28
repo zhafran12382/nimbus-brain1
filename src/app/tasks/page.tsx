@@ -275,7 +275,14 @@ export default function TasksPage() {
                           <Clock className="h-4 w-4 text-white" />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-sm font-medium text-text-primary truncate">{task.name}</h3>
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="text-sm font-medium text-text-primary truncate">{task.name}</h3>
+                            {task.run_once && (
+                              <span className="shrink-0 rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-violet-400 uppercase tracking-wider">
+                                Sekali
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-text-muted truncate">{task.prompt}</p>
                         </div>
                       </div>
@@ -289,10 +296,12 @@ export default function TasksPage() {
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-muted">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {formatCron(task.cron_expression)}
+                        {task.run_once && task.status === "completed"
+                          ? `Selesai — ${formatCron(task.cron_expression)}`
+                          : formatCron(task.cron_expression)}
                       </span>
                       <span>Dibuat {timeAgo(task.created_at)}</span>
-                      {task.easycron_id && (
+                      {task.easycron_id && task.status !== "completed" && (
                         <span className="text-blue-400/60">EasyCron #{task.easycron_id.slice(0, 8)}</span>
                       )}
                     </div>

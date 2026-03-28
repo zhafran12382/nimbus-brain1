@@ -399,13 +399,14 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "create_scheduled_task",
-      description: "Buat scheduled task baru menggunakan EasyCron. Konversi jadwal user ke format cron expression. Contoh: harian jam 7 pagi = '0 7 * * *', setiap Senin jam 9 = '0 9 * * 1'.",
+      description: "Buat scheduled task baru menggunakan EasyCron. Konversi jadwal user ke format cron expression. Contoh: harian jam 7 pagi = '0 7 * * *', setiap Senin jam 9 = '0 9 * * 1'. Untuk one-time task (misal 'ingatkan 20 menit lagi', 'besok jam 7'), set run_once=true dan buat cron expression yang spesifik ke waktu tersebut.",
       parameters: {
         type: "object",
         properties: {
           name: { type: "string", description: "Nama task (unik, untuk identifikasi)" },
           prompt: { type: "string", description: "Prompt/perintah yang akan dieksekusi saat waktunya tiba" },
-          cron_expression: { type: "string", description: "Cron expression (5 field: menit jam tanggal bulan hari). Contoh: '0 7 * * *' = setiap hari jam 7:00, '*/30 * * * *' = setiap 30 menit" }
+          cron_expression: { type: "string", description: "Cron expression (5 field: menit jam tanggal bulan hari). Contoh: '0 7 * * *' = setiap hari jam 7:00, '*/30 * * * *' = setiap 30 menit, '30 14 28 3 *' = 28 Maret jam 14:30 (one-time)" },
+          run_once: { type: "boolean", description: "Set true untuk task sekali jalan (reminder, alarm). Task akan otomatis selesai setelah dieksekusi. Default: false (recurring)" }
         },
         required: ["name", "prompt", "cron_expression"]
       }

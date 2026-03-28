@@ -855,6 +855,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
       }
 
       const taskName = String(args.name).trim();
+      const runOnce = args.run_once === true;
 
       // 1. Save to database first
       const { data, error } = await supabase
@@ -863,6 +864,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
           name: taskName,
           prompt: args.prompt,
           cron_expression: cronExp,
+          run_once: runOnce,
         })
         .select()
         .single();
@@ -889,7 +891,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
             .from('scheduled_tasks')
             .update({ easycron_id: String(easycronData.cron_job_id) })
             .eq('id', data.id);
-          return `📅 Task "${data.name}" berhasil dibuat! Cron: ${cronExp} | EasyCron ID: ${easycronData.cron_job_id} | DB ID: ${data.id}`;
+          return `📅 Task "${data.name}" berhasil dibuat${runOnce ? ' (sekali jalan)' : ''}! Cron: ${cronExp} | EasyCron ID: ${easycronData.cron_job_id} | DB ID: ${data.id}`;
         } else {
           // DB saved but EasyCron failed — clean up
           await supabase.from('scheduled_tasks').delete().eq('id', data.id);
@@ -910,8 +912,8 @@ JSON ARRAY ONLY. NO other text before or after.`;
       if (error) return `Error: ${error.message}`;
       if (!data?.length) return 'Belum ada scheduled tasks.';
 
-      return data.map((t: { id: string; name: string; status: string; prompt: string; cron_expression: string; easycron_id: string | null }) => {
-        return `• ${t.name} [${t.status}] — "${t.prompt}" | Cron: ${t.cron_expression} | ID: ${t.id}${t.easycron_id ? ` | EasyCron: ${t.easycron_id}` : ''}`;
+      return data.map((t: { id: string; name: string; status: string; prompt: string; cron_expression: string; easycron_id: string | null; run_once?: boolean }) => {
+        return `• ${t.name} [${t.status}]${t.run_once ? ' (sekali)' : ''} — "${t.prompt}" | Cron: ${t.cron_expression} | ID: ${t.id}${t.easycron_id ? ` | EasyCron: ${t.easycron_id}` : ''}`;
       }).join('\n');
     }
 
