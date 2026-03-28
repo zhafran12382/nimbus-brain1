@@ -15,27 +15,82 @@ import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 
+const DOW_NAMES: Record<string, string> = {
+  "0": "Minggu", "1": "Senin", "2": "Selasa", "3": "Rabu",
+  "4": "Kamis", "5": "Jumat", "6": "Sabtu", "7": "Minggu",
+};
+
+const MONTH_NAMES: Record<string, string> = {
+  "1": "Januari", "2": "Februari", "3": "Maret", "4": "April",
+  "5": "Mei", "6": "Juni", "7": "Juli", "8": "Agustus",
+  "9": "September", "10": "Oktober", "11": "November", "12": "Desember",
+};
+
+function formatTime(h: string, m: string): string {
+  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
+}
+
+function formatDow(dow: string): string {
+  // "1-5" → "Senin-Jumat", "0,6" → "Minggu, Sabtu", "1" → "Senin"
+  if (dow.includes("-")) {
+    const [start, end] = dow.split("-");
+    return `${DOW_NAMES[start] || start}–${DOW_NAMES[end] || end}`;
+  }
+  if (dow.includes(",")) {
+    return dow.split(",").map(d => DOW_NAMES[d.trim()] || d).join(", ");
+  }
+  return DOW_NAMES[dow] || dow;
+}
+
 function formatCron(cron: string): string {
   const parts = cron.trim().split(/\s+/);
   if (parts.length !== 5) return cron;
   const [min, hour, dom, mon, dow] = parts;
 
-  // Every N minutes
-  if (min.startsWith("*/") && hour === "*" && dom === "*" && mon === "*" && dow === "*") {
+  const isWild = (v: string) => v === "*";
+  const isNum = (v: string) => /^\d+$/.test(v);
+  const isInterval = (v: string) => v.startsWith("*/");
+
+  // Every N minutes: */5 * * * *
+  if (isInterval(min) && isWild(hour) && isWild(dom) && isWild(mon) && isWild(dow)) {
     return `Setiap ${min.slice(2)} menit`;
   }
-  // Every hour at :MM
-  if (!min.includes("*") && !min.includes("/") && hour === "*" && dom === "*" && mon === "*" && dow === "*") {
+
+  // Every N hours: 0 */2 * * *
+  if (isNum(min) && isInterval(hour) && isWild(dom) && isWild(mon) && isWild(dow)) {
+    return `Setiap ${hour.slice(2)} jam (menit ke-${min})`;
+  }
+
+  // Every hour at :MM: 30 * * * *
+  if (isNum(min) && isWild(hour) && isWild(dom) && isWild(mon) && isWild(dow)) {
     return `Setiap jam, menit ke-${min}`;
   }
-  // Daily at HH:MM
-  if (!min.includes("*") && !hour.includes("*") && dom === "*" && mon === "*" && dow === "*") {
-    return `Setiap hari jam ${hour.padStart(2, "0")}:${min.padStart(2, "0")}`;
+
+  // Specific time with day-of-week: 0 7 * * 1-5
+  if (isNum(min) && isNum(hour) && isWild(dom) && isWild(mon) && !isWild(dow)) {
+    return `${formatDow(dow)}, jam ${formatTime(hour, min)}`;
   }
-  // Weekdays
-  if (!min.includes("*") && !hour.includes("*") && dom === "*" && mon === "*" && dow === "1-5") {
-    return `Senin-Jumat jam ${hour.padStart(2, "0")}:${min.padStart(2, "0")}`;
+
+  // Daily at HH:MM: 0 7 * * *
+  if (isNum(min) && isNum(hour) && isWild(dom) && isWild(mon) && isWild(dow)) {
+    return `Setiap hari jam ${formatTime(hour, min)}`;
   }
+
+  // Specific day of month: 0 9 1 * *
+  if (isNum(min) && isNum(hour) && isNum(dom) && isWild(mon) && isWild(dow)) {
+    return `Tanggal ${dom} setiap bulan, jam ${formatTime(hour, min)}`;
+  }
+
+  // Specific date: 0 9 25 12 *
+  if (isNum(min) && isNum(hour) && isNum(dom) && isNum(mon) && isWild(dow)) {
+    return `${dom} ${MONTH_NAMES[mon] || `bulan ${mon}`}, jam ${formatTime(hour, min)}`;
+  }
+
+  // Specific month+dom+dow patterns
+  if (isNum(min) && isNum(hour) && isWild(dom) && isNum(mon) && isWild(dow)) {
+    return `Setiap hari di ${MONTH_NAMES[mon] || `bulan ${mon}`}, jam ${formatTime(hour, min)}`;
+  }
+
   return cron;
 }
 

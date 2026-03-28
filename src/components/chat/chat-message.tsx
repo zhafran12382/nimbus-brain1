@@ -333,12 +333,17 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         )}
 
-        {/* Timestamp & model info */}
-        <div className="flex items-center gap-2 px-1">
+        {/* Timestamp & model info & token usage */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
           <span className="text-[12px] text-[#8A8A8A]">{timestamp}</span>
           {!isUser && message.model_used && (
             <span className="hidden sm:inline text-[12px] text-[#8A8A8A]">
               {message.provider_used === 'openrouter' ? '🔵' : '🟢'} {message.model_used}
+            </span>
+          )}
+          {!isUser && message.usage && (message.usage.prompt_tokens > 0 || message.usage.completion_tokens > 0) && (
+            <span className="text-[11px] text-[#6A6A6A]">
+              ↑{message.usage.prompt_tokens.toLocaleString()} ↓{message.usage.completion_tokens.toLocaleString()}
             </span>
           )}
         </div>

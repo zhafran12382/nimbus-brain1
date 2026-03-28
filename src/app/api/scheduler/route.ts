@@ -33,13 +33,24 @@ export async function GET(request: NextRequest) {
 
   log('SCHEDULER', `Executing task: "${task.name}" — prompt: "${task.prompt}"`);
 
-  // Create notification linked to task_id
-  const { error: notifError } = await supabase.from('notifications').insert({
+  // Create notification linked to task_id (with fallback if task_id column doesn't exist)
+  let notifError: { message: string } | null = null;
+  const { error: err1 } = await supabase.from('notifications').insert({
     title: `⏰ Task: ${task.name}`,
     message: task.prompt,
     type: 'info',
     task_id: task.id,
   });
+  if (err1) {
+    // Retry without task_id in case column doesn't exist yet
+    log('SCHEDULER', `Insert with task_id failed (${err1.message}), retrying without task_id...`);
+    const { error: err2 } = await supabase.from('notifications').insert({
+      title: `⏰ Task: ${task.name}`,
+      message: task.prompt,
+      type: 'info',
+    });
+    notifError = err2;
+  }
 
   if (notifError) {
     log('SCHEDULER', `Failed to create notification: ${notifError.message}`);

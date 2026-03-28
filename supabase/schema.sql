@@ -90,7 +90,18 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 9. Notifications table
+-- 9. Scheduled Tasks table (EasyCron-based) — must come before notifications (FK dependency)
+CREATE TABLE IF NOT EXISTS scheduled_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  easycron_id TEXT,
+  name TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  cron_expression TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 10. Notifications table
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
@@ -101,15 +112,15 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 10. Scheduled Tasks table (EasyCron-based)
-CREATE TABLE IF NOT EXISTS scheduled_tasks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  easycron_id TEXT,
-  name TEXT NOT NULL,
-  prompt TEXT NOT NULL,
-  cron_expression TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- Add task_id column if notifications table already existed without it
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'notifications' AND column_name = 'task_id'
+  ) THEN
+    ALTER TABLE notifications ADD COLUMN task_id UUID REFERENCES scheduled_tasks(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 );
 
 -- ========================================

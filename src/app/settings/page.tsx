@@ -208,7 +208,7 @@ export default function SettingsPage() {
                 step={1000}
                 value={agentSettings.maxThinkTokens}
                 onChange={(e) => setAgentSettings((s) => ({ ...s, maxThinkTokens: Number(e.target.value) }))}
-                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[hsl(0_0%_15%)] accent-accent"
+                className="w-full"
               />
               <div className="flex justify-between text-[10px] text-text-muted">
                 <span>1K</span>
@@ -231,7 +231,7 @@ export default function SettingsPage() {
                 step={1}
                 value={agentSettings.searchSourceLimit}
                 onChange={(e) => setAgentSettings((s) => ({ ...s, searchSourceLimit: Number(e.target.value) }))}
-                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[hsl(0_0%_15%)] accent-accent"
+                className="w-full"
               />
               <div className="flex justify-between text-[10px] text-text-muted">
                 <span>1</span>

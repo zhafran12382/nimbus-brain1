@@ -241,6 +241,7 @@ function ChatPageContent() {
       let finalModelUsed = "";
       let finalProviderUsed = providerId;
       let returnedConvId = conversationId;
+      let finalUsage: { prompt_tokens: number; completion_tokens: number } | undefined;
 
       const personality = getPersonality();
       const agentSettings = getAgentSettings();
@@ -317,6 +318,7 @@ function ChatPageContent() {
               finalContent = event.content || "";
               finalToolCalls = event.tool_calls || [];
               finalModelUsed = event.model_used || modelId;
+              finalUsage = event.usage || undefined;
               setStreamingState((prev) =>
                 prev
                   ? {
@@ -377,6 +379,7 @@ function ChatPageContent() {
           tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
           model_used: finalModelUsed,
           provider_used: finalProviderUsed,
+          usage: finalUsage,
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMessage]);

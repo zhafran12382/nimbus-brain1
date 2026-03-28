@@ -27,6 +27,7 @@ export interface ChatMessage {
   tool_calls?: ToolCallResult[];
   model_used?: string;
   provider_used?: ProviderId;
+  usage?: { prompt_tokens: number; completion_tokens: number };
   created_at: string;
 }
 
