@@ -907,7 +907,7 @@ export async function POST(req: NextRequest) {
               });
 
               try {
-                const result = await executeTool(fnName, fnArgs, { searchSourceLimit: effectiveSearchLimit });
+                const result = await executeTool(fnName, fnArgs, { searchSourceLimit: effectiveSearchLimit, modelId, providerId });
                 log('TOOL EXEC', `${fnName} result:`, result.substring(0, 200));
                 log('TOOL STATE', `${fnName} success=true, resultLength=${result.length}`);
 
@@ -983,7 +983,7 @@ export async function POST(req: NextRequest) {
                     args: fnArgs,
                     text: toolLabels[fnName] || `🔧 Executing ${fnName}...`,
                   });
-                  const result = await executeTool(fnName, fnArgs, { searchSourceLimit: effectiveSearchLimit });
+                  const result = await executeTool(fnName, fnArgs, { searchSourceLimit: effectiveSearchLimit, modelId, providerId });
                   parsedActions.push({ name: fnName, args: fnArgs, result });
                   send({ type: "tool_result", name: fnName, result });
                   
@@ -1203,6 +1203,9 @@ export async function POST(req: NextRequest) {
             content: finalContent,
             tool_calls: allToolCalls.length > 0 ? allToolCalls : null,
             model_used: modelId,
+            provider_used: providerId,
+            prompt_tokens: totalPromptTokens || null,
+            completion_tokens: totalCompletionTokens || null,
             conversation_id: conversationId,
           });
           if (asstMsgErr) {

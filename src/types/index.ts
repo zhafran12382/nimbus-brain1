@@ -143,6 +143,8 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
+  label?: string | null;
+  extra_line?: string | null;
   type: 'info' | 'success' | 'warning' | 'error';
   is_read: boolean;
   task_id: string | null;
@@ -156,6 +158,8 @@ export interface ScheduledTask {
   prompt: string;
   cron_expression: string;
   run_once: boolean;
+  model_used: string | null;
+  provider_used: string | null;
   status: 'active' | 'paused' | 'completed';
   created_at: string;
 }

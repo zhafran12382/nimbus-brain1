@@ -110,7 +110,17 @@ function ChatPageContent() {
         .eq("conversation_id", activeConversationId)
         .order("created_at", { ascending: true })
         .limit(50);
-      if (data) setMessages((data as ChatMessage[]).filter(m => m.content && m.content.trim() !== ''));
+      if (data) {
+        const mapped = (data as (ChatMessage & { prompt_tokens?: number; completion_tokens?: number })[])
+          .filter(m => m.content && m.content.trim() !== '')
+          .map(m => {
+            if (!m.usage && (m.prompt_tokens || m.completion_tokens)) {
+              m.usage = { prompt_tokens: m.prompt_tokens || 0, completion_tokens: m.completion_tokens || 0 };
+            }
+            return m as ChatMessage;
+          });
+        setMessages(mapped);
+      }
     };
     loadMessages();
   }, [activeConversationId]);

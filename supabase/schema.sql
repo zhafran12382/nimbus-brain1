@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   content TEXT NOT NULL,
   tool_calls JSONB,
   model_used TEXT,
+  provider_used TEXT,
+  prompt_tokens INT,
+  completion_tokens INT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -98,6 +101,8 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
   prompt TEXT NOT NULL,
   cron_expression TEXT NOT NULL,
   run_once BOOLEAN NOT NULL DEFAULT FALSE,
+  model_used TEXT,
+  provider_used TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -112,11 +117,29 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- Add model_used/provider_used to scheduled_tasks if missing
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'scheduled_tasks' AND column_name = 'model_used'
+  ) THEN
+    ALTER TABLE scheduled_tasks ADD COLUMN model_used TEXT;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'scheduled_tasks' AND column_name = 'provider_used'
+  ) THEN
+    ALTER TABLE scheduled_tasks ADD COLUMN provider_used TEXT;
+  END IF;
+END $$;
+
 -- 10. Notifications table
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   message TEXT NOT NULL,
+  label TEXT,
+  extra_line TEXT,
   type TEXT NOT NULL DEFAULT 'info' CHECK (type IN ('info', 'success', 'warning', 'error')),
   is_read BOOLEAN NOT NULL DEFAULT FALSE,
   task_id UUID REFERENCES scheduled_tasks(id) ON DELETE SET NULL,
@@ -133,6 +156,44 @@ DO $$ BEGIN
   END IF;
 END $$;
 );
+
+-- Add label/extra_line to notifications if missing
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'notifications' AND column_name = 'label'
+  ) THEN
+    ALTER TABLE notifications ADD COLUMN label TEXT;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'notifications' AND column_name = 'extra_line'
+  ) THEN
+    ALTER TABLE notifications ADD COLUMN extra_line TEXT;
+  END IF;
+END $$;
+
+-- Add provider_used and token usage columns if chat_messages already existed without them
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'chat_messages' AND column_name = 'provider_used'
+  ) THEN
+    ALTER TABLE chat_messages ADD COLUMN provider_used TEXT;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'chat_messages' AND column_name = 'prompt_tokens'
+  ) THEN
+    ALTER TABLE chat_messages ADD COLUMN prompt_tokens INT;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'chat_messages' AND column_name = 'completion_tokens'
+  ) THEN
+    ALTER TABLE chat_messages ADD COLUMN completion_tokens INT;
+  END IF;
+END $$;
 
 -- ========================================
 -- Indexes

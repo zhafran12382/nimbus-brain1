@@ -64,7 +64,7 @@ async function insertNotification(title: string, message: string, type: string =
   await supabase.from('notifications').insert({ title, message, type });
 }
 
-export async function executeTool(name: string, args: Record<string, unknown>, options?: { searchSourceLimit?: number }): Promise<string> {
+export async function executeTool(name: string, args: Record<string, unknown>, options?: { searchSourceLimit?: number; modelId?: string; providerId?: string }): Promise<string> {
   switch (name) {
     case 'create_target': {
       const { data, error } = await supabase
@@ -865,6 +865,8 @@ JSON ARRAY ONLY. NO other text before or after.`;
           prompt: args.prompt,
           cron_expression: cronExp,
           run_once: runOnce,
+          model_used: options?.modelId || null,
+          provider_used: options?.providerId || null,
         })
         .select()
         .single();
