@@ -131,6 +131,25 @@ async function tryAiUpgrade(
   }
 }
 
+// ── Background helpers ──
+
+async function deleteEasyCronJob(easycronId: string): Promise<void> {
+  if (!process.env.EASYCRON_API_KEY) return;
+  try {
+    const body = new URLSearchParams();
+    body.append('token', process.env.EASYCRON_API_KEY);
+    body.append('cron_job_id', easycronId);
+    await fetch('https://www.easycron.com/rest/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+    log('EASYCRON', `Deleted job ${easycronId}`);
+  } catch {
+    log('EASYCRON', `Failed to delete job ${easycronId}`);
+  }
+}
+
 // ── Main handler ──
 
 export async function GET(request: NextRequest) {
@@ -142,6 +161,11 @@ export async function GET(request: NextRequest) {
   }
 
   log('TRIGGER', `id="${taskId}" name="${taskName}"`);
+
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 1 — Fast path (must complete < 500ms)
+  // Fetch task → insert notification → mark completed → return
+  // ═══════════════════════════════════════════════════════════
 
   // ── STEP 1: Fetch task ──
   let query = supabase.from('scheduled_tasks').select('*');
@@ -177,15 +201,7 @@ export async function GET(request: NextRequest) {
 
   log('OK', `Notification created for "${task.name}"`);
 
-  // ── STEP 3: AI upgrade (best-effort, won't block or fail) ──
-  const aiModel = task.model_used || DEFAULT_MODEL_ID;
-  const aiProvider = (task.provider_used as ProviderId) || DEFAULT_PROVIDER_ID;
-
-  // Fire AI upgrade but don't await — response returns immediately
-  // On Vercel, this runs until the function closes (a few seconds after response)
-  tryAiUpgrade(task.id, task.name, task.prompt, aiModel, aiProvider).catch(() => {});
-
-  // ── STEP 4: One-time task cleanup ──
+  // ── STEP 3: Mark task completed (if run_once) ──
   let completed = false;
   if (task.run_once) {
     const { error: upErr } = await supabase
@@ -195,23 +211,24 @@ export async function GET(request: NextRequest) {
 
     completed = !upErr;
     if (upErr) log('ERROR', `Failed to mark completed: ${upErr.message}`);
-
-    // Delete EasyCron job
-    if (task.easycron_id && process.env.EASYCRON_API_KEY) {
-      try {
-        const body = new URLSearchParams();
-        body.append('token', process.env.EASYCRON_API_KEY);
-        body.append('cron_job_id', task.easycron_id);
-        await fetch('https://www.easycron.com/rest/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body.toString(),
-        });
-      } catch {}
-    }
   }
 
-  // ── STEP 5: Return ──
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 2 — Background (fire-and-forget, won't block response)
+  // AI upgrade + EasyCron cleanup run after HTTP 200 is sent.
+  // On Vercel/Node the function stays alive briefly after response.
+  // ═══════════════════════════════════════════════════════════
+
+  const aiModel = task.model_used || DEFAULT_MODEL_ID;
+  const aiProvider = (task.provider_used as ProviderId) || DEFAULT_PROVIDER_ID;
+
+  tryAiUpgrade(task.id, task.name, task.prompt, aiModel, aiProvider).catch(() => {});
+
+  if (task.run_once && task.easycron_id) {
+    deleteEasyCronJob(task.easycron_id).catch(() => {});
+  }
+
+  // ── Return HTTP 200 immediately ──
   return NextResponse.json({
     status: 'ok',
     task: task.name,
