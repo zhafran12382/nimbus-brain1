@@ -11,6 +11,17 @@ import { PersonalitySettings } from "@/types";
 import { modalEntrance } from "@/lib/animations";
 
 const PERSONALITY_KEY = "nimbus-brain-personality";
+const AGENT_SETTINGS_KEY = "nimbus-brain-agent-settings";
+
+interface AgentSettings {
+  maxThinkTokens: number;
+  searchSourceLimit: number;
+}
+
+const DEFAULT_AGENT_SETTINGS: AgentSettings = {
+  maxThinkTokens: 10000,
+  searchSourceLimit: 5,
+};
 
 const DEFAULT_SETTINGS: PersonalitySettings = {
   preset: "friendly",
@@ -41,6 +52,7 @@ const styles = [
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<PersonalitySettings>(DEFAULT_SETTINGS);
+  const [agentSettings, setAgentSettings] = useState<AgentSettings>(DEFAULT_AGENT_SETTINGS);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -49,6 +61,10 @@ export default function SettingsPage() {
       if (raw) {
         setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
       }
+      const agentRaw = localStorage.getItem(AGENT_SETTINGS_KEY);
+      if (agentRaw) {
+        setAgentSettings({ ...DEFAULT_AGENT_SETTINGS, ...JSON.parse(agentRaw) });
+      }
     } catch {
       // localStorage may be unavailable or contain invalid JSON
     }
@@ -56,13 +72,16 @@ export default function SettingsPage() {
 
   const handleSave = () => {
     localStorage.setItem(PERSONALITY_KEY, JSON.stringify(settings));
+    localStorage.setItem(AGENT_SETTINGS_KEY, JSON.stringify(agentSettings));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const handleReset = () => {
     setSettings(DEFAULT_SETTINGS);
+    setAgentSettings(DEFAULT_AGENT_SETTINGS);
     localStorage.removeItem(PERSONALITY_KEY);
+    localStorage.removeItem(AGENT_SETTINGS_KEY);
   };
 
   return (
@@ -169,6 +188,58 @@ export default function SettingsPage() {
             <p className="text-[10px] text-text-muted mt-1 text-right">
               {settings.customInstructions.length}/500
             </p>
+          </section>
+
+          {/* Agent Settings */}
+          <section className="glass-card rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-text-primary mb-1">Agent Settings</h3>
+            <p className="text-[10px] text-text-muted mb-4">Kontrol perilaku AI saat memproses permintaan</p>
+
+            {/* Max Think Tokens */}
+            <div className="space-y-2 mb-5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-text-secondary">Max Think Tokens</Label>
+                <span className="text-xs font-mono text-accent">{agentSettings.maxThinkTokens.toLocaleString()}</span>
+              </div>
+              <input
+                type="range"
+                min={1000}
+                max={32000}
+                step={1000}
+                value={agentSettings.maxThinkTokens}
+                onChange={(e) => setAgentSettings((s) => ({ ...s, maxThinkTokens: Number(e.target.value) }))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-[10px] text-text-muted">
+                <span>1K</span>
+                <span>16K</span>
+                <span>32K</span>
+              </div>
+              <p className="text-[10px] text-text-muted">Jumlah token maksimum untuk proses berpikir (mode Think). Lebih tinggi = analisis lebih mendalam.</p>
+            </div>
+
+            {/* Search Source Limit */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-text-secondary">Search Source Limit</Label>
+                <span className="text-xs font-mono text-accent">{agentSettings.searchSourceLimit}</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={20}
+                step={1}
+                value={agentSettings.searchSourceLimit}
+                onChange={(e) => setAgentSettings((s) => ({ ...s, searchSourceLimit: Number(e.target.value) }))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-[10px] text-text-muted">
+                <span>1</span>
+                <span>10</span>
+                <span>20</span>
+              </div>
+              <p className="text-[10px] text-text-muted">Jumlah sumber pencarian per query (mode Search). Lebih banyak = hasil lebih lengkap, tapi lebih lambat.</p>
+            </div>
           </section>
 
           {/* Actions */}

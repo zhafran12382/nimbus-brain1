@@ -15,6 +15,7 @@ import {
   BookOpen,
   User,
   GraduationCap,
+  Clock,
 } from "lucide-react";
 import { Conversation } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -76,6 +77,13 @@ const personalItems = [
     icon: Target,
     gradient: "from-emerald-500 to-teal-400",
     description: "Track your goals",
+  },
+  {
+    href: "/tasks",
+    label: "Task Manager",
+    icon: Clock,
+    gradient: "from-blue-500 to-cyan-400",
+    description: "Scheduled tasks & reminders",
   },
 ];
 

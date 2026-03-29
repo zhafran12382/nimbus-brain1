@@ -19,6 +19,7 @@ import { NotificationBell } from "@/components/notifications/notification-panel"
 const ACTIVE_CONV_KEY = "nimbus-active-conv";
 const PERSONALITY_KEY = "nimbus-brain-personality";
 const MODE_KEY = "nimbus-brain-chat-mode";
+const AGENT_SETTINGS_KEY = "nimbus-brain-agent-settings";
 
 function getStoredConvId(): string | null {
   if (typeof window === "undefined") return null;
@@ -32,6 +33,16 @@ function getPersonality(): PersonalitySettings | null {
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
+  }
+}
+
+function getAgentSettings(): { maxThinkTokens?: number; searchSourceLimit?: number } | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = localStorage.getItem(AGENT_SETTINGS_KEY);
+    return raw ? JSON.parse(raw) : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -99,7 +110,17 @@ function ChatPageContent() {
         .eq("conversation_id", activeConversationId)
         .order("created_at", { ascending: true })
         .limit(50);
-      if (data) setMessages((data as ChatMessage[]).filter(m => m.content && m.content.trim() !== ''));
+      if (data) {
+        const mapped = (data as (ChatMessage & { prompt_tokens?: number; completion_tokens?: number })[])
+          .filter(m => m.content && m.content.trim() !== '')
+          .map(m => {
+            if (!m.usage && (m.prompt_tokens || m.completion_tokens)) {
+              m.usage = { prompt_tokens: m.prompt_tokens || 0, completion_tokens: m.completion_tokens || 0 };
+            }
+            return m as ChatMessage;
+          });
+        setMessages(mapped);
+      }
     };
     loadMessages();
   }, [activeConversationId]);
@@ -215,6 +236,8 @@ function ChatPageContent() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
+    let returnedConvId = conversationId;
+
     try {
       const chatHistory = newMessages.map((m) => ({
         role: m.role,
@@ -229,9 +252,10 @@ function ChatPageContent() {
       }[] = [];
       let finalModelUsed = "";
       let finalProviderUsed = providerId;
-      let returnedConvId = conversationId;
+      let finalUsage: { prompt_tokens: number; completion_tokens: number } | undefined;
 
       const personality = getPersonality();
+      const agentSettings = getAgentSettings();
 
       await sendChatStream(
         chatHistory,
@@ -305,12 +329,14 @@ function ChatPageContent() {
               finalContent = event.content || "";
               finalToolCalls = event.tool_calls || [];
               finalModelUsed = event.model_used || modelId;
+              finalUsage = event.usage || undefined;
               setStreamingState((prev) =>
                 prev
                   ? {
                       ...prev,
                       thinkingContent: event.thinking_content ?? prev.thinkingContent,
                       thinkingDurationMs: event.thinking_duration_ms ?? prev.thinkingDurationMs,
+                      usage: event.usage ?? prev.usage,
                     }
                   : null
               );
@@ -332,6 +358,9 @@ function ChatPageContent() {
               break;
 
             case "error":
+              if (event.conversationId) {
+                returnedConvId = event.conversationId;
+              }
               throw new Error(event.message);
           }
         },
@@ -340,6 +369,7 @@ function ChatPageContent() {
         controller.signal,
         chatMode,
         providerId,
+        agentSettings,
       );
 
       if (controller.signal.aborted) return;
@@ -363,6 +393,7 @@ function ChatPageContent() {
           tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
           model_used: finalModelUsed,
           provider_used: finalProviderUsed,
+          usage: finalUsage,
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMessage]);
@@ -383,6 +414,12 @@ function ChatPageContent() {
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
+
+      // Preserve conversationId even on error so history isn't lost
+      if (returnedConvId && returnedConvId !== activeConversationId) {
+        setActiveConversationId(returnedConvId);
+        setRefreshKey((k) => k + 1);
+      }
     } finally {
       setIsLoading(false);
       setStreamingState(null);

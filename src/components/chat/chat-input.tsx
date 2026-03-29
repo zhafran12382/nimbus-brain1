@@ -1,11 +1,30 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { motion } from "framer-motion";
-import { ArrowUp, Loader2, ImageIcon } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowUp, Loader2, ImageIcon, Brain, Search } from "lucide-react";
 import { ChatMode, ProviderId } from "@/types";
 import { ModeToggle } from "./mode-toggle";
 import { ModelSelector } from "./model-selector";
+
+const AGENT_SETTINGS_KEY = "nimbus-brain-agent-settings";
+
+interface AgentSettings {
+  maxThinkTokens: number;
+  searchSourceLimit: number;
+}
+
+const DEFAULT_AGENT: AgentSettings = { maxThinkTokens: 10000, searchSourceLimit: 5 };
+
+function loadAgentSettings(): AgentSettings {
+  if (typeof window === "undefined") return DEFAULT_AGENT;
+  try {
+    const raw = localStorage.getItem(AGENT_SETTINGS_KEY);
+    return raw ? { ...DEFAULT_AGENT, ...JSON.parse(raw) } : DEFAULT_AGENT;
+  } catch {
+    return DEFAULT_AGENT;
+  }
+}
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -34,7 +53,18 @@ export function ChatInput({
   const [input, setInput] = useState("");
   const [focused, setFocused] = useState(false);
   const [imageMode, setImageMode] = useState(false);
+  const [agent, setAgent] = useState<AgentSettings>(DEFAULT_AGENT);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load agent settings from localStorage
+  useEffect(() => {
+    setAgent(loadAgentSettings());
+  }, []);
+
+  const saveAgent = (updated: AgentSettings) => {
+    setAgent(updated);
+    localStorage.setItem(AGENT_SETTINGS_KEY, JSON.stringify(updated));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +80,8 @@ export function ChatInput({
   };
 
   const hasText = input.trim().length > 0;
+  const showThinkSlider = mode === "think" || mode === "search+think";
+  const showSearchSlider = mode === "search" || mode === "search+think";
 
   return (
     <div
@@ -57,6 +89,56 @@ export function ChatInput({
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="mx-auto max-w-[var(--chat-content-max-width)] px-3 sm:px-4">
+        {/* Mode-conditional sliders */}
+        <AnimatePresence>
+          {(showThinkSlider || showSearchSlider) && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="flex flex-col gap-2.5 pt-3 pb-1">
+                {showThinkSlider && (
+                  <div className="flex items-center gap-3">
+                    <Brain className="h-3.5 w-3.5 text-violet-400 shrink-0" />
+                    <input
+                      type="range"
+                      min={512}
+                      max={32000}
+                      step={512}
+                      value={agent.maxThinkTokens}
+                      onChange={(e) => saveAgent({ ...agent, maxThinkTokens: Number(e.target.value) })}
+                      className="flex-1 h-1"
+                    />
+                    <span className="text-[11px] font-mono text-violet-400 w-[70px] text-right shrink-0">
+                      {agent.maxThinkTokens >= 1000 ? `${(agent.maxThinkTokens / 1000).toFixed(agent.maxThinkTokens % 1000 === 0 ? 0 : 1)}K` : agent.maxThinkTokens} tokens
+                    </span>
+                  </div>
+                )}
+                {showSearchSlider && (
+                  <div className="flex items-center gap-3">
+                    <Search className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                    <input
+                      type="range"
+                      min={1}
+                      max={20}
+                      step={1}
+                      value={agent.searchSourceLimit}
+                      onChange={(e) => saveAgent({ ...agent, searchSourceLimit: Number(e.target.value) })}
+                      className="flex-1 h-1"
+                    />
+                    <span className="text-[11px] font-mono text-blue-400 w-[70px] text-right shrink-0">
+                      {agent.searchSourceLimit} sources
+                    </span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Input Row */}
         <form
           onSubmit={handleSubmit}

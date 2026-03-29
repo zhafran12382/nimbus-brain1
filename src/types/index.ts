@@ -27,6 +27,7 @@ export interface ChatMessage {
   tool_calls?: ToolCallResult[];
   model_used?: string;
   provider_used?: ProviderId;
+  usage?: { prompt_tokens: number; completion_tokens: number };
   created_at: string;
 }
 
@@ -142,8 +143,11 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
+  label?: string | null;
+  extra_line?: string | null;
   type: 'info' | 'success' | 'warning' | 'error';
   is_read: boolean;
+  task_id: string | null;
   created_at: string;
 }
 
@@ -153,6 +157,9 @@ export interface ScheduledTask {
   name: string;
   prompt: string;
   cron_expression: string;
+  run_once: boolean;
+  model_used: string | null;
+  provider_used: string | null;
   status: 'active' | 'paused' | 'completed';
   created_at: string;
 }
