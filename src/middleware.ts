@@ -42,6 +42,7 @@ export async function middleware(req: NextRequest) {
   // Allow auth API routes and login page through without auth
   if (
     pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/scheduler') ||
     pathname === '/login' ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
