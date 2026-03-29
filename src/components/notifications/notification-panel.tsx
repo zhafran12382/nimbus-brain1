@@ -206,11 +206,48 @@ export function NotificationBell() {
     }
   }, []);
 
+  // Polling fallback (30s)
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
+
+  // Supabase Realtime: listen for new notifications (INSERT) and updates (UPDATE)
+  useEffect(() => {
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on(
+        "postgres_changes" as "system",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        (payload: { new: Record<string, unknown> }) => {
+          const newNotif = payload.new as unknown as Notification;
+          setNotifications((prev) => {
+            // Avoid duplicates
+            if (prev.some((n) => n.id === newNotif.id)) return prev;
+            return [newNotif, ...prev].slice(0, 20);
+          });
+          if (!newNotif.is_read) {
+            setUnreadCount((prev) => prev + 1);
+          }
+        }
+      )
+      .on(
+        "postgres_changes" as "system",
+        { event: "UPDATE", schema: "public", table: "notifications" },
+        (payload: { new: Record<string, unknown> }) => {
+          const updated = payload.new as unknown as Notification;
+          setNotifications((prev) =>
+            prev.map((n) => (n.id === updated.id ? updated : n))
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
