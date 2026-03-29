@@ -44,9 +44,9 @@ async function insertNotification(
   if (!e2) return true;
   log('INSERT', `Without label failed: ${e2.message}`);
 
-  // Attempt 3: minimal (without task_id FK)
+  // Attempt 3: minimal with task_id only (no label/extra_line/FK-only columns)
   const { error: e3 } = await supabase.from('notifications').insert({
-    title, message, type: 'info',
+    title, message, type: 'info', task_id: taskId || null,
   });
   if (!e3) return true;
   log('INSERT', `Minimal insert failed: ${e3.message}`);
@@ -246,27 +246,21 @@ export async function GET(request: NextRequest) {
   log('PHASE1', `Completed in ${phase1Ms}ms — notification=${inserted} completed=${completed}`);
 
   // ═══════════════════════════════════════════════════════════
-  // PHASE 2 — Background (fire-and-forget, won't block response)
-  // AI upgrade + EasyCron cleanup run after HTTP 200 is sent.
-  // On Vercel/Node the function stays alive briefly after response.
+  // PHASE 2 — AI upgrade + EasyCron cleanup (awaited before response)
+  // Both are time-bounded (AI aborts at 8s) so this won't cause timeout.
+  // Using Promise.allSettled ensures both run even if one throws.
   // ═══════════════════════════════════════════════════════════
 
   const aiModel = task.model_used || DEFAULT_MODEL_ID;
   const aiProvider = (task.provider_used as ProviderId) || DEFAULT_PROVIDER_ID;
 
-  tryAiUpgrade(task.id, task.name, task.prompt, aiModel, aiProvider).catch((err: unknown) => {
-    const msg = err instanceof Error ? err.message : String(err);
-    log('AI', `Unhandled error in tryAiUpgrade: ${msg}`);
-  });
+  await Promise.allSettled([
+    tryAiUpgrade(task.id, task.name, task.prompt, aiModel, aiProvider),
+    task.run_once && task.easycron_id
+      ? deleteEasyCronJob(task.easycron_id)
+      : Promise.resolve(),
+  ]);
 
-  if (task.run_once && task.easycron_id) {
-    deleteEasyCronJob(task.easycron_id).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      log('EASYCRON', `Unhandled error in deleteEasyCronJob: ${msg}`);
-    });
-  }
-
-  // ── Return HTTP 200 immediately ──
   return NextResponse.json({
     status: 'ok',
     task: task.name,
