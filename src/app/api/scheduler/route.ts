@@ -132,7 +132,7 @@ async function tryAiUpgrade(
       }).eq('id', existing.id);
 
       if (ue) {
-        log('AI', `Full update failed: ${ue.message}, trying minimal update`);
+        log('AI', `Failed to update notification with label/extra_line fields: ${ue.message}, trying minimal update`);
         // Fallback: update without label/extra_line
         const { error: ue2 } = await supabase.from('notifications').update({
           title: String(parsed.title).slice(0, 60),

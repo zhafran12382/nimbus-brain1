@@ -19,7 +19,8 @@ function log(tag: string, ...args: unknown[]) {
  */
 export async function GET() {
   const startMs = Date.now();
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const STUCK_TASK_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
+  const oneHourAgo = new Date(Date.now() - STUCK_TASK_THRESHOLD_MS).toISOString();
 
   log('START', `Looking for stuck tasks (run_once + active + created before ${oneHourAgo})`);
 
