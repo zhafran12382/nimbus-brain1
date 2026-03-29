@@ -61,8 +61,12 @@ async function tryAiUpgrade(
   modelId: string,
   providerId: ProviderId,
 ): Promise<void> {
+  const startMs = Date.now();
   const provider = getProviderConfig(providerId);
-  if (!provider) return;
+  if (!provider) {
+    log('AI', `No provider config for "${providerId}", skipping AI upgrade`);
+    return;
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
@@ -84,18 +88,30 @@ async function tryAiUpgrade(
       signal: controller.signal,
     });
 
-    if (!res.ok) return;
+    if (!res.ok) {
+      log('AI', `API returned ${res.status} for task "${taskName}" (${Date.now() - startMs}ms)`);
+      return;
+    }
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content?.trim();
-    if (!raw) return;
+    if (!raw) {
+      log('AI', `Empty AI response for task "${taskName}" (${Date.now() - startMs}ms)`);
+      return;
+    }
 
     const cleaned = raw.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
     const fb = cleaned.indexOf('{');
     const lb = cleaned.lastIndexOf('}');
-    if (fb === -1 || lb === -1) return;
+    if (fb === -1 || lb === -1) {
+      log('AI', `No JSON found in AI response for task "${taskName}"`);
+      return;
+    }
 
     const parsed = JSON.parse(cleaned.substring(fb, lb + 1));
-    if (!parsed.title || !parsed.message) return;
+    if (!parsed.title || !parsed.message) {
+      log('AI', `Parsed JSON missing title/message for task "${taskName}"`);
+      return;
+    }
 
     // Find the most recent notification for this task and update it
     const { data: existing } = await supabase
@@ -116,16 +132,24 @@ async function tryAiUpgrade(
       }).eq('id', existing.id);
 
       if (ue) {
+        log('AI', `Full update failed: ${ue.message}, trying minimal update`);
         // Fallback: update without label/extra_line
-        await supabase.from('notifications').update({
+        const { error: ue2 } = await supabase.from('notifications').update({
           title: String(parsed.title).slice(0, 60),
           message: String(parsed.message).slice(0, 160),
         }).eq('id', existing.id);
+        if (ue2) {
+          log('AI', `Minimal update also failed: ${ue2.message}`);
+        }
       }
-      log('AI', 'Notification upgraded with AI content');
+      log('AI', `Notification upgraded for "${taskName}" (${Date.now() - startMs}ms)`);
+    } else {
+      log('AI', `No existing notification found for task ${taskId} to upgrade`);
     }
-  } catch {
-    // AI failed — fine, static notification already exists
+  } catch (err: unknown) {
+    const elapsed = Date.now() - startMs;
+    const msg = err instanceof Error ? err.message : String(err);
+    log('AI', `AI upgrade failed for "${taskName}" after ${elapsed}ms: ${msg}`);
   } finally {
     clearTimeout(timer);
   }
@@ -134,25 +158,30 @@ async function tryAiUpgrade(
 // ── Background helpers ──
 
 async function deleteEasyCronJob(easycronId: string): Promise<void> {
-  if (!process.env.EASYCRON_API_KEY) return;
+  if (!process.env.EASYCRON_API_KEY) {
+    log('EASYCRON', `No API key, skipping delete for job ${easycronId}`);
+    return;
+  }
   try {
     const body = new URLSearchParams();
     body.append('token', process.env.EASYCRON_API_KEY);
     body.append('cron_job_id', easycronId);
-    await fetch('https://www.easycron.com/rest/delete', {
+    const res = await fetch('https://www.easycron.com/rest/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
     });
-    log('EASYCRON', `Deleted job ${easycronId}`);
-  } catch {
-    log('EASYCRON', `Failed to delete job ${easycronId}`);
+    log('EASYCRON', `Delete job ${easycronId}: HTTP ${res.status}`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log('EASYCRON', `Failed to delete job ${easycronId}: ${msg}`);
   }
 }
 
 // ── Main handler ──
 
 export async function GET(request: NextRequest) {
+  const handlerStart = Date.now();
   const taskId = request.nextUrl.searchParams.get('id');
   const taskName = request.nextUrl.searchParams.get('task');
 
@@ -163,7 +192,7 @@ export async function GET(request: NextRequest) {
   log('TRIGGER', `id="${taskId}" name="${taskName}"`);
 
   // ═══════════════════════════════════════════════════════════
-  // PHASE 1 — Fast path (must complete < 500ms)
+  // PHASE 1 — Fast path (must complete < 2s)
   // Fetch task → insert notification → mark completed → return
   // ═══════════════════════════════════════════════════════════
 
@@ -213,6 +242,9 @@ export async function GET(request: NextRequest) {
     if (upErr) log('ERROR', `Failed to mark completed: ${upErr.message}`);
   }
 
+  const phase1Ms = Date.now() - handlerStart;
+  log('PHASE1', `Completed in ${phase1Ms}ms — notification=${inserted} completed=${completed}`);
+
   // ═══════════════════════════════════════════════════════════
   // PHASE 2 — Background (fire-and-forget, won't block response)
   // AI upgrade + EasyCron cleanup run after HTTP 200 is sent.
@@ -222,10 +254,16 @@ export async function GET(request: NextRequest) {
   const aiModel = task.model_used || DEFAULT_MODEL_ID;
   const aiProvider = (task.provider_used as ProviderId) || DEFAULT_PROVIDER_ID;
 
-  tryAiUpgrade(task.id, task.name, task.prompt, aiModel, aiProvider).catch(() => {});
+  tryAiUpgrade(task.id, task.name, task.prompt, aiModel, aiProvider).catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    log('AI', `Unhandled error in tryAiUpgrade: ${msg}`);
+  });
 
   if (task.run_once && task.easycron_id) {
-    deleteEasyCronJob(task.easycron_id).catch(() => {});
+    deleteEasyCronJob(task.easycron_id).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      log('EASYCRON', `Unhandled error in deleteEasyCronJob: ${msg}`);
+    });
   }
 
   // ── Return HTTP 200 immediately ──
@@ -236,6 +274,7 @@ export async function GET(request: NextRequest) {
     notification_created: true,
     run_once: task.run_once,
     completed,
+    phase1_ms: phase1Ms,
     executed_at: new Date().toISOString(),
   });
 }

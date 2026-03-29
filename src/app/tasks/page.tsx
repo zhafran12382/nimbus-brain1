@@ -137,6 +137,48 @@ export default function TasksPage() {
     fetchTasks();
   }, [fetchTasks]);
 
+  // Supabase Realtime: listen for task changes (INSERT, UPDATE, DELETE)
+  useEffect(() => {
+    const channel = supabase
+      .channel("tasks-realtime")
+      .on(
+        "postgres_changes" as "system",
+        { event: "INSERT", schema: "public", table: "scheduled_tasks" },
+        (payload: { new: Record<string, unknown> }) => {
+          const newTask = payload.new as unknown as ScheduledTask;
+          setTasks((prev) => {
+            if (prev.some((t) => t.id === newTask.id)) return prev;
+            return [newTask, ...prev];
+          });
+        }
+      )
+      .on(
+        "postgres_changes" as "system",
+        { event: "UPDATE", schema: "public", table: "scheduled_tasks" },
+        (payload: { new: Record<string, unknown> }) => {
+          const updated = payload.new as unknown as ScheduledTask;
+          setTasks((prev) =>
+            prev.map((t) => (t.id === updated.id ? updated : t))
+          );
+        }
+      )
+      .on(
+        "postgres_changes" as "system",
+        { event: "DELETE", schema: "public", table: "scheduled_tasks" },
+        (payload: { old: Record<string, unknown> }) => {
+          const deleted = payload.old as unknown as { id: string };
+          if (deleted.id) {
+            setTasks((prev) => prev.filter((t) => t.id !== deleted.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const handleToggleStatus = async (task: ScheduledTask) => {
     const newStatus = task.status === "active" ? "paused" : "active";
     setActionLoading(task.id);
