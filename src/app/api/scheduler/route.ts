@@ -15,11 +15,11 @@ function log(tag: string, ...args: unknown[]) {
   console.log(`[${timestamp}] [SCHEDULER] [${tag}]`, ...args);
 }
 
-const NOTIFICATION_SYSTEM_PROMPT = `Generate a short notification reminder in Indonesian.
+const NOTIFICATION_SYSTEM_PROMPT = `Generate a notification reminder in Indonesian.
 Context: User created a scheduled task earlier. Now it's time to remind them.
 Output ONLY valid JSON: {"title":"...","short_label":"...","message":"...","extra_line":"..."}
-Rules: title max 60 chars, short_label max 40 chars, message max 160 chars referencing user intent, extra_line max 120 chars optional reinforcement.
-Do not mention AI, system, scheduling, tokens, or tools. Keep natural and short. Output ONLY JSON.`;
+Rules: title max 60 chars, short_label max 40 chars, message up to 3000 chars with detailed helpful content about the user's task, extra_line max 120 chars optional reinforcement.
+Do not mention AI, system, scheduling, tokens, or tools. Keep natural and helpful. Output ONLY JSON.`;
 
 // ── Helpers ──
 
@@ -77,7 +77,7 @@ async function tryAiUpgrade(
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), 30000);
 
   try {
     log('AI', `Starting AI upgrade for "${taskName}" model=${AI_UPGRADE_MODEL} provider=${AI_UPGRADE_PROVIDER}`);
@@ -92,7 +92,7 @@ async function tryAiUpgrade(
           { role: 'user', content: `Task: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
         ],
         temperature: 0.7,
-        max_tokens: 300,
+        max_tokens: 3000,
         provider: { require_parameters: true },
         route: 'fallback',
       }),
@@ -158,7 +158,7 @@ async function tryAiUpgrade(
       // Try full update
       const { error: ue } = await supabase.from('notifications').update({
         title: String(parsed.title).slice(0, 60),
-        message: String(parsed.message).slice(0, 160),
+        message: String(parsed.message).slice(0, 3000),
         label: String(parsed.short_label || '').slice(0, 40) || null,
         extra_line: String(parsed.extra_line || '').slice(0, 120) || null,
       }).eq('id', existing.id);
@@ -168,7 +168,7 @@ async function tryAiUpgrade(
         // Fallback: update without label/extra_line
         const { error: ue2 } = await supabase.from('notifications').update({
           title: String(parsed.title).slice(0, 60),
-          message: String(parsed.message).slice(0, 160),
+          message: String(parsed.message).slice(0, 3000),
         }).eq('id', existing.id);
         if (ue2) {
           log('AI', `Minimal update also failed: ${ue2.message}`);
@@ -186,7 +186,7 @@ async function tryAiUpgrade(
     const errorCode = isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR';
     await insertNotification(
       `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
-      `${isTimeout ? 'Request timeout (>15s)' : msg.slice(0, 100)}. Kode: ${errorCode}`.slice(0, 160),
+      `${isTimeout ? 'Request timeout (>30s)' : msg.slice(0, 100)}. Kode: ${errorCode}`.slice(0, 160),
       taskId, undefined, undefined, 'warning',
     );
   } finally {
@@ -258,7 +258,7 @@ export async function GET(request: NextRequest) {
 
   // ── STEP 2: Create notification IMMEDIATELY (static content) ──
   const title = `⏰ ${task.name}`.slice(0, 60);
-  const message = String(task.prompt).slice(0, 160);
+  const message = String(task.prompt).slice(0, 3000);
 
   const inserted = await insertNotification(title, message, task.id);
 
