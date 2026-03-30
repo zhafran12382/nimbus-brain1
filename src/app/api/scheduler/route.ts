@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getProviderConfig } from '@/lib/models';
 import type { ProviderId } from '@/types';
@@ -113,7 +113,7 @@ async function tryAiUpgrade(
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 28000);
+  const timer = setTimeout(() => controller.abort(), 15000);
 
   try {
     const budget = getTokenBudget(taskName, prompt);
@@ -223,7 +223,7 @@ async function tryAiUpgrade(
     const errorCode = isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR';
     await insertNotification(
       `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
-      `${isTimeout ? 'Request timeout (>28s)' : msg.slice(0, 100)}. Kode: ${errorCode}`.slice(0, 160),
+      `${isTimeout ? 'Request timeout (>15s)' : msg.slice(0, 100)}. Kode: ${errorCode}`.slice(0, 160),
       taskId, undefined, undefined, 'warning',
     );
   } finally {
@@ -322,18 +322,26 @@ export async function GET(request: NextRequest) {
   log('PHASE1', `Completed in ${phase1Ms}ms — notification=${inserted} completed=${completed}`);
 
   // ═══════════════════════════════════════════════════════════
-  // PHASE 2 — AI upgrade + EasyCron cleanup (awaited before response)
+  // PHASE 2 — Background: AI upgrade + EasyCron cleanup
+  // Uses next/server after() to run AFTER the response is sent.
+  // This ensures EasyCron gets a fast HTTP 200, and the AI upgrade
+  // runs reliably in the background with guaranteed execution time.
   // AI upgrade uses hardcoded openai/gpt-oss-120b via openrouter.
-  // Both are time-bounded (AI aborts at 15s) so this won't cause timeout.
-  // Using Promise.allSettled ensures both run even if one throws.
   // ═══════════════════════════════════════════════════════════
 
-  await Promise.allSettled([
-    tryAiUpgrade(task.id, task.name, task.prompt),
-    task.run_once && task.easycron_id
-      ? deleteEasyCronJob(task.easycron_id)
-      : Promise.resolve(),
-  ]);
+  after(async () => {
+    try {
+      await Promise.allSettled([
+        tryAiUpgrade(task.id, task.name, task.prompt),
+        task.run_once && task.easycron_id
+          ? deleteEasyCronJob(task.easycron_id)
+          : Promise.resolve(),
+      ]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log('PHASE2', `Unhandled error in after(): ${msg}`);
+    }
+  });
 
   return NextResponse.json({
     status: 'ok',
