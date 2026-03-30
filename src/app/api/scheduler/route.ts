@@ -15,11 +15,41 @@ function log(tag: string, ...args: unknown[]) {
   console.log(`[${timestamp}] [SCHEDULER] [${tag}]`, ...args);
 }
 
-const NOTIFICATION_SYSTEM_PROMPT = `Generate a notification reminder in Indonesian.
-Context: User created a scheduled task earlier. Now it's time to remind them.
-Output ONLY valid JSON: {"title":"...","short_label":"...","message":"...","extra_line":"..."}
-Rules: title max 60 chars, short_label max 40 chars, message up to 3000 chars with detailed helpful content about the user's task, extra_line max 120 chars optional reinforcement.
-Do not mention AI, system, scheduling, tokens, or tools. Keep natural and helpful. Output ONLY JSON.`;
+// ── Smart token budget ──
+// Simple reminders ("ingetin gw makan", "minum air", etc.) → short message, low tokens
+// Complex tasks (research, news digest, study plans) → detailed message, high tokens
+const SIMPLE_TASK_KEYWORDS = /\b(inget|remind|makan|minum|tidur|bangun|istirahat|sholat|salat|break|stretch|jalan|olahraga|cuci|bersih|telpon|call|bayar|bill|kirim|send|beli|buy)\b/i;
+
+function getTokenBudget(taskName: string, prompt: string): { max_tokens: number; style: 'short' | 'detailed' } {
+  const combined = `${taskName} ${prompt}`.toLowerCase();
+  if (SIMPLE_TASK_KEYWORDS.test(combined) && combined.length < 100) {
+    return { max_tokens: 300, style: 'short' };
+  }
+  return { max_tokens: 3000, style: 'detailed' };
+}
+
+function getSystemPrompt(style: 'short' | 'detailed'): string {
+  if (style === 'short') {
+    return `Buat notifikasi pengingat singkat dalam bahasa Indonesia.
+Konteks: User sudah membuat task terjadwal, sekarang waktunya mengingatkan.
+Output HANYA JSON valid: {"title":"...","short_label":"...","message":"...","extra_line":"..."}
+Aturan:
+- title: max 60 karakter, HARUS menarik dan natural (gunakan emoji yang relevan). Contoh: "🍽️ Waktunya Makan Siang!", "💧 Yuk Minum Air!", "🏃 Saatnya Gerak Badan!"
+- short_label: max 40 karakter
+- message: max 160 karakter, singkat dan to-the-point
+- extra_line: max 120 karakter, opsional motivasi singkat
+JANGAN sebut AI, sistem, scheduling, atau token. Output HANYA JSON.`;
+  }
+  return `Buat notifikasi pengingat dalam bahasa Indonesia.
+Konteks: User sudah membuat task terjadwal, sekarang waktunya mengingatkan.
+Output HANYA JSON valid: {"title":"...","short_label":"...","message":"...","extra_line":"..."}
+Aturan:
+- title: max 60 karakter, HARUS menarik dan natural (gunakan emoji yang relevan). Contoh: "📰 Update Berita Tech Hari Ini", "📚 Waktunya Review Materi!", "🎯 Check Progress Target Kamu"
+- short_label: max 40 karakter
+- message: sampai 3000 karakter, isi dengan konten yang helpful dan relevan sesuai konteks task user
+- extra_line: max 120 karakter, opsional reinforcement
+JANGAN sebut AI, sistem, scheduling, atau token. Tulis secukupnya sesuai kebutuhan, jangan dipanjang-panjangkan kalau memang tasknya simpel. Output HANYA JSON.`;
+}
 
 // ── Helpers ──
 
@@ -80,7 +110,8 @@ async function tryAiUpgrade(
   const timer = setTimeout(() => controller.abort(), 30000);
 
   try {
-    log('AI', `Starting AI upgrade for "${taskName}" model=${AI_UPGRADE_MODEL} provider=${AI_UPGRADE_PROVIDER}`);
+    const budget = getTokenBudget(taskName, prompt);
+    log('AI', `Starting AI upgrade for "${taskName}" model=${AI_UPGRADE_MODEL} provider=${AI_UPGRADE_PROVIDER} style=${budget.style} max_tokens=${budget.max_tokens}`);
 
     const res = await fetch(`${provider.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -88,11 +119,11 @@ async function tryAiUpgrade(
       body: JSON.stringify({
         model: AI_UPGRADE_MODEL,
         messages: [
-          { role: 'system', content: NOTIFICATION_SYSTEM_PROMPT },
+          { role: 'system', content: getSystemPrompt(budget.style) },
           { role: 'user', content: `Task: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
         ],
         temperature: 0.7,
-        max_tokens: 3000,
+        max_tokens: budget.max_tokens,
         provider: { require_parameters: true },
         route: 'fallback',
       }),
