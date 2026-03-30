@@ -3,8 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { getProviderConfig } from '@/lib/models';
 import type { ProviderId } from '@/types';
 
-// Hardcoded AI model for notification upgrade — always use this model
-const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b';
+// Hardcoded AI model for notification upgrade — always use the free tier
+const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b:free';
 const AI_UPGRADE_PROVIDER: ProviderId = 'openrouter';
 
 export const dynamic = 'force-dynamic';
@@ -323,7 +323,7 @@ export async function GET(request: NextRequest) {
 
   // ═══════════════════════════════════════════════════════════
   // PHASE 2 — AI upgrade + EasyCron cleanup (awaited)
-  // AI upgrade uses hardcoded openai/gpt-oss-120b via openrouter.
+  // AI upgrade uses openai/gpt-oss-120b:free via openrouter (free tier).
   // AbortController timeout is 15s, well within maxDuration=30s.
   // Promise.allSettled ensures both run even if one fails.
   // ═══════════════════════════════════════════════════════════
