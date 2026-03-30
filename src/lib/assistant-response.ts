@@ -316,7 +316,11 @@ export function sanitizeAssistantContent(content: string): string {
 
 /**
  * Clean up raw citation placeholders that should not appear in the final UI.
- * Preserves valid markdown citation links like [1](url) and [text](url).
+ * 
+ * Removed: [N source], [N sources], (N source), [Ntsource], [citation needed],
+ *          [ref], [reference], [sources], and other malformed placeholders.
+ * Converted: Bare [N] (without URL) → <sup>N</sup> superscript badges.
+ * Preserved: Valid markdown links [text](url) and citation links [N](url).
  */
 export function sanitizeCitations(text: string): string {
   let result = text;
@@ -358,8 +362,8 @@ export function sanitizeCitations(text: string): string {
 
   // Clean up bare number-only citation brackets that don't link anywhere [1], [2], etc.
   // Only remove if NOT followed by ( which would make it a markdown link
-  result = result.replace(/\[(\d+)\](?!\()/g, (match, num) => {
-    // Keep it as a superscript number instead of removing entirely
+  result = result.replace(/\[(\d{1,3})\](?!\()/g, (_, num) => {
+    // num is guaranteed to be 1-3 digits by the regex, safe for HTML insertion
     return `<sup>${num}</sup>`;
   });
 

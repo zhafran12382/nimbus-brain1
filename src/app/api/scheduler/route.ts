@@ -18,6 +18,12 @@ function log(tag: string, ...args: unknown[]) {
 // ── Smart token budget ──
 // Simple reminders ("ingetin gw makan", "minum air", etc.) → short message, low tokens
 // Complex tasks (research, news digest, study plans) → detailed message, high tokens
+// Simple task keywords — grouped by category:
+// Daily activities: inget, makan, minum, tidur, bangun, istirahat, sholat, salat, break, stretch, jalan, olahraga
+// Chores: cuci, bersih
+// Communication: telpon, call, kirim, send
+// Shopping/payments: bayar, bill, beli, buy
+// The "remind" alias covers both Indonesian (inget) and English (remind)
 const SIMPLE_TASK_KEYWORDS = /\b(inget|remind|makan|minum|tidur|bangun|istirahat|sholat|salat|break|stretch|jalan|olahraga|cuci|bersih|telpon|call|bayar|bill|kirim|send|beli|buy)\b/i;
 
 function getTokenBudget(taskName: string, prompt: string): { max_tokens: number; style: 'short' | 'detailed' } {
@@ -107,7 +113,7 @@ async function tryAiUpgrade(
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
+  const timer = setTimeout(() => controller.abort(), 28000);
 
   try {
     const budget = getTokenBudget(taskName, prompt);
@@ -217,7 +223,7 @@ async function tryAiUpgrade(
     const errorCode = isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR';
     await insertNotification(
       `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
-      `${isTimeout ? 'Request timeout (>30s)' : msg.slice(0, 100)}. Kode: ${errorCode}`.slice(0, 160),
+      `${isTimeout ? 'Request timeout (>28s)' : msg.slice(0, 100)}. Kode: ${errorCode}`.slice(0, 160),
       taskId, undefined, undefined, 'warning',
     );
   } finally {
