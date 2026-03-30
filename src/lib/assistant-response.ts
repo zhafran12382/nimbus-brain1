@@ -304,7 +304,82 @@ export function sanitizeAssistantContent(content: string): string {
     "",
   );
 
+  // ── Citation sanitization ──
+  // Remove raw citation placeholders that leak into final output.
+  // Handles: [1 source], [2 sources], [N sources], (1 source), (2 sources),
+  // truncated tokens like [1tsource], [1t source], [source], [sources],
+  // and other malformed citation artifacts.
+  sanitized = sanitizeCitations(sanitized);
+
   return sanitized.trim();
+}
+
+/**
+ * Clean up raw citation placeholders that should not appear in the final UI.
+ * 
+ * Removed: [N source], [N sources], (N source), [Ntsource], [citation needed],
+ *          [ref], [reference], [sources], and other malformed placeholders.
+ * Converted: Bare [N] (without URL) → <sup>N</sup> superscript badges.
+ * Preserved: Valid markdown links [text](url) and citation links [N](url).
+ */
+export function sanitizeCitations(text: string): string {
+  let result = text;
+
+  // Protect code blocks from citation sanitization
+  const codeBlocks: string[] = [];
+  result = result.replace(/```[\s\S]*?```/g, (m) => {
+    codeBlocks.push(m);
+    return `%%CITE_CB_${codeBlocks.length - 1}%%`;
+  });
+  const inlineCodes: string[] = [];
+  result = result.replace(/`[^`\n]+`/g, (m) => {
+    inlineCodes.push(m);
+    return `%%CITE_IC_${inlineCodes.length - 1}%%`;
+  });
+
+  // Protect valid markdown links [text](url) — these have a real URL in parens
+  const validLinks: string[] = [];
+  result = result.replace(/\[[^\]]*\]\(https?:\/\/[^)]+\)/g, (m) => {
+    validLinks.push(m);
+    return `%%CITE_VL_${validLinks.length - 1}%%`;
+  });
+
+  // Remove [N source], [N sources], [Ntsource], [Nt source] patterns
+  result = result.replace(/\[\s*\d+\s*t?\s*sources?\s*\]/gi, '');
+
+  // Remove (N source), (N sources) patterns
+  result = result.replace(/\(\s*\d+\s*sources?\s*\)/gi, '');
+
+  // Remove bare [source], [sources] without numbers
+  result = result.replace(/\[\s*sources?\s*\]/gi, '');
+
+  // Remove [citation needed] or [citation] placeholders
+  result = result.replace(/\[\s*citation(?:\s+needed)?\s*\]/gi, '');
+
+  // Remove [ref], [reference], [refs] placeholders
+  result = result.replace(/\[\s*refs?\s*\]/gi, '');
+  result = result.replace(/\[\s*references?\s*\]/gi, '');
+
+  // Clean up bare number-only citation brackets that don't link anywhere [1], [2], etc.
+  // Only remove if NOT followed by ( which would make it a markdown link
+  result = result.replace(/\[(\d{1,3})\](?!\()/g, (_, num) => {
+    // num is guaranteed to be 1-3 digits by the regex, safe for HTML insertion
+    return `<sup>${num}</sup>`;
+  });
+
+  // Clean up duplicate superscripts (e.g., <sup>1</sup><sup>1</sup>)
+  result = result.replace(/(<sup>\d+<\/sup>)\1+/g, '$1');
+
+  // Clean up excessive whitespace left by removed citations
+  result = result.replace(/ {2,}/g, ' ');
+  result = result.replace(/\n{3,}/g, '\n\n');
+
+  // Restore protected content
+  result = result.replace(/%%CITE_VL_(\d+)%%/g, (_, i) => validLinks[Number(i)]);
+  result = result.replace(/%%CITE_IC_(\d+)%%/g, (_, i) => inlineCodes[Number(i)]);
+  result = result.replace(/%%CITE_CB_(\d+)%%/g, (_, i) => codeBlocks[Number(i)]);
+
+  return result;
 }
 
 export function formatThinkingDuration(ms?: number): string {
