@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getProviderConfig, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID } from '@/lib/models';
+import { getProviderConfig } from '@/lib/models';
 import type { ProviderId } from '@/types';
+
+// Hardcoded AI model for notification upgrade — always use this model
+const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b';
+const AI_UPGRADE_PROVIDER: ProviderId = 'openrouter';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -44,7 +48,7 @@ async function insertNotification(
   if (!e2) return true;
   log('INSERT', `Without label failed: ${e2.message}`);
 
-  // Attempt 3: minimal with task_id only (no label/extra_line/FK-only columns)
+  // Attempt 3: absolute minimal (title + message + type + task_id)
   const { error: e3 } = await supabase.from('notifications').insert({
     title, message, type: 'info', task_id: taskId || null,
   });
@@ -58,44 +62,46 @@ async function tryAiUpgrade(
   taskId: string,
   taskName: string,
   prompt: string,
-  modelId: string,
-  providerId: ProviderId,
 ): Promise<void> {
   const startMs = Date.now();
-  const provider = getProviderConfig(providerId);
+  const provider = getProviderConfig(AI_UPGRADE_PROVIDER);
   if (!provider) {
-    log('AI', `No provider config for "${providerId}", skipping AI upgrade`);
+    log('AI', `No provider config for "${AI_UPGRADE_PROVIDER}", skipping AI upgrade`);
     return;
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timer = setTimeout(() => controller.abort(), 15000);
 
   try {
+    log('AI', `Starting AI upgrade for "${taskName}" model=${AI_UPGRADE_MODEL} provider=${AI_UPGRADE_PROVIDER}`);
+
     const res = await fetch(`${provider.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: provider.getHeaders(),
       body: JSON.stringify({
-        model: modelId,
+        model: AI_UPGRADE_MODEL,
         messages: [
           { role: 'system', content: NOTIFICATION_SYSTEM_PROMPT },
           { role: 'user', content: `Task: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
         ],
         temperature: 0.7,
         max_tokens: 300,
-        ...(providerId === 'openrouter' ? { provider: { require_parameters: true }, route: 'fallback' } : {}),
+        provider: { require_parameters: true },
+        route: 'fallback',
       }),
       signal: controller.signal,
     });
 
     if (!res.ok) {
-      log('AI', `API returned ${res.status} for task "${taskName}" (${Date.now() - startMs}ms)`);
+      const body = await res.text().catch(() => '(unreadable)');
+      log('AI', `API returned ${res.status} for task "${taskName}" (${Date.now() - startMs}ms) body=${body.slice(0, 300)}`);
       return;
     }
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content?.trim();
     if (!raw) {
-      log('AI', `Empty AI response for task "${taskName}" (${Date.now() - startMs}ms)`);
+      log('AI', `Empty AI response for task "${taskName}" (${Date.now() - startMs}ms) data=${JSON.stringify(data).slice(0, 300)}`);
       return;
     }
 
@@ -247,15 +253,13 @@ export async function GET(request: NextRequest) {
 
   // ═══════════════════════════════════════════════════════════
   // PHASE 2 — AI upgrade + EasyCron cleanup (awaited before response)
-  // Both are time-bounded (AI aborts at 8s) so this won't cause timeout.
+  // AI upgrade uses hardcoded openai/gpt-oss-120b via openrouter.
+  // Both are time-bounded (AI aborts at 15s) so this won't cause timeout.
   // Using Promise.allSettled ensures both run even if one throws.
   // ═══════════════════════════════════════════════════════════
 
-  const aiModel = task.model_used || DEFAULT_MODEL_ID;
-  const aiProvider = (task.provider_used as ProviderId) || DEFAULT_PROVIDER_ID;
-
   await Promise.allSettled([
-    tryAiUpgrade(task.id, task.name, task.prompt, aiModel, aiProvider),
+    tryAiUpgrade(task.id, task.name, task.prompt),
     task.run_once && task.easycron_id
       ? deleteEasyCronJob(task.easycron_id)
       : Promise.resolve(),

@@ -413,18 +413,17 @@ export function NotificationBell() {
   const handleRescheduleSave = async (notification: Notification, date: string, time: string) => {
     if (!date || !time) return;
 
-    // Build a one-shot cron expression from the chosen date+time (minute hour day month *)
-    const [, month, day] = date.split("-").map(Number);
-    const [hour, minute] = time.split(":").map(Number);
-
     if (notification.task_id) {
-      // Update the scheduled task: new cron, status back to active
-      const cronExpression = `${minute} ${hour} ${day} ${month} *`;
-      const { error } = await supabase
-        .from("scheduled_tasks")
-        .update({ cron_expression: cronExpression, status: "active", run_once: true })
-        .eq("id", notification.task_id);
-      if (error) throw error;
+      // Call the reschedule API to update DB + create/edit EasyCron job
+      const res = await fetch("/api/scheduler/reschedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: notification.task_id, date, time }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
     } else {
       // No linked task — duplicate notification as new unread reminder immediately
       const { error } = await supabase.from("notifications").insert({
