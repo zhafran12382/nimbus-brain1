@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse, after } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getProviderConfig } from '@/lib/models';
 import type { ProviderId } from '@/types';
@@ -322,26 +322,26 @@ export async function GET(request: NextRequest) {
   log('PHASE1', `Completed in ${phase1Ms}ms — notification=${inserted} completed=${completed}`);
 
   // ═══════════════════════════════════════════════════════════
-  // PHASE 2 — Background: AI upgrade + EasyCron cleanup
-  // Uses next/server after() to run AFTER the response is sent.
-  // This ensures EasyCron gets a fast HTTP 200, and the AI upgrade
-  // runs reliably in the background with guaranteed execution time.
+  // PHASE 2 — AI upgrade + EasyCron cleanup (awaited)
   // AI upgrade uses hardcoded openai/gpt-oss-120b via openrouter.
+  // AbortController timeout is 15s, well within maxDuration=30s.
+  // Promise.allSettled ensures both run even if one fails.
   // ═══════════════════════════════════════════════════════════
 
-  after(async () => {
-    try {
-      await Promise.allSettled([
-        tryAiUpgrade(task.id, task.name, task.prompt),
-        task.run_once && task.easycron_id
-          ? deleteEasyCronJob(task.easycron_id)
-          : Promise.resolve(),
-      ]);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      log('PHASE2', `Unhandled error in after(): ${msg}`);
-    }
-  });
+  const phase2Results = await Promise.allSettled([
+    tryAiUpgrade(task.id, task.name, task.prompt),
+    task.run_once && task.easycron_id
+      ? deleteEasyCronJob(task.easycron_id)
+      : Promise.resolve(),
+  ]);
+
+  const aiResult = phase2Results[0];
+  if (aiResult.status === 'rejected') {
+    log('PHASE2', `AI upgrade rejected: ${aiResult.reason}`);
+  }
+
+  const totalMs = Date.now() - handlerStart;
+  log('DONE', `Total handler time: ${totalMs}ms (phase1=${phase1Ms}ms phase2=${totalMs - phase1Ms}ms)`);
 
   return NextResponse.json({
     status: 'ok',
