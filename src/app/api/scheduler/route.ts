@@ -29,10 +29,11 @@ async function insertNotification(
   taskId?: string,
   label?: string,
   extraLine?: string,
+  type: 'info' | 'warning' | 'error' | 'success' = 'info',
 ): Promise<boolean> {
   // Attempt 1: all columns
   const { error: e1 } = await supabase.from('notifications').insert({
-    title, message, type: 'info',
+    title, message, type,
     task_id: taskId || null,
     label: label || null,
     extra_line: extraLine || null,
@@ -42,7 +43,7 @@ async function insertNotification(
 
   // Attempt 2: without label/extra_line (columns may not exist)
   const { error: e2 } = await supabase.from('notifications').insert({
-    title, message, type: 'info',
+    title, message, type,
     task_id: taskId || null,
   });
   if (!e2) return true;
@@ -50,7 +51,7 @@ async function insertNotification(
 
   // Attempt 3: absolute minimal (title + message + type + task_id)
   const { error: e3 } = await supabase.from('notifications').insert({
-    title, message, type: 'info', task_id: taskId || null,
+    title, message, type, task_id: taskId || null,
   });
   if (!e3) return true;
   log('INSERT', `Minimal insert failed: ${e3.message}`);
@@ -67,6 +68,11 @@ async function tryAiUpgrade(
   const provider = getProviderConfig(AI_UPGRADE_PROVIDER);
   if (!provider) {
     log('AI', `No provider config for "${AI_UPGRADE_PROVIDER}", skipping AI upgrade`);
+    await insertNotification(
+      `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
+      `Provider "${AI_UPGRADE_PROVIDER}" tidak ditemukan. Kode: PROVIDER_NOT_FOUND`,
+      taskId, undefined, undefined, 'warning',
+    );
     return;
   }
 
@@ -96,12 +102,22 @@ async function tryAiUpgrade(
     if (!res.ok) {
       const body = await res.text().catch(() => '(unreadable)');
       log('AI', `API returned ${res.status} for task "${taskName}" (${Date.now() - startMs}ms) body=${body.slice(0, 300)}`);
+      await insertNotification(
+        `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
+        `API mengembalikan error HTTP ${res.status}. Kode: HTTP_${res.status}`.slice(0, 160),
+        taskId, undefined, undefined, 'warning',
+      );
       return;
     }
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content?.trim();
     if (!raw) {
       log('AI', `Empty AI response for task "${taskName}" (${Date.now() - startMs}ms) data=${JSON.stringify(data).slice(0, 300)}`);
+      await insertNotification(
+        `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
+        `Respons AI kosong atau tidak valid. Kode: EMPTY_RESPONSE`.slice(0, 160),
+        taskId, undefined, undefined, 'warning',
+      );
       return;
     }
 
@@ -110,12 +126,22 @@ async function tryAiUpgrade(
     const lb = cleaned.lastIndexOf('}');
     if (fb === -1 || lb === -1) {
       log('AI', `No JSON found in AI response for task "${taskName}"`);
+      await insertNotification(
+        `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
+        `Respons AI tidak mengandung JSON valid. Kode: INVALID_JSON`.slice(0, 160),
+        taskId, undefined, undefined, 'warning',
+      );
       return;
     }
 
     const parsed = JSON.parse(cleaned.substring(fb, lb + 1));
     if (!parsed.title || !parsed.message) {
       log('AI', `Parsed JSON missing title/message for task "${taskName}"`);
+      await insertNotification(
+        `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
+        `JSON dari AI tidak memiliki field title/message. Kode: MISSING_FIELDS`.slice(0, 160),
+        taskId, undefined, undefined, 'warning',
+      );
       return;
     }
 
@@ -156,6 +182,13 @@ async function tryAiUpgrade(
     const elapsed = Date.now() - startMs;
     const msg = err instanceof Error ? err.message : String(err);
     log('AI', `AI upgrade failed for "${taskName}" after ${elapsed}ms: ${msg}`);
+    const isTimeout = err instanceof Error && err.name === 'AbortError';
+    const errorCode = isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR';
+    await insertNotification(
+      `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
+      `${isTimeout ? 'Request timeout (>15s)' : msg.slice(0, 100)}. Kode: ${errorCode}`.slice(0, 160),
+      taskId, undefined, undefined, 'warning',
+    );
   } finally {
     clearTimeout(timer);
   }
