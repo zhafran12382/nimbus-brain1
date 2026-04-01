@@ -3,9 +3,9 @@ import { supabase } from '@/lib/supabase';
 import { getProviderConfig } from '@/lib/models';
 import type { ProviderId } from '@/types';
 
-// Hardcoded AI model for notification upgrade — always use the free tier
-const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b:free';
-const AI_UPGRADE_PROVIDER: ProviderId = 'openrouter';
+// Hardcoded AI model for notification upgrade — paid tier via OpenRouter
+const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b';
+const AI_UPGRADE_PROVIDER: ProviderId = 'openrouter-paid';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -131,7 +131,6 @@ async function tryAiUpgrade(
         temperature: 0.7,
         max_tokens: budget.max_tokens,
         provider: { require_parameters: true },
-        route: 'fallback',
       }),
       signal: controller.signal,
     });
@@ -323,7 +322,7 @@ export async function GET(request: NextRequest) {
 
   // ═══════════════════════════════════════════════════════════
   // PHASE 2 — AI upgrade + EasyCron cleanup (awaited)
-  // AI upgrade uses openai/gpt-oss-120b:free via openrouter (free tier).
+  // AI upgrade uses openai/gpt-oss-120b via openrouter-paid (paid tier).
   // AbortController timeout is 15s, well within maxDuration=30s.
   // Promise.allSettled ensures both run even if one fails.
   // ═══════════════════════════════════════════════════════════
