@@ -15,46 +15,30 @@ function log(tag: string, ...args: unknown[]) {
   console.log(`[${timestamp}] [SCHEDULER] [${tag}]`, ...args);
 }
 
-// ── Smart token budget ──
-// Simple reminders ("ingetin gw makan", "minum air", etc.) → short message, low tokens
-// Complex tasks (research, news digest, study plans) → detailed message, high tokens
-// Simple task keywords — grouped by category:
-// Daily activities: inget, makan, minum, tidur, bangun, istirahat, sholat, salat, break, stretch, jalan, olahraga
-// Chores: cuci, bersih
-// Communication: telpon, call, kirim, send
-// Shopping/payments: bayar, bill, beli, buy
-// The "remind" alias covers both Indonesian (inget) and English (remind)
+// ── Smart token budget (3-tier) ──
+// Simple reminders → 150 max_tokens (fast, low latency)
+// Digest tasks (news, crypto, updates) → 350 max_tokens
+// Complex reasoning → 800 max_tokens (capped to avoid timeout)
 const SIMPLE_TASK_KEYWORDS = /\b(inget|remind|makan|minum|tidur|bangun|istirahat|sholat|salat|break|stretch|jalan|olahraga|cuci|bersih|telpon|call|bayar|bill|kirim|send|beli|buy)\b/i;
+const DIGEST_TASK_KEYWORDS = /\b(berita|news|update|digest|crypto|bitcoin|saham|stock|market|harian|daily|weekly|mingguan|rangkum|summary|brief)\b/i;
 
-function getTokenBudget(taskName: string, prompt: string): { max_tokens: number; style: 'short' | 'detailed' } {
+type TokenStyle = 'short' | 'digest' | 'complex';
+
+function getTokenBudget(taskName: string, prompt: string): { max_tokens: number; style: TokenStyle } {
   const combined = `${taskName} ${prompt}`.toLowerCase();
   if (SIMPLE_TASK_KEYWORDS.test(combined) && combined.length < 100) {
-    return { max_tokens: 300, style: 'short' };
+    return { max_tokens: 150, style: 'short' };
   }
-  return { max_tokens: 3000, style: 'detailed' };
+  if (DIGEST_TASK_KEYWORDS.test(combined)) {
+    return { max_tokens: 350, style: 'digest' };
+  }
+  return { max_tokens: 800, style: 'complex' };
 }
 
-function getSystemPrompt(style: 'short' | 'detailed'): string {
-  if (style === 'short') {
-    return `Buat notifikasi pengingat singkat dalam bahasa Indonesia.
-Konteks: User sudah membuat task terjadwal, sekarang waktunya mengingatkan.
-Output HANYA JSON valid: {"title":"...","short_label":"...","message":"...","extra_line":"..."}
-Aturan:
-- title: max 60 karakter, HARUS menarik dan natural (gunakan emoji yang relevan). Contoh: "🍽️ Waktunya Makan Siang!", "💧 Yuk Minum Air!", "🏃 Saatnya Gerak Badan!"
-- short_label: max 40 karakter
-- message: max 160 karakter, singkat dan to-the-point
-- extra_line: max 120 karakter, opsional motivasi singkat
-JANGAN sebut AI, sistem, scheduling, atau token. Output HANYA JSON.`;
-  }
-  return `Buat notifikasi pengingat dalam bahasa Indonesia.
-Konteks: User sudah membuat task terjadwal, sekarang waktunya mengingatkan.
-Output HANYA JSON valid: {"title":"...","short_label":"...","message":"...","extra_line":"..."}
-Aturan:
-- title: max 60 karakter, HARUS menarik dan natural (gunakan emoji yang relevan). Contoh: "📰 Update Berita Tech Hari Ini", "📚 Waktunya Review Materi!", "🎯 Check Progress Target Kamu"
-- short_label: max 40 karakter
-- message: sampai 3000 karakter, isi dengan konten yang helpful dan relevan sesuai konteks task user
-- extra_line: max 120 karakter, opsional reinforcement
-JANGAN sebut AI, sistem, scheduling, atau token. Tulis secukupnya sesuai kebutuhan, jangan dipanjang-panjangkan kalau memang tasknya simpel. Output HANYA JSON.`;
+function getSystemPrompt(style: TokenStyle): string {
+  return `Buat notifikasi pengingat dalam bahasa Indonesia yang natural dan menarik.
+Output HANYA JSON valid: {"title":"judul (emoji + max 60 char)","short_label":"max 40 char","message":"isi notifikasi","extra_line":"opsional, singkat"}
+Aturan: title harus pakai emoji relevan, message ${style === 'short' ? 'max 160 karakter, singkat' : style === 'digest' ? 'max 400 karakter, informatif' : 'max 600 karakter, detail tapi padat'}. JANGAN sebut AI/sistem/token. Output HANYA JSON.`;
 }
 
 // ── Helpers ──
@@ -192,9 +176,10 @@ async function tryAiUpgrade(
 
     if (existing) {
       // Try full update
+      const msgLimit = budget.style === 'short' ? 160 : budget.style === 'digest' ? 400 : 600;
       const { error: ue } = await supabase.from('notifications').update({
         title: String(parsed.title).slice(0, 60),
-        message: String(parsed.message).slice(0, 3000),
+        message: String(parsed.message).slice(0, msgLimit),
         label: String(parsed.short_label || '').slice(0, 40) || null,
         extra_line: String(parsed.extra_line || '').slice(0, 120) || null,
       }).eq('id', existing.id);
@@ -204,7 +189,7 @@ async function tryAiUpgrade(
         // Fallback: update without label/extra_line
         const { error: ue2 } = await supabase.from('notifications').update({
           title: String(parsed.title).slice(0, 60),
-          message: String(parsed.message).slice(0, 3000),
+          message: String(parsed.message).slice(0, msgLimit),
         }).eq('id', existing.id);
         if (ue2) {
           log('AI', `Minimal update also failed: ${ue2.message}`);
@@ -294,7 +279,7 @@ export async function GET(request: NextRequest) {
 
   // ── STEP 2: Create notification IMMEDIATELY (static content) ──
   const title = `⏰ ${task.name}`.slice(0, 60);
-  const message = String(task.prompt).slice(0, 3000);
+  const message = String(task.prompt).slice(0, 500);
 
   const inserted = await insertNotification(title, message, task.id);
 
