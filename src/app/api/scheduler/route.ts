@@ -15,31 +15,12 @@ function log(tag: string, ...args: unknown[]) {
   console.log(`[${timestamp}] [SCHEDULER] [${tag}]`, ...args);
 }
 
-// ── Smart token budget (3-tier) ──
-// Simple reminders → 150 max_tokens (fast, low latency)
-// Digest tasks (news, crypto, updates) → 350 max_tokens
-// Complex reasoning → 800 max_tokens (capped to avoid timeout)
-const SIMPLE_TASK_KEYWORDS = /\b(inget|remind|makan|minum|tidur|bangun|istirahat|sholat|salat|break|stretch|jalan|olahraga|cuci|bersih|telpon|call|bayar|bill|kirim|send|beli|buy)\b/i;
-const DIGEST_TASK_KEYWORDS = /\b(berita|news|update|digest|crypto|bitcoin|saham|stock|market|harian|daily|weekly|mingguan|rangkum|summary|brief)\b/i;
+// ── Flat token budget: 300 max_tokens for all tasks ──
+const AI_MAX_TOKENS = 300;
 
-type TokenStyle = 'short' | 'digest' | 'complex';
-
-function getTokenBudget(taskName: string, prompt: string): { max_tokens: number; style: TokenStyle } {
-  const combined = `${taskName} ${prompt}`.toLowerCase();
-  if (SIMPLE_TASK_KEYWORDS.test(combined) && combined.length < 100) {
-    return { max_tokens: 150, style: 'short' };
-  }
-  if (DIGEST_TASK_KEYWORDS.test(combined)) {
-    return { max_tokens: 350, style: 'digest' };
-  }
-  return { max_tokens: 800, style: 'complex' };
-}
-
-function getSystemPrompt(style: TokenStyle): string {
-  return `Buat notifikasi pengingat dalam bahasa Indonesia yang natural dan menarik.
-Output HANYA JSON valid: {"title":"judul (emoji + max 60 char)","short_label":"max 40 char","message":"isi notifikasi","extra_line":"opsional, singkat"}
-Aturan: title harus pakai emoji relevan, message ${style === 'short' ? 'max 160 karakter, singkat' : style === 'digest' ? 'max 400 karakter, informatif' : 'max 600 karakter, detail tapi padat'}. JANGAN sebut AI/sistem/token. Output HANYA JSON.`;
-}
+const SYSTEM_PROMPT = `Buat notifikasi pengingat dalam bahasa Indonesia yang natural dan menarik.
+Output HANYA JSON valid: {"title":"judul (emoji + max 60 char)","short_label":"max 40 char","message":"isi notifikasi singkat dan jelas","extra_line":"opsional, reinforcement singkat"}
+Aturan: title harus pakai emoji relevan, message singkat dan to-the-point. JANGAN sebut AI/sistem/token. Output HANYA JSON.`;
 
 // ── Helpers ──
 
@@ -100,8 +81,7 @@ async function tryAiUpgrade(
   const timer = setTimeout(() => controller.abort(), 15000);
 
   try {
-    const budget = getTokenBudget(taskName, prompt);
-    log('AI', `Starting AI upgrade for "${taskName}" model=${AI_UPGRADE_MODEL} provider=${AI_UPGRADE_PROVIDER} style=${budget.style} max_tokens=${budget.max_tokens}`);
+    log('AI', `Starting AI upgrade for "${taskName}" model=${AI_UPGRADE_MODEL} provider=${AI_UPGRADE_PROVIDER} max_tokens=${AI_MAX_TOKENS}`);
 
     const res = await fetch(`${provider.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -109,12 +89,12 @@ async function tryAiUpgrade(
       body: JSON.stringify({
         model: AI_UPGRADE_MODEL,
         messages: [
-          { role: 'system', content: getSystemPrompt(budget.style) },
+          { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `Task: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
         ],
         temperature: 0.7,
-        max_tokens: budget.max_tokens,
-        provider: { require_parameters: true },
+        max_tokens: AI_MAX_TOKENS,
+        provider: { order: ['Groq'], require_parameters: true },
       }),
       signal: controller.signal,
     });
@@ -176,10 +156,9 @@ async function tryAiUpgrade(
 
     if (existing) {
       // Try full update
-      const msgLimit = budget.style === 'short' ? 160 : budget.style === 'digest' ? 400 : 600;
       const { error: ue } = await supabase.from('notifications').update({
         title: String(parsed.title).slice(0, 60),
-        message: String(parsed.message).slice(0, msgLimit),
+        message: String(parsed.message).slice(0, 500),
         label: String(parsed.short_label || '').slice(0, 40) || null,
         extra_line: String(parsed.extra_line || '').slice(0, 120) || null,
       }).eq('id', existing.id);
@@ -189,7 +168,7 @@ async function tryAiUpgrade(
         // Fallback: update without label/extra_line
         const { error: ue2 } = await supabase.from('notifications').update({
           title: String(parsed.title).slice(0, 60),
-          message: String(parsed.message).slice(0, msgLimit),
+          message: String(parsed.message).slice(0, 500),
         }).eq('id', existing.id);
         if (ue2) {
           log('AI', `Minimal update also failed: ${ue2.message}`);
@@ -307,8 +286,8 @@ export async function GET(request: NextRequest) {
 
   // ═══════════════════════════════════════════════════════════
   // PHASE 2 — AI upgrade + EasyCron cleanup (awaited)
-  // AI upgrade uses openai/gpt-oss-120b via openrouter-paid (paid tier).
-  // AbortController timeout is 15s, well within maxDuration=30s.
+  // AI upgrade uses openai/gpt-oss-120b via openrouter-paid, routed to Groq.
+  // Flat 300 max_tokens. AbortController timeout is 15s.
   // Promise.allSettled ensures both run even if one fails.
   // ═══════════════════════════════════════════════════════════
 
