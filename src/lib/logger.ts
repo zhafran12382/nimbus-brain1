@@ -155,7 +155,7 @@ function persistToSupabase(entry: LogEntry): void {
       timestamp: entry.timestamp,
       level: entry.level,
       component: entry.component,
-      message: entry.message.slice(0, 2000), // cap message length
+      message: entry.message.slice(0, 2000), // cap for Supabase column; in-memory retains full message
       data: entry.data ? JSON.stringify(entry.data) : null,
       correlation_id: entry.correlationId || null,
       duration_ms: entry.durationMs ?? null,
