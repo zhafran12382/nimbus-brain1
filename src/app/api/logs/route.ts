@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queryLogs, getLogStats, clearLogs, type LogQuery } from '@/lib/logger';
+import { queryLogsAsync, getLogStatsAsync, clearLogsAsync, isSupabaseAvailable, type LogQuery } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/logs - Query logs with filters
+ * GET /api/logs - Query logs with filters (async, tries Supabase first)
  * Query params: level, component, correlationId, search, startTime, endTime, limit, offset
  * 
  * GET /api/logs?stats=true - Get log statistics
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   // Stats mode
   if (params.get('stats') === 'true') {
-    const stats = getLogStats(
+    const stats = await getLogStatsAsync(
       params.get('startTime') || undefined,
       params.get('endTime') || undefined,
     );
@@ -35,14 +35,17 @@ export async function GET(req: NextRequest) {
   if (params.get('limit')) query.limit = parseInt(params.get('limit')!, 10);
   if (params.get('offset')) query.offset = parseInt(params.get('offset')!, 10);
 
-  const result = queryLogs(query);
-  return NextResponse.json(result);
+  const result = await queryLogsAsync(query);
+  return NextResponse.json({
+    ...result,
+    supabaseAvailable: isSupabaseAvailable(),
+  });
 }
 
 /**
- * DELETE /api/logs - Clear all logs
+ * DELETE /api/logs - Clear all logs (memory + Supabase)
  */
 export async function DELETE() {
-  clearLogs();
+  await clearLogsAsync();
   return NextResponse.json({ success: true, message: 'Logs cleared' });
 }
