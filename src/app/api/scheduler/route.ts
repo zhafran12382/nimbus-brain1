@@ -39,6 +39,13 @@ function log(tag: string, ...args: unknown[]) {
 // ── Flat token budget: 300 max_tokens for all tasks ──
 const AI_MAX_TOKENS = 300;
 
+// ── Notification field limits ──
+const MAX_NOTIFICATION_TITLE = 60;
+const MAX_NOTIFICATION_MESSAGE = 500;
+const MAX_NOTIFICATION_LABEL = 40;
+const MAX_NOTIFICATION_EXTRA = 120;
+const MAX_ORIGINAL_PROMPT = 2000;
+
 const SYSTEM_PROMPT = `Buat notifikasi pengingat dalam bahasa Indonesia yang natural dan menarik.
 Output HANYA JSON valid: {"title":"judul (emoji + max 60 char)","short_label":"max 40 char","message":"isi notifikasi singkat dan jelas","extra_line":"opsional, reinforcement singkat"}
 Aturan: title harus pakai emoji relevan, message singkat dan to-the-point. JANGAN sebut AI/sistem/token. Output HANYA JSON.`;
@@ -365,12 +372,12 @@ async function tryAiUpgrade(
     if (existing) {
       // ── Step 12: Update notification ──
       const updatePayload = {
-        title: String(parsed.title).slice(0, 60),
-        message: String(parsed.message).slice(0, 500),
-        label: String(parsed.short_label || '').slice(0, 40) || null,
-        extra_line: String(parsed.extra_line || '').slice(0, 120) || null,
+        title: String(parsed.title).slice(0, MAX_NOTIFICATION_TITLE),
+        message: String(parsed.message).slice(0, MAX_NOTIFICATION_MESSAGE),
+        label: String(parsed.short_label || '').slice(0, MAX_NOTIFICATION_LABEL) || null,
+        extra_line: String(parsed.extra_line || '').slice(0, MAX_NOTIFICATION_EXTRA) || null,
         is_truncated: isTruncated,
-        original_prompt: prompt.slice(0, 2000) || null,
+        original_prompt: prompt.slice(0, MAX_ORIGINAL_PROMPT) || null,
       };
       dbg.log('AI:DB', 'Updating notification with payload', { ...updatePayload, original_prompt: updatePayload.original_prompt?.slice(0, 50) + '...' });
 
@@ -380,18 +387,18 @@ async function tryAiUpgrade(
         dbg.log('AI:DB', `Full update failed: ${ue.message} — trying without new columns`);
         // Fallback: update without is_truncated/original_prompt (columns may not exist yet)
         const fallbackPayload = {
-          title: String(parsed.title).slice(0, 60),
-          message: String(parsed.message).slice(0, 500),
-          label: String(parsed.short_label || '').slice(0, 40) || null,
-          extra_line: String(parsed.extra_line || '').slice(0, 120) || null,
+          title: String(parsed.title).slice(0, MAX_NOTIFICATION_TITLE),
+          message: String(parsed.message).slice(0, MAX_NOTIFICATION_MESSAGE),
+          label: String(parsed.short_label || '').slice(0, MAX_NOTIFICATION_LABEL) || null,
+          extra_line: String(parsed.extra_line || '').slice(0, MAX_NOTIFICATION_EXTRA) || null,
         };
         const { error: ue1b } = await supabase.from('notifications').update(fallbackPayload).eq('id', existing.id);
         if (ue1b) {
           dbg.log('AI:DB', `Fallback update failed: ${ue1b.message} — trying minimal update`);
           // Fallback: update without label/extra_line
           const minPayload = {
-            title: String(parsed.title).slice(0, 60),
-            message: String(parsed.message).slice(0, 500),
+            title: String(parsed.title).slice(0, MAX_NOTIFICATION_TITLE),
+            message: String(parsed.message).slice(0, MAX_NOTIFICATION_MESSAGE),
           };
           const { error: ue2 } = await supabase.from('notifications').update(minPayload).eq('id', existing.id);
           if (ue2) {

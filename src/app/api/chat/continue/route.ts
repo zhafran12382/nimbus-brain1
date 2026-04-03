@@ -54,11 +54,19 @@ export async function POST(req: NextRequest) {
     }
 
     // Build the continuation prompt that will be the "user" message
-    const truncatedContent = [message, extra_line].filter(Boolean).join('\n');
+    // Sanitize inputs: limit length and strip potential prompt injection markers
+    const sanitize = (s: string, maxLen: number) => 
+      String(s || '').slice(0, maxLen).replace(/```/g, '').trim();
+    
+    const safePrompt = sanitize(original_prompt, 2000);
+    const safeMessage = sanitize(message, 1000);
+    const safeExtra = extra_line ? sanitize(extra_line, 200) : '';
+    const truncatedContent = [safeMessage, safeExtra].filter(Boolean).join('\n');
+    
     const continuationPrompt = `Lanjutkan teks berikut ini secara presisi dari titik terakhir. Jangan mengulang apa yang sudah ada, langsung lanjutkan.
 
 Konteks permintaan awal user:
-"${original_prompt}"
+"${safePrompt}"
 
 Teks yang terpotong (lanjutkan dari sini):
 ---
