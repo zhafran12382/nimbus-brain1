@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+
+const TRIGGER = "admin access";
 
 /**
  * AdminAccessTrigger
  * 
  * Listens for the user typing "Admin access" anywhere on the page.
+ * Works both for global keypresses and when the user is focused in any input.
  * When detected, shows a login modal. On successful auth, redirects to /admin/logs.
  * The modal is invisible until triggered — no URL, no button, nothing.
  */
@@ -18,32 +21,56 @@ export function AdminAccessTrigger() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // Listen for "Admin access" typed anywhere
-  const bufferRef = useState(() => ({ chars: "" }))[0];
-
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Only track printable characters
-    if (e.key.length === 1) {
-      bufferRef.chars += e.key;
-      // Keep only last 20 chars
-      if (bufferRef.chars.length > 20) {
-        bufferRef.chars = bufferRef.chars.slice(-20);
-      }
-      // Check for trigger phrase (case-insensitive)
-      if (bufferRef.chars.toLowerCase().includes("admin access")) {
-        bufferRef.chars = "";
-        setShowModal(true);
-        setError("");
-        setUsername("");
-        setPassword("");
-      }
-    }
-  }, [bufferRef]);
+  // Stable mutable buffer — useRef so it survives re-renders without triggering them
+  const bufferRef = useRef("");
 
   useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
+    const openModal = () => {
+      bufferRef.current = "";
+      setShowModal(true);
+      setError("");
+      setUsername("");
+      setPassword("");
+    };
+
+    // Strategy 1: keydown on document (capture phase) — works for global keypresses
+    // and also captures keystrokes while an input is focused, since keydown bubbles.
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (showModal) return; // ignore while modal is open
+      if (e.key.length === 1) {
+        bufferRef.current += e.key;
+        if (bufferRef.current.length > 30) {
+          bufferRef.current = bufferRef.current.slice(-30);
+        }
+        if (bufferRef.current.toLowerCase().includes(TRIGGER)) {
+          openModal();
+        }
+      }
+      // Reset buffer on Escape
+      if (e.key === "Escape") {
+        bufferRef.current = "";
+      }
+    };
+
+    // Strategy 2: input event — fires when text changes in any input/textarea.
+    // This catches virtual keyboard input on mobile and paste events.
+    const handleInput = (e: Event) => {
+      if (showModal) return;
+      const target = e.target as HTMLInputElement | HTMLTextAreaElement | null;
+      if (target && typeof target.value === "string") {
+        if (target.value.toLowerCase().includes(TRIGGER)) {
+          openModal();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener("input", handleInput, true);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("input", handleInput, true);
+    };
+  }, [showModal]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
