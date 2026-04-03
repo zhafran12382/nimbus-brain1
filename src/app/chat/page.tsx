@@ -130,6 +130,32 @@ function ChatPageContent() {
     setMessages([]);
   }, []);
 
+  // ── Detect "Lanjutkan percakapan" continuation from notification ──
+  // When user clicks "Lanjutkan percakapan" in a truncated notification,
+  // it stores conv ID + prompt in localStorage, then navigates here.
+  const continuationHandled = useRef(false);
+  useEffect(() => {
+    if (!initialized || continuationHandled.current) return;
+    const contConvId = localStorage.getItem("nimbus-continue-conv-id");
+    const contPrompt = localStorage.getItem("nimbus-continue-prompt");
+    if (contConvId && contPrompt) {
+      continuationHandled.current = true;
+      // Clean up immediately to prevent re-triggering
+      localStorage.removeItem("nimbus-continue-conv-id");
+      localStorage.removeItem("nimbus-continue-prompt");
+      // Set the conversation and trigger the send after a short delay
+      setActiveConversationId(contConvId);
+      // We need to wait for the conversation to be set before sending
+      setTimeout(() => {
+        // Programmatically trigger the send by dispatching a custom event
+        // that the chat input can pick up, or directly call handleSend
+        window.dispatchEvent(new CustomEvent("nimbus-continue-chat", {
+          detail: { conversationId: contConvId, prompt: contPrompt },
+        }));
+      }, 500);
+    }
+  }, [initialized]);
+
   const handleModeChange = useCallback((mode: ChatMode) => {
     setChatMode(mode);
     localStorage.setItem(MODE_KEY, mode);
@@ -426,6 +452,18 @@ function ChatPageContent() {
       abortControllerRef.current = null;
     }
   }, [messages, activeConversationId, chatMode, modelId, providerId]);
+
+  // ── Listen for continuation event from notification "Lanjutkan percakapan" ──
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.prompt) {
+        handleSend(detail.prompt);
+      }
+    };
+    window.addEventListener("nimbus-continue-chat", handler);
+    return () => window.removeEventListener("nimbus-continue-chat", handler);
+  }, [handleSend]);
 
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden">

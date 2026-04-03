@@ -1,0 +1,114 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
+
+/**
+ * POST /api/chat/continue
+ * 
+ * Creates a new conversation thread to continue a truncated AI notification.
+ * Returns the conversation ID and pre-populated messages so the frontend
+ * can navigate to the chat page and trigger the AI to continue.
+ * 
+ * Body: { notification_id, title, message, original_prompt, extra_line? }
+ */
+export async function POST(req: NextRequest) {
+  const correlationId = logger.createCorrelationId();
+  
+  try {
+    const body = await req.json();
+    const { notification_id, title, message, original_prompt, extra_line } = body;
+
+    if (!notification_id || !message || !original_prompt) {
+      return NextResponse.json(
+        { error: 'Missing required fields: notification_id, message, original_prompt' },
+        { status: 400 }
+      );
+    }
+
+    logger.info('AI', 'Continue conversation requested', {
+      notification_id,
+      original_prompt_len: original_prompt?.length,
+      message_len: message?.length,
+    }, correlationId);
+
+    // Create a new conversation
+    const convTitle = `📝 Lanjutan: ${(title || message).slice(0, 30)}...`;
+    const { data: conversation, error: convErr } = await supabase
+      .from('conversations')
+      .insert({ title: convTitle })
+      .select()
+      .single();
+
+    if (convErr || !conversation) {
+      logger.error('DB', 'Failed to create continuation conversation', {
+        code: 'CONV_CREATE_FAILED',
+        error: convErr?.message || 'No data returned',
+        correlationId,
+      });
+      return NextResponse.json(
+        { error: 'Failed to create conversation' },
+        { status: 500 }
+      );
+    }
+
+    // Build the continuation prompt that will be the "user" message
+    const truncatedContent = [message, extra_line].filter(Boolean).join('\n');
+    const continuationPrompt = `Lanjutkan teks berikut ini secara presisi dari titik terakhir. Jangan mengulang apa yang sudah ada, langsung lanjutkan.
+
+Konteks permintaan awal user:
+"${original_prompt}"
+
+Teks yang terpotong (lanjutkan dari sini):
+---
+${truncatedContent}
+---
+
+Lanjutkan teks di atas dengan tepat dan lengkap. Gunakan bahasa Indonesia.`;
+
+    // Save the user message
+    const { error: msgErr } = await supabase.from('chat_messages').insert({
+      role: 'user',
+      content: continuationPrompt,
+      conversation_id: conversation.id,
+    });
+
+    if (msgErr) {
+      logger.error('DB', 'Failed to save continuation message', {
+        code: 'MSG_INSERT_FAILED',
+        error: msgErr.message,
+        correlationId,
+      });
+    }
+
+    // Mark notification as read
+    await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notification_id);
+
+    logger.info('AI', 'Continuation conversation created', {
+      conversation_id: conversation.id,
+      notification_id,
+    }, correlationId);
+
+    return NextResponse.json({
+      success: true,
+      conversation_id: conversation.id,
+      continuation_prompt: continuationPrompt,
+    });
+
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error('AI', 'Continue conversation failed', {
+      code: 'CONTINUE_FAILED',
+      error: msg,
+      correlationId,
+    });
+    return NextResponse.json(
+      { error: msg },
+      { status: 500 }
+    );
+  }
+}

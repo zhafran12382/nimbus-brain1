@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Info, AlertTriangle, XCircle, CheckCircle, X, Check, Clock } from "lucide-react";
+import { Bell, Info, AlertTriangle, XCircle, CheckCircle, X, Check, Clock, MessageSquare, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Notification } from "@/types";
 
@@ -37,15 +38,20 @@ function NotificationDetail({
   onClose,
   onMarkDone,
   onRemindAgain,
+  onContinueChat,
+  continueLoading,
 }: {
   notification: Notification;
   onClose: () => void;
   onMarkDone: (id: string) => void;
   onRemindAgain: (notification: Notification) => void;
+  onContinueChat: (notification: Notification) => void;
+  continueLoading?: boolean;
 }) {
   const config = typeConfig[notification.type] || typeConfig.info;
   const Icon = config.icon;
   const detailRef = useRef<HTMLDivElement>(null);
+  const isTruncated = notification.is_truncated && notification.original_prompt;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -116,6 +122,16 @@ function NotificationDetail({
             </p>
           )}
 
+          {/* Truncation indicator */}
+          {isTruncated && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+              <p className="text-[11px] text-amber-400/80">
+                Teks notifikasi ini terpotong oleh AI. Klik &quot;Lanjutkan percakapan&quot; untuk melihat versi lengkap.
+              </p>
+            </div>
+          )}
+
           {/* Timestamp */}
           <p className="text-[11px] text-[hsl(0_0%_30%)]">
             {getRelativeTime(notification.created_at)}
@@ -123,13 +139,28 @@ function NotificationDetail({
 
           {/* Actions */}
           <div className="flex gap-2 pt-1">
-            <button
-              onClick={() => onMarkDone(notification.id)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500/10 text-blue-400 text-sm font-medium hover:bg-blue-500/20 transition-colors"
-            >
-              <Check className="h-3.5 w-3.5" />
-              Selesai
-            </button>
+            {isTruncated ? (
+              <button
+                onClick={() => onContinueChat(notification)}
+                disabled={continueLoading}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-500/10 text-purple-400 text-sm font-medium hover:bg-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {continueLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <MessageSquare className="h-3.5 w-3.5" />
+                )}
+                {continueLoading ? "Memuat..." : "Lanjutkan percakapan"}
+              </button>
+            ) : (
+              <button
+                onClick={() => onMarkDone(notification.id)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500/10 text-blue-400 text-sm font-medium hover:bg-blue-500/20 transition-colors"
+              >
+                <Check className="h-3.5 w-3.5" />
+                Selesai
+              </button>
+            )}
             {notification.task_id && (
               <button
                 onClick={() => onRemindAgain(notification)}
@@ -295,6 +326,11 @@ function NotificationItem({
               {notification.label}
             </span>
           )}
+          {notification.is_truncated && (
+            <span className="inline-block text-[10px] font-medium text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded mt-0.5 ml-1">
+              ✂️ Terpotong
+            </span>
+          )}
           <p className="text-xs text-[hsl(0_0%_45%)] mt-0.5 line-clamp-2">{notification.message}</p>
           <p className="text-[10px] text-[hsl(0_0%_35%)] mt-1">{getRelativeTime(notification.created_at)}</p>
         </div>
@@ -305,11 +341,13 @@ function NotificationItem({
 
 // --- Main bell + panel ---
 export function NotificationBell() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [rescheduleTask, setRescheduleTask] = useState<Notification | null>(null);
+  const [continueLoading, setContinueLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const fetchNotifications = useCallback(async () => {
@@ -408,6 +446,39 @@ export function NotificationBell() {
   const handleRemindAgain = (notification: Notification) => {
     setSelectedNotification(null);
     setRescheduleTask(notification);
+  };
+
+  const handleContinueChat = async (notification: Notification) => {
+    if (continueLoading) return;
+    setContinueLoading(true);
+    try {
+      const res = await fetch("/api/chat/continue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notification_id: notification.id,
+          title: notification.title,
+          message: notification.message,
+          original_prompt: notification.original_prompt,
+          extra_line: notification.extra_line,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      // Store the conversation ID and continuation prompt for the chat page to pick up
+      localStorage.setItem("nimbus-continue-conv-id", data.conversation_id);
+      localStorage.setItem("nimbus-continue-prompt", data.continuation_prompt);
+
+      setSelectedNotification(null);
+
+      // Navigate to chat page — it will detect the continuation and auto-send
+      router.push("/chat");
+    } catch (err) {
+      console.error("Continue chat failed:", err);
+    } finally {
+      setContinueLoading(false);
+    }
   };
 
   const handleRescheduleSave = async (notification: Notification, date: string, time: string) => {
@@ -519,6 +590,8 @@ export function NotificationBell() {
                 onClose={() => setSelectedNotification(null)}
                 onMarkDone={handleMarkDone}
                 onRemindAgain={handleRemindAgain}
+                onContinueChat={handleContinueChat}
+                continueLoading={continueLoading}
               />
             )}
             {rescheduleTask && (

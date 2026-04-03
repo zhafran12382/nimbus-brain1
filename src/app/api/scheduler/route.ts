@@ -92,6 +92,8 @@ interface AiUpgradeResult {
   rawResponse?: string;
   parsedJson?: Record<string, unknown>;
   notificationUpdated?: boolean;
+  /** Whether AI response was truncated (finish_reason=length) */
+  isTruncated?: boolean;
 }
 
 async function tryAiUpgrade(
@@ -265,12 +267,15 @@ async function tryAiUpgrade(
     // ── Step 9: Extract AI content ──
     const choices = data.choices as Array<{ message?: { content?: string; role?: string }; finish_reason?: string }> | undefined;
     const firstChoice = choices?.[0];
+    const isTruncated = firstChoice?.finish_reason === 'length';
     dbg.log('AI:CHOICE', 'First choice details', {
       finish_reason: firstChoice?.finish_reason,
+      is_truncated: isTruncated,
       role: firstChoice?.message?.role,
       content_length: firstChoice?.message?.content?.length ?? 0,
       content_preview: firstChoice?.message?.content?.slice(0, 200),
     });
+    result.isTruncated = isTruncated;
 
     const raw = firstChoice?.message?.content?.trim();
     if (!raw) {
@@ -364,28 +369,43 @@ async function tryAiUpgrade(
         message: String(parsed.message).slice(0, 500),
         label: String(parsed.short_label || '').slice(0, 40) || null,
         extra_line: String(parsed.extra_line || '').slice(0, 120) || null,
+        is_truncated: isTruncated,
+        original_prompt: prompt.slice(0, 2000) || null,
       };
-      dbg.log('AI:DB', 'Updating notification with payload', updatePayload);
+      dbg.log('AI:DB', 'Updating notification with payload', { ...updatePayload, original_prompt: updatePayload.original_prompt?.slice(0, 50) + '...' });
 
       const { error: ue } = await supabase.from('notifications').update(updatePayload).eq('id', existing.id);
 
       if (ue) {
-        dbg.log('AI:DB', `Full update failed: ${ue.message} — trying minimal update`);
-        // Fallback: update without label/extra_line
-        const minPayload = {
+        dbg.log('AI:DB', `Full update failed: ${ue.message} — trying without new columns`);
+        // Fallback: update without is_truncated/original_prompt (columns may not exist yet)
+        const fallbackPayload = {
           title: String(parsed.title).slice(0, 60),
           message: String(parsed.message).slice(0, 500),
+          label: String(parsed.short_label || '').slice(0, 40) || null,
+          extra_line: String(parsed.extra_line || '').slice(0, 120) || null,
         };
-        const { error: ue2 } = await supabase.from('notifications').update(minPayload).eq('id', existing.id);
-        if (ue2) {
-          dbg.log('AI:DB', `Minimal update also failed: ${ue2.message}`);
-          result.errorCode = 'DB_UPDATE_FAILED';
-          result.errorDetail = `Both update attempts failed: ${ue.message} / ${ue2.message}`;
-          result.durationMs = Date.now() - startMs;
-          result.notificationUpdated = false;
-          return result;
+        const { error: ue1b } = await supabase.from('notifications').update(fallbackPayload).eq('id', existing.id);
+        if (ue1b) {
+          dbg.log('AI:DB', `Fallback update failed: ${ue1b.message} — trying minimal update`);
+          // Fallback: update without label/extra_line
+          const minPayload = {
+            title: String(parsed.title).slice(0, 60),
+            message: String(parsed.message).slice(0, 500),
+          };
+          const { error: ue2 } = await supabase.from('notifications').update(minPayload).eq('id', existing.id);
+          if (ue2) {
+            dbg.log('AI:DB', `Minimal update also failed: ${ue2.message}`);
+            result.errorCode = 'DB_UPDATE_FAILED';
+            result.errorDetail = `All update attempts failed: ${ue.message} / ${ue1b.message} / ${ue2.message}`;
+            result.durationMs = Date.now() - startMs;
+            result.notificationUpdated = false;
+            return result;
+          }
+          dbg.log('AI:DB', 'Minimal update succeeded (without label/extra_line)');
+        } else {
+          dbg.log('AI:DB', 'Fallback update succeeded (without is_truncated/original_prompt)');
         }
-        dbg.log('AI:DB', 'Minimal update succeeded (without label/extra_line)');
       } else {
         dbg.log('AI:DB', 'Full update succeeded');
       }
@@ -393,7 +413,7 @@ async function tryAiUpgrade(
       result.success = true;
       result.notificationUpdated = true;
       result.durationMs = Date.now() - startMs;
-      dbg.log('AI:SUCCESS', `Notification upgraded for "${taskName}" in ${result.durationMs}ms`);
+      dbg.log('AI:SUCCESS', `Notification upgraded for "${taskName}" in ${result.durationMs}ms (truncated=${isTruncated})`);
     } else {
       result.errorCode = 'NO_NOTIFICATION_FOUND';
       result.errorDetail = `No notification found for task_id="${taskId}" to upgrade`;

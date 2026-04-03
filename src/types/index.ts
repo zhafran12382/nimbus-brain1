@@ -148,6 +148,10 @@ export interface Notification {
   type: 'info' | 'success' | 'warning' | 'error';
   is_read: boolean;
   task_id: string | null;
+  /** Whether AI upgrade response was truncated (finish_reason=length) */
+  is_truncated?: boolean;
+  /** Original user prompt that created the scheduled task */
+  original_prompt?: string | null;
   created_at: string;
 }
 
