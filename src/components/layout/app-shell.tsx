@@ -9,6 +9,8 @@ import { LockedInProvider } from "@/components/study/locked-in-context";
 import { LockedInSetup } from "@/components/study/locked-in-setup";
 import { LockedInAnimation } from "@/components/study/locked-in-animation";
 import { LockedInMode } from "@/components/study/locked-in-mode";
+import { AdminAccessTrigger } from "@/components/debug/admin-access-trigger";
+import { FloatingDebugWindow } from "@/components/debug/floating-debug";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -53,6 +55,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
         />
+
+        {/* Debug tools: Admin access trigger + floating debug window */}
+        <AdminAccessTrigger />
+        <FloatingDebugWindow />
       </div>
     </LockedInProvider>
   );

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getProviderConfig } from '@/lib/models';
+import { logger } from '@/lib/logger';
 import type { ProviderId } from '@/types';
 
 // Hardcoded AI model for notification upgrade — via OpenRouter routed to Groq
@@ -458,12 +459,15 @@ async function deleteEasyCronJob(easycronId: string): Promise<void> {
 export async function GET(request: NextRequest) {
   const handlerStart = Date.now();
   const dbg = createDebugLog();
+  const correlationId = logger.createCorrelationId();
   const taskId = request.nextUrl.searchParams.get('id');
   const taskName = request.nextUrl.searchParams.get('task');
 
+  logger.request('Scheduler triggered', { taskId, taskName, url: `${request.nextUrl.pathname}${request.nextUrl.search}` }, correlationId);
   dbg.log('TRIGGER', `Handler start — id="${taskId}" name="${taskName}" url="${request.nextUrl.pathname}${request.nextUrl.search}"`);
 
   if (!taskId && !taskName) {
+    logger.warn('SCHEDULER', 'Missing id or task parameter', undefined, correlationId);
     return NextResponse.json({ error: 'Missing id or task parameter' }, { status: 400 });
   }
 
@@ -531,6 +535,7 @@ export async function GET(request: NextRequest) {
   // ═══════════════════════════════════════════════════════════
 
   dbg.log('PHASE2', 'Starting AI upgrade + EasyCron cleanup');
+  logger.scheduler('Phase 2 starting: AI upgrade + EasyCron cleanup', { task_id: task.id, task_name: task.name }, correlationId);
 
   const phase2Results = await Promise.allSettled([
     tryAiUpgrade(task.id, task.name, task.prompt, dbg),
@@ -543,12 +548,36 @@ export async function GET(request: NextRequest) {
   let aiResult: AiUpgradeResult | null = null;
   if (aiSettled.status === 'fulfilled') {
     aiResult = aiSettled.value;
+    if (aiResult.success) {
+      logger.ai('AI upgrade succeeded', {
+        task_id: task.id,
+        task_name: task.name,
+        model: aiResult.model,
+        provider: aiResult.providerUsed,
+        duration_ms: aiResult.durationMs,
+      }, correlationId);
+    } else {
+      logger.error('AI', `AI upgrade failed: ${aiResult.errorCode}`, {
+        code: aiResult.errorCode || 'UNKNOWN',
+        error: aiResult.errorDetail || 'Unknown error',
+        data: { task_id: task.id, task_name: task.name, model: aiResult.model, provider: aiResult.providerUsed },
+        correlationId,
+        durationMs: aiResult.durationMs,
+      });
+    }
   } else {
     dbg.log('PHASE2', `AI upgrade Promise rejected: ${aiSettled.reason}`);
+    logger.error('AI', 'AI upgrade Promise rejected', {
+      code: 'PROMISE_REJECTED',
+      error: String(aiSettled.reason),
+      data: { task_id: task.id },
+      correlationId,
+    });
   }
 
   const totalMs = Date.now() - handlerStart;
   dbg.log('DONE', `Total handler time: ${totalMs}ms (phase1=${phase1Ms}ms phase2=${totalMs - phase1Ms}ms)`);
+  logger.perf('Scheduler handler completed', totalMs, { task_id: task.id, phase1_ms: phase1Ms, phase2_ms: totalMs - phase1Ms }, correlationId);
 
   // ── Return response with full debug info ──
   return NextResponse.json({
