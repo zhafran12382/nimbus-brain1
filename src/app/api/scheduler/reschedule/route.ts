@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
-
-function log(tag: string, ...args: unknown[]) {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] [RESCHEDULE] [${tag}]`, ...args);
-}
 
 /**
  * POST /api/scheduler/reschedule
@@ -17,8 +13,12 @@ function log(tag: string, ...args: unknown[]) {
  * Body: { task_id: string, date: "YYYY-MM-DD", time: "HH:MM" }
  */
 export async function POST(request: NextRequest) {
+  const correlationId = logger.createCorrelationId();
+  const start = Date.now();
   const body = await request.json();
   const { task_id, date, time } = body as { task_id?: string; date?: string; time?: string };
+
+  logger.scheduler('Reschedule request received', { task_id, date, time }, correlationId);
 
   if (!task_id || !date || !time) {
     return NextResponse.json({ error: 'Missing task_id, date, or time' }, { status: 400 });
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   // Cron fires at this exact minute/hour/day/month. Since run_once=true,
   // the scheduler marks the task completed after first trigger and deletes the EasyCron job.
   const cronExpression = `${minute} ${hour} ${day} ${month} *`;
-  log('PARSE', `task_id=${task_id} date=${date} time=${time} cron=${cronExpression}`);
+  logger.scheduler('Parsed cron expression', { task_id, cronExpression }, correlationId);
 
   // Fetch existing task
   const { data: task, error: taskErr } = await supabase
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (taskErr || !task) {
-    log('ERROR', `Task not found: ${taskErr?.message || 'no rows'}`);
+    logger.error('SCHEDULER', 'Task not found', { code: 'TASK_NOT_FOUND', error: taskErr?.message, correlationId });
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   }
 
@@ -59,8 +59,7 @@ export async function POST(request: NextRequest) {
   let newEasycronId = task.easycron_id;
 
   if (task.easycron_id) {
-    // Edit existing EasyCron job
-    log('EASYCRON', `Editing existing job ${task.easycron_id} with cron=${cronExpression}`);
+    logger.scheduler('Editing existing EasyCron job', { easycron_id: task.easycron_id, cronExpression }, correlationId);
     try {
       const params = new URLSearchParams();
       params.append('token', process.env.EASYCRON_API_KEY || '');
@@ -75,22 +74,20 @@ export async function POST(request: NextRequest) {
       });
       const data = await res.json();
       if (data.status !== 'success') {
-        log('EASYCRON', `Edit failed: ${JSON.stringify(data)}`);
+        logger.error('SCHEDULER', 'EasyCron edit failed', { code: 'EASYCRON_EDIT_FAIL', data: { response: data }, correlationId });
         // If edit failed (job might have been deleted), create a new one
         newEasycronId = null;
       } else {
-        log('EASYCRON', `Edit succeeded for job ${task.easycron_id}`);
+        logger.scheduler('EasyCron edit succeeded', { easycron_id: task.easycron_id }, correlationId);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      log('EASYCRON', `Edit request failed: ${msg}`);
+      logger.error('SCHEDULER', 'EasyCron edit request failed', { code: 'EASYCRON_EDIT_ERROR', error: err instanceof Error ? err : String(err), correlationId });
       newEasycronId = null;
     }
   }
 
   if (!newEasycronId) {
-    // Create new EasyCron job
-    log('EASYCRON', `Creating new job for task ${task.id} with cron=${cronExpression}`);
+    logger.scheduler('Creating new EasyCron job', { task_id: task.id, cronExpression }, correlationId);
     try {
       const params = new URLSearchParams();
       params.append('token', process.env.EASYCRON_API_KEY || '');
@@ -106,9 +103,9 @@ export async function POST(request: NextRequest) {
 
       if (data.status === 'success' && data.cron_job_id) {
         newEasycronId = String(data.cron_job_id);
-        log('EASYCRON', `Created new job ${newEasycronId}`);
+        logger.scheduler('EasyCron job created', { easycron_id: newEasycronId }, correlationId);
       } else {
-        log('EASYCRON', `Create failed: ${JSON.stringify(data)}`);
+        logger.error('SCHEDULER', 'EasyCron create failed', { code: 'EASYCRON_CREATE_FAIL', data: { response: data }, correlationId });
         return NextResponse.json(
           { error: `EasyCron error: ${data.error || data.message || 'unknown'}` },
           { status: 502 },
@@ -116,7 +113,7 @@ export async function POST(request: NextRequest) {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      log('EASYCRON', `Create request failed: ${msg}`);
+      logger.error('SCHEDULER', 'EasyCron create request failed', { code: 'EASYCRON_CREATE_ERROR', error: err instanceof Error ? err : msg, correlationId });
       return NextResponse.json({ error: `EasyCron unreachable: ${msg}` }, { status: 502 });
     }
   }
@@ -133,11 +130,11 @@ export async function POST(request: NextRequest) {
     .eq('id', task.id);
 
   if (updateErr) {
-    log('ERROR', `Failed to update task: ${updateErr.message}`);
+    logger.error('SCHEDULER', 'Failed to update task in DB', { code: 'DB_UPDATE_FAIL', error: updateErr.message, correlationId });
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
   }
 
-  log('OK', `Task "${task.name}" rescheduled to ${cronExpression} (easycron=${newEasycronId})`);
+  logger.scheduler('Task rescheduled successfully', { task_id: task.id, task_name: task.name, cronExpression, easycron_id: newEasycronId, durationMs: Date.now() - start }, correlationId);
 
   return NextResponse.json({
     status: 'ok',

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,16 +30,22 @@ function verifySessionToken(token: string): { username: string } | null {
 }
 
 export async function GET(req: NextRequest) {
+  const correlationId = logger.createCorrelationId();
+  logger.auth('Session check started', undefined, correlationId);
+
   const token = req.cookies.get('nimbus-session')?.value;
 
   if (!token) {
+    logger.auth('Session check failed: no token', undefined, correlationId);
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
   const session = verifySessionToken(token);
   if (!session) {
+    logger.auth('Session check failed: invalid token', undefined, correlationId);
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
+  logger.auth('Session check succeeded', { username: session.username }, correlationId);
   return NextResponse.json({ authenticated: true, username: session.username });
 }
