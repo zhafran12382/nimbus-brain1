@@ -85,7 +85,7 @@ export function ChatInput({
 
   return (
     <div
-      className="sticky bottom-0 z-10 border-t border-[hsl(0_0%_100%_/_0.04)] bg-[hsl(0_0%_4%)]"
+      className="sticky bottom-0 z-10 border-t border-border-subtle bg-background"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="mx-auto max-w-[var(--chat-content-max-width)] px-3 sm:px-4">
@@ -145,9 +145,9 @@ export function ChatInput({
           className="flex items-end gap-2 pt-3 pb-3"
         >
           <div
-            className={`flex flex-1 flex-col rounded-[1.35rem] border transition-all duration-200 bg-[hsl(220_14%_11%_/_0.88)] min-w-0 ${focused
-                ? "border-[hsl(217_91%_60%_/_0.35)] shadow-[0_0_0_1px_hsl(217_91%_60%_/_0.14),0_8px_28px_-10px_hsl(217_91%_60%_/_0.5)]"
-                : "border-[hsl(0_0%_100%_/_0.1)]"
+            className={`flex flex-1 flex-col rounded-[1.35rem] border transition-all duration-200 bg-surface min-w-0 ${focused
+                ? "border-accent shadow-[0_0_0_1px_var(--color-accent-muted),0_8px_28px_-10px_var(--color-accent-glow)]"
+                : "border-border-default"
               }`}
           >
             <input
@@ -158,7 +158,8 @@ export function ChatInput({
               onBlur={() => setFocused(false)}
               placeholder={imageMode ? "Describe the image you want..." : "Tanya Nimbus Brain..."}
               disabled={isLoading}
-              className="w-full bg-transparent px-4 py-3.5 text-[16px] leading-[1.65] tracking-[0.01em] text-[#ECECEC] placeholder:text-[15px] placeholder:text-[#8F9198] focus:outline-none disabled:opacity-50 min-w-0"
+              className="w-full bg-transparent px-4 py-3.5 text-[16px] leading-[1.65] tracking-[0.01em] text-text-primary placeholder:text-[15px] placeholder:text-text-muted focus:outline-none disabled:opacity-50 min-w-0 resize-none"
+              autoComplete="off"
             />
 
             {/* Bottom Row inside input box: Mode (Left) + Image + Model (Right) */}
@@ -201,8 +202,8 @@ export function ChatInput({
             className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-all duration-200 self-end ${hasText
                 ? imageMode
                   ? "bg-violet-500 text-white shadow-[0_8px_24px_-8px_hsl(263_70%_58%_/_0.7)]"
-                  : "bg-[hsl(217_91%_60%)] text-white shadow-[0_8px_24px_-8px_hsl(217_91%_60%_/_0.7)]"
-                : "bg-[hsl(220_12%_14%)] text-[hsl(0_0%_40%)]"
+                  : "bg-accent text-white shadow-[0_8px_24px_-8px_var(--color-accent-glow)]"
+                : "bg-elevated text-text-muted"
               } disabled:opacity-50`}
             style={{ minHeight: "48px", minWidth: "48px" }}
           >

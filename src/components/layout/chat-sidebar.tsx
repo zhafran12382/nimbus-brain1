@@ -20,6 +20,27 @@ import {
 import { Conversation } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { useTheme } from "next-themes";
+import { Moon, Sun } from "lucide-react";
+
+/* ──────────────── Theme Toggle ──────────────── */
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+
+  return (
+    <button
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-hover transition-colors"
+      title="Toggle theme"
+    >
+      {resolvedTheme === "dark" ? (
+        <Sun className="h-4 w-4" />
+      ) : (
+        <Moon className="h-4 w-4" />
+      )}
+    </button>
+  );
+}
 
 /* ──────────────── Types ──────────────── */
 
@@ -207,7 +228,7 @@ export function ChatSidebar({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-[70] flex w-[280px] max-w-[85vw] flex-col glass border-r border-border-subtle transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
+          "fixed inset-y-0 left-0 z-[70] flex w-[280px] max-w-[85vw] flex-col bg-surface border-r border-border-subtle transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
           "lg:relative lg:z-auto lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
@@ -228,7 +249,7 @@ export function ChatSidebar({
 
         {/* ─── Area X: Personal / Study Tabs ─── */}
         <div className="px-3 pt-3 pb-1">
-          <div className="flex gap-1 p-0.5 rounded-lg bg-[hsl(0_0%_7%)] border border-border-subtle">
+          <div className="flex gap-1 p-0.5 rounded-lg bg-elevated border border-border-subtle">
               <button
                 onClick={() => setSidebarTab("personal")}
                 className={cn(
@@ -480,10 +501,13 @@ export function ChatSidebar({
         </div>
 
         {/* ─── Footer ─── */}
-        <div className="p-3 border-t border-border-subtle">
-          <p className="text-[10px] text-text-muted text-center">
+        <div className="p-3 border-t border-border-subtle flex items-center justify-between">
+          <p className="text-[10px] text-text-muted text-center flex-1">
             Nimbus Brain v1.0 — Powered by AI
           </p>
+          <div className="ml-2">
+            <ThemeToggle />
+          </div>
         </div>
       </aside>
     </>

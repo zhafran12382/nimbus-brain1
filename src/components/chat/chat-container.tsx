@@ -55,32 +55,32 @@ export function ChatContainer({
               {/* Logo with glow */}
               <div
                 className="logo-pulse flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 text-2xl font-bold text-white mb-4"
-                style={{ boxShadow: "0 0 60px hsl(217 91% 60% / 0.15)" }}
+                style={{ boxShadow: "0 0 60px var(--color-accent-glow)" }}
               >
                 N
               </div>
-              <p className="text-lg font-semibold text-[hsl(0_0%_93%)]">Nimbus Brain</p>
-              <p className="text-sm text-[hsl(0_0%_45%)] mt-1 max-w-xs">
+              <p className="text-lg font-semibold text-text-primary">Nimbus Brain</p>
+              <p className="text-sm text-text-muted mt-1 max-w-xs">
                 Asisten personal cerdas. Tanya apa saja atau kelola target-mu.
               </p>
               <div className="flex flex-wrap gap-2 mt-5 justify-center">
                 <button
                   onClick={() => onSend("Apa berita terbaru hari ini?")}
-                  className="px-3.5 py-2 rounded-xl border border-dashed border-[hsl(0_0%_100%_/_0.08)] text-xs text-[hsl(0_0%_45%)] hover:text-[hsl(217_91%_60%)] hover:border-[hsl(217_91%_60%_/_0.3)] hover:bg-[hsl(217_91%_60%_/_0.05)] transition-colors"
+                  className="px-3.5 py-2 rounded-xl border border-border-default text-xs text-text-secondary hover:text-accent hover:border-accent hover:bg-hover transition-colors"
                   style={{ minHeight: "40px" }}
                 >
                   Berita terbaru hari ini
                 </button>
                 <button
                   onClick={() => onSend("Buat target baru: baca 10 buku tahun ini")}
-                  className="px-3.5 py-2 rounded-xl border border-dashed border-[hsl(0_0%_100%_/_0.08)] text-xs text-[hsl(0_0%_45%)] hover:text-[hsl(217_91%_60%)] hover:border-[hsl(217_91%_60%_/_0.3)] hover:bg-[hsl(217_91%_60%_/_0.05)] transition-colors"
+                  className="px-3.5 py-2 rounded-xl border border-border-default text-xs text-text-secondary hover:text-accent hover:border-accent hover:bg-hover transition-colors"
                   style={{ minHeight: "40px" }}
                 >
                   Buat target baru
                 </button>
                 <button
                   onClick={() => onSend("Tampilkan semua target aktif dan progress-nya")}
-                  className="px-3.5 py-2 rounded-xl border border-dashed border-[hsl(0_0%_100%_/_0.08)] text-xs text-[hsl(0_0%_45%)] hover:text-[hsl(217_91%_60%)] hover:border-[hsl(217_91%_60%_/_0.3)] hover:bg-[hsl(217_91%_60%_/_0.05)] transition-colors"
+                  className="px-3.5 py-2 rounded-xl border border-border-default text-xs text-text-secondary hover:text-accent hover:border-accent hover:bg-hover transition-colors"
                   style={{ minHeight: "40px" }}
                 >
                   Lihat progress target

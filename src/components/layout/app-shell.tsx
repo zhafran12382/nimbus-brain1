@@ -33,10 +33,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {isChatPage ? (
           // Chat page renders its own full layout —
           // the sidebar, header, etc. are managed inside chat/page.tsx
-          <>{children}</>
+          <div className="bg-background text-text-primary min-h-[100dvh]">
+            {children}
+          </div>
         ) : (
           // Non-chat pages: simple full-screen layout (no NavRail/BottomBar)
-          <main className="min-h-[100dvh]">
+          <main className="min-h-[100dvh] bg-background text-text-primary">
             <motion.div
               key={pathname}
               initial={slideUp.initial}

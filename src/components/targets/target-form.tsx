@@ -40,24 +40,26 @@ export function TargetForm({ open, onOpenChange, editTarget }: TargetFormProps) 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (editTarget) {
-      setTitle(editTarget.title);
-      setCategory(editTarget.category);
-      setDescription(editTarget.description || "");
-      setTargetValue(String(editTarget.target_value));
-      setCurrentValue(String(editTarget.current_value));
-      setUnit(editTarget.unit);
-      setDeadline(editTarget.deadline || "");
-      setStatus(editTarget.status);
-    } else {
-      setTitle("");
-      setCategory("custom");
-      setDescription("");
-      setTargetValue("");
-      setCurrentValue("");
-      setUnit("%");
-      setDeadline("");
-      setStatus("active");
+    if (open) {
+      if (editTarget) {
+        setTitle(editTarget.title);
+        setCategory(editTarget.category);
+        setDescription(editTarget.description || "");
+        setTargetValue(String(editTarget.target_value));
+        setCurrentValue(String(editTarget.current_value));
+        setUnit(editTarget.unit);
+        setDeadline(editTarget.deadline || "");
+        setStatus(editTarget.status);
+      } else {
+        setTitle("");
+        setCategory("custom");
+        setDescription("");
+        setTargetValue("");
+        setCurrentValue("");
+        setUnit("%");
+        setDeadline("");
+        setStatus("active");
+      }
     }
   }, [editTarget, open]);
 

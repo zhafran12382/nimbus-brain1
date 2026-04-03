@@ -241,7 +241,7 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 150, damping: 20 }}
-      className="my-2 rounded-xl border border-[hsl(270_60%_50%_/_0.2)] bg-gradient-to-r from-[hsl(270_60%_50%_/_0.1)] to-[hsl(217_91%_60%_/_0.1)] px-3 py-2"
+      className="my-2 rounded-xl border border-violet-500/20 bg-violet-500/5 px-3 py-2"
     >
       <AnimatePresence mode="wait">
         {compact ? (
@@ -250,7 +250,7 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.2 }}
-            className="flex items-center gap-2 text-[12px] text-[hsl(0_0%_70%)]"
+            className="flex items-center gap-2 text-[12px] text-text-secondary"
           >
             <span>🧠</span>
             <span className="truncate">{memoryContent}</span>
@@ -274,7 +274,7 @@ function MemoryCard({ tool, isStreaming }: { tool: ToolStatus; isStreaming: bool
             >
               🧠
             </motion.span>
-            <span className="text-[13px] text-[hsl(0_0%_70%)]">
+            <span className="text-[13px] text-text-secondary">
               {isStreaming ? "Remembering..." : `Remembered: ${memoryContent}`}
             </span>
           </motion.div>
@@ -294,23 +294,23 @@ function PythonCard({ py }: { py: { code: string; output?: string; error?: strin
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden"
+      className="rounded-xl border border-border-subtle bg-surface overflow-hidden"
     >
       {/* Header — clickable to toggle */}
       <button
         onClick={() => hasBody && setExpanded(prev => !prev)}
-        className="w-full flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)] hover:bg-[hsl(0_0%_10%)] transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-1.5 border-b border-border-subtle bg-elevated hover:bg-hover transition-colors"
       >
-        <span className="text-[hsl(0_0%_50%)]"><TerminalIcon /></span>
-        <span className="text-[11px] font-medium text-[hsl(0_0%_50%)] flex-1 text-left">Python</span>
+        <span className="text-text-muted"><TerminalIcon /></span>
+        <span className="text-[11px] font-medium text-text-muted flex-1 text-left">Python</span>
         {py.output && (
-          <span className="text-[10px] text-green-400/60 font-medium">OUTPUT</span>
+          <span className="text-[10px] text-green-500 font-medium">OUTPUT</span>
         )}
         {py.error && (
-          <span className="text-[10px] text-red-400/60 font-medium">ERROR</span>
+          <span className="text-[10px] text-red-500 font-medium">ERROR</span>
         )}
         {hasBody && (
-          <ChevronDown className={`w-3 h-3 text-[hsl(0_0%_40%)] transition-transform duration-200 ${expanded ? "rotate-0" : "-rotate-90"}`} />
+          <ChevronDown className={`w-3 h-3 text-text-muted transition-transform duration-200 ${expanded ? "rotate-0" : "-rotate-90"}`} />
         )}
       </button>
 
@@ -325,26 +325,26 @@ function PythonCard({ py }: { py: { code: string; output?: string; error?: strin
             className="overflow-hidden"
           >
             {py.code && (
-              <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
+              <pre className="text-[11px] font-mono text-text-secondary p-3 overflow-x-auto leading-relaxed">
                 <code>{py.code}</code>
               </pre>
             )}
             {py.output && (
-              <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(140_50%_5%)]">
+              <div className="border-t border-border-subtle px-3 py-2 bg-green-500/5">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] text-green-400/70 font-medium uppercase tracking-wider">Output</span>
+                  <span className="text-[10px] text-green-600 font-medium uppercase tracking-wider">Output</span>
                 </div>
-                <pre className="text-[12px] font-mono text-green-300/90 whitespace-pre-wrap leading-relaxed">
+                <pre className="text-[12px] font-mono text-green-700 dark:text-green-400 whitespace-pre-wrap leading-relaxed">
                   {py.output}
                 </pre>
               </div>
             )}
             {py.error && (
-              <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(0_50%_5%)]">
+              <div className="border-t border-border-subtle px-3 py-2 bg-red-500/5">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] text-red-400/70 font-medium uppercase tracking-wider">Error</span>
+                  <span className="text-[10px] text-red-600 font-medium uppercase tracking-wider">Error</span>
                 </div>
-                <pre className="text-[12px] font-mono text-red-300/90 whitespace-pre-wrap leading-relaxed">
+                <pre className="text-[12px] font-mono text-red-700 dark:text-red-400 whitespace-pre-wrap leading-relaxed">
                   {py.error}
                 </pre>
               </div>
@@ -535,13 +535,13 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden"
+                  className="rounded-xl border border-border-subtle bg-surface overflow-hidden"
                 >
-                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)]">
+                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border-subtle bg-elevated">
                     <div className="spinner-perplexity !w-3 !h-3 shrink-0" />
-                    <span className="text-[11px] font-medium text-[hsl(0_0%_50%)]">Running Python...</span>
+                    <span className="text-[11px] font-medium text-text-muted">Running Python...</span>
                   </div>
-                  <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
+                  <pre className="text-[11px] font-mono text-text-secondary p-3 overflow-x-auto leading-relaxed">
                     <code>{activePythonCode}</code>
                   </pre>
                 </motion.div>
@@ -555,16 +555,16 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
-              className="mb-3 rounded-lg bg-[hsl(0_0%_7%)] border border-[hsl(0_0%_100%_/_0.06)] px-3 py-2"
+              className="mb-3 rounded-lg bg-surface border border-border-subtle px-3 py-2"
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm">{toolPreview.emoji}</span>
                 <div>
-                  <p className="text-[12px] font-medium text-[hsl(0_0%_93%)]">
+                  <p className="text-[12px] font-medium text-text-primary">
                     {toolPreview.title}
                   </p>
                   {toolPreview.detail && (
-                    <p className="text-[11px] text-[hsl(0_0%_45%)]">{toolPreview.detail}</p>
+                    <p className="text-[11px] text-text-secondary">{toolPreview.detail}</p>
                   )}
                 </div>
               </div>
@@ -609,34 +609,34 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
-              className="mt-4 pt-4 border-t border-[hsl(0_0%_100%_/_0.06)] flex flex-col gap-3"
+              className="mt-4 pt-4 flex flex-col gap-3"
             >
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[hsl(0_0%_50%)]">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-text-muted">
                 {completedAt && (
-                  <span className="text-[hsl(0_0%_40%)]">{new Date(completedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="opacity-70">{new Date(completedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
                 )}
-                <span className="font-medium text-[hsl(0_0%_60%)]">{modelUsed}</span>
+                <span className="font-medium">{modelUsed}</span>
                 {usage && (usage.prompt_tokens > 0 || usage.completion_tokens > 0) && (
                   <>
-                    <span title="Input tokens">↑ {usage.prompt_tokens.toLocaleString()}</span>
-                    <span title="Output tokens">↓ {usage.completion_tokens.toLocaleString()}</span>
+                    <span title="Input tokens" className="opacity-70">↑ {usage.prompt_tokens.toLocaleString()}</span>
+                    <span title="Output tokens" className="opacity-70">↓ {usage.completion_tokens.toLocaleString()}</span>
                   </>
                 )}
                 {uniqueSources.length > 0 && (
-                  <span className="text-blue-400">{uniqueSources.length} sources</span>
+                  <span className="text-blue-500">{uniqueSources.length} sources</span>
                 )}
               </div>
-              <div className="flex items-center gap-3 text-[hsl(0_0%_50%)]">
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+              <div className="flex items-center gap-3 text-text-muted">
+                <button className="hover:text-text-primary transition-colors">
                   <Lock className="w-4 h-4" />
                 </button>
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                <button className="hover:text-text-primary transition-colors">
                   <Download className="w-4 h-4" />
                 </button>
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                <button className="hover:text-text-primary transition-colors">
                   <Copy className="w-4 h-4" />
                 </button>
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                <button className="hover:text-text-primary transition-colors">
                   <RefreshCw className="w-4 h-4" />
                 </button>
               </div>

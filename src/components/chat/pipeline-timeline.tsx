@@ -42,7 +42,7 @@ function SourceChip({ domain, url }: { domain: string; url: string }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-1.5 rounded-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.06)] px-2.5 py-1 text-[11px] text-[hsl(0_0%_55%)] hover:text-[hsl(0_0%_80%)] hover:bg-[rgba(255,255,255,0.1)] transition-colors whitespace-nowrap shrink-0"
+      className="flex items-center gap-1.5 rounded-full bg-elevated border border-border-default px-2.5 py-1 text-[11px] text-text-muted hover:text-text-primary hover:bg-hover transition-colors whitespace-nowrap shrink-0"
     >
       <img
         src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
@@ -60,8 +60,8 @@ function NodeDot({ active }: { active: boolean }) {
     <div
       className="w-[9px] h-[9px] rounded-full shrink-0 transition-colors duration-200"
       style={{
-        background: active ? "hsl(217 91% 60%)" : "hsl(0 0% 25%)",
-        boxShadow: active ? "0 0 7px hsl(217 91% 60% / 0.55)" : "none",
+        background: active ? "var(--accent)" : "var(--border-default)",
+        boxShadow: active ? "0 0 7px var(--color-accent-glow)" : "none",
       }}
     />
   );
@@ -115,21 +115,21 @@ export function PipelineTimeline({
             bottom: hasSteps && (expanded || !isCollapsible) ? "4px" : "auto",
             height: hasSteps && (expanded || !isCollapsible) ? "auto" : "16px",
             background: headerIsActive
-              ? "hsl(217 91% 60% / 0.22)"
-              : "hsl(0 0% 100% / 0.07)",
+              ? "var(--color-accent-muted)"
+              : "var(--border-default)",
           }}
         />
 
         {/* ── Header row ── */}
         {isCollapsible && (
           <div
-            className="relative flex items-center gap-2.5 py-1.5 text-[13px] text-[hsl(0_0%_65%)] hover:text-[hsl(0_0%_80%)] transition-colors cursor-pointer"
+            className="relative flex items-center gap-2.5 py-1.5 text-[13px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
             onClick={() => canCollapse && setExpanded((prev) => !prev)}
           >
             {/* Header node dot */}
             <div className="absolute -left-[18px] top-1/2 -translate-y-1/2">
               {showGlobe
-                ? <Globe className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+                ? <Globe className="w-3.5 h-3.5 shrink-0 text-blue-500" />
                 : <NodeDot active={headerIsActive} />
               }
             </div>
@@ -176,8 +176,8 @@ export function PipelineTimeline({
                       <div
                         className={`flex items-center gap-2 text-[13px] ${
                           step.status === "done"
-                            ? "text-[hsl(0_0%_50%)]"
-                            : "text-[hsl(0_0%_72%)]"
+                            ? "text-text-muted"
+                            : "text-text-secondary"
                         }`}
                       >
                         <span className="text-xs shrink-0 w-3.5 text-center leading-none">
@@ -192,14 +192,14 @@ export function PipelineTimeline({
                           {searchQueries.map((query, i) => (
                             <div
                               key={`sq-${i}`}
-                              className="flex items-center gap-2 text-[12px] text-[hsl(0_0%_40%)]"
+                              className="flex items-center gap-2 text-[12px] text-text-muted opacity-70"
                             >
                               <Search className="w-3 h-3 shrink-0 opacity-50" />
                               <span className="truncate">&quot;{query}&quot;</span>
                             </div>
                           ))}
                           {currentSearchQuery && (
-                            <div className="flex items-center gap-2 text-[12px] text-[hsl(0_0%_40%)]">
+                            <div className="flex items-center gap-2 text-[12px] text-text-muted opacity-70">
                               <Search className="w-3 h-3 shrink-0 opacity-50" />
                               <span className="truncate">&quot;{currentSearchQuery}&quot;</span>
                             </div>

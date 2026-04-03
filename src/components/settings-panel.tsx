@@ -40,7 +40,14 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
     if (open) {
       try {
         const raw = localStorage.getItem(PERSONALITY_KEY);
-        if (raw) setPersonality({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          // Only update if it's different to prevent cascading renders
+          setPersonality(prev => {
+            const next = { ...DEFAULT_SETTINGS, ...parsed };
+            return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+          });
+        }
       } catch {}
     }
   }, [open]);

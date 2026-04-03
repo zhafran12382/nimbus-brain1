@@ -443,7 +443,7 @@ function ChatPageContent() {
       {/* Right: Main Chat Area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Header with Area A (Router) */}
-        <header className="relative z-20 flex h-14 min-w-0 items-center gap-2 border-b border-[hsl(0_0%_100%_/_0.04)] px-2.5 sm:gap-3 sm:px-4 glass">
+        <header className="relative z-20 flex h-14 min-w-0 items-center gap-2 border-b border-border-subtle px-2.5 sm:gap-3 sm:px-4 bg-surface">
           {/* Hamburger (mobile + sidebar toggle) */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}

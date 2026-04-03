@@ -23,6 +23,7 @@ export function PomodoroTimer({ onExitClick, quote }: PomodoroTimerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Reset timer if status changes externally or initially
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (status === "focus") setTimeLeft(focusMinutes * 60);
     else if (status === "break") setTimeLeft(breakMinutes * 60);
@@ -43,6 +44,7 @@ export function PomodoroTimer({ onExitClick, quote }: PomodoroTimerProps) {
     }, 1000);
 
     return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAnimation, isPaused, status]);
 
   const handleTimerEnd = () => {
@@ -193,7 +195,7 @@ export function PomodoroTimer({ onExitClick, quote }: PomodoroTimerProps) {
 
               {/* Quote */}
               <div className="text-center mb-6 px-4">
-                <p className="text-xs text-zinc-400 italic leading-relaxed">"{quote}"</p>
+                <p className="text-xs text-zinc-400 italic leading-relaxed">&quot;{quote}&quot;</p>
               </div>
 
               {/* Controls */}

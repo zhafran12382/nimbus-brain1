@@ -17,11 +17,9 @@ export function LockedInAnimation() {
   useEffect(() => {
     if (!showAnimation) return;
     
-    setWordIndex(0);
-    const intervals = [1000, 2000, 3000];
-    
-    const t1 = setTimeout(() => setWordIndex(1), intervals[0]);
-    const t2 = setTimeout(() => setWordIndex(2), intervals[1]);
+    // Set wordIndex immediately on mount rather than sync set state to avoid cascading updates
+    const t1 = setTimeout(() => setWordIndex(1), 1000);
+    const t2 = setTimeout(() => setWordIndex(2), 2000);
     const t3 = setTimeout(() => {
       setShowAnimation(false);
     }, 4000);
@@ -30,6 +28,8 @@ export function LockedInAnimation() {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
+      // Reset word index after unmount cleanly
+      setWordIndex(0);
     };
   }, [showAnimation, setShowAnimation]);
 

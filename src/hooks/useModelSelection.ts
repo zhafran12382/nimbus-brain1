@@ -41,7 +41,6 @@ export function useModelSelection() {
 
   // Restore from localStorage on mount ONLY (fixes hydration mismatch)
   useEffect(() => {
-    setIsMounted(true);
     const stored = readStorage();
     if (stored) {
       // Only restore if the provider is still visible in the client dropdown
@@ -62,6 +61,8 @@ export function useModelSelection() {
         setModelId(DEFAULT_MODEL_ID);
       }
     }
+    // Mark as mounted *after* attempting restore to avoid premature sync writes
+    setIsMounted(true);
   }, []);
 
   // Persist to localStorage when selection changes, but only after mount

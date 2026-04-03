@@ -78,17 +78,17 @@ function PythonCardHistory({ py }: { py: { code: string; output?: string; error?
   const hasBody = !!(py.code || py.output || py.error);
 
   return (
-    <div className="rounded-xl border border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_5%)] overflow-hidden">
+    <div className="rounded-xl border border-border-subtle bg-surface overflow-hidden">
       <button
         onClick={() => hasBody && setExpanded(prev => !prev)}
-        className="w-full flex items-center gap-2 px-3 py-1.5 border-b border-[hsl(0_0%_100%_/_0.06)] bg-[hsl(0_0%_8%)] hover:bg-[hsl(0_0%_10%)] transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-1.5 border-b border-border-subtle bg-elevated hover:bg-hover transition-colors"
       >
-        <span className="text-[hsl(0_0%_50%)]"><TerminalIcon /></span>
-        <span className="text-[11px] font-medium text-[hsl(0_0%_50%)] flex-1 text-left">Python</span>
-        {py.output && <span className="text-[10px] text-green-400/60 font-medium">OUTPUT</span>}
-        {py.error && <span className="text-[10px] text-red-400/60 font-medium">ERROR</span>}
+        <span className="text-text-muted"><TerminalIcon /></span>
+        <span className="text-[11px] font-medium text-text-muted flex-1 text-left">Python</span>
+        {py.output && <span className="text-[10px] text-green-500 font-medium">OUTPUT</span>}
+        {py.error && <span className="text-[10px] text-red-500 font-medium">ERROR</span>}
         {hasBody && (
-          <ChevronDown className={`w-3 h-3 text-[hsl(0_0%_40%)] transition-transform duration-200 ${expanded ? "rotate-0" : "-rotate-90"}`} />
+          <ChevronDown className={`w-3 h-3 text-text-muted transition-transform duration-200 ${expanded ? "rotate-0" : "-rotate-90"}`} />
         )}
       </button>
       <AnimatePresence initial={false}>
@@ -101,24 +101,24 @@ function PythonCardHistory({ py }: { py: { code: string; output?: string; error?
             className="overflow-hidden"
           >
             {py.code && (
-              <pre className="text-[11px] font-mono text-[hsl(0_0%_65%)] p-3 overflow-x-auto leading-relaxed">
+              <pre className="text-[11px] font-mono text-text-secondary p-3 overflow-x-auto leading-relaxed">
                 <code>{py.code}</code>
               </pre>
             )}
             {py.output && (
-              <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(140_50%_5%)]">
+              <div className="border-t border-border-subtle px-3 py-2 bg-green-500/5">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] text-green-400/70 font-medium uppercase tracking-wider">Output</span>
+                  <span className="text-[10px] text-green-600 font-medium uppercase tracking-wider">Output</span>
                 </div>
-                <pre className="text-[12px] font-mono text-green-300/90 whitespace-pre-wrap leading-relaxed">{py.output}</pre>
+                <pre className="text-[12px] font-mono text-green-700 dark:text-green-400 whitespace-pre-wrap leading-relaxed">{py.output}</pre>
               </div>
             )}
             {py.error && (
-              <div className="border-t border-[hsl(0_0%_100%_/_0.06)] px-3 py-2 bg-[hsl(0_50%_5%)]">
+              <div className="border-t border-border-subtle px-3 py-2 bg-red-500/5">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] text-red-400/70 font-medium uppercase tracking-wider">Error</span>
+                  <span className="text-[10px] text-red-600 font-medium uppercase tracking-wider">Error</span>
                 </div>
-                <pre className="text-[12px] font-mono text-red-300/90 whitespace-pre-wrap leading-relaxed">{py.error}</pre>
+                <pre className="text-[12px] font-mono text-red-700 dark:text-red-400 whitespace-pre-wrap leading-relaxed">{py.error}</pre>
               </div>
             )}
           </motion.div>
@@ -292,7 +292,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="w-full max-w-md">
             <QuizCard quizData={quizParsed.quizData as { id: string; topic: string; difficulty: "easy" | "medium" | "hard"; total_questions: number; questions: { id: number; question: string; options: string[] }[] }} />
             {quizParsed.remainingContent && (
-              <div className="mt-2 px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]">
+              <div className="mt-2 px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-text-primary">
                 <div className="chat-markdown prose prose-invert prose-base max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                   <Markdown remarkPlugins={chatRemarkPlugins} rehypePlugins={chatRehypePlugins} components={chatMarkdownComponents}>{quizParsed.remainingContent}</Markdown>
                 </div>
@@ -302,18 +302,18 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : (
           <div
             className={isUser
-              ? "rounded-2xl rounded-br-sm bg-[rgba(255,255,255,0.06)] px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]"
-              : "px-3.5 py-3 text-base leading-[1.65] tracking-[0.01em] text-[#ECECEC]"
+              ? "rounded-2xl rounded-br-sm bg-elevated px-4 py-3 text-[15px] leading-relaxed tracking-[0.01em] text-text-primary border border-border-subtle"
+              : "px-2 py-3 text-[15px] leading-relaxed tracking-[0.01em] text-text-primary"
             }
           >
             {isUser ? (
               <p className="whitespace-pre-wrap">{message.content}</p>
             ) : assistantText.startsWith('⚠️') ? (
-              <p className="text-amber-400">{assistantText}</p>
+              <p className="text-amber-500">{assistantText}</p>
             ) : (
-              <>
+              <div className="space-y-4">
                 {parsedAssistant?.thinking && (
-                  <div className="mb-3">
+                  <div className="mb-1">
                     <ThinkingBlock
                       content={parsedAssistant.thinking}
                       durationMs={parsedAssistant.thinkingDurationMs ?? undefined}
@@ -324,25 +324,25 @@ export function ChatMessage({ message }: ChatMessageProps) {
                   <Markdown remarkPlugins={chatRemarkPlugins} rehypePlugins={chatRehypePlugins} components={chatMarkdownComponents}>{assistantText}</Markdown>
                 </div>
                 {parsedAssistant?.sources && parsedAssistant.sources.length > 0 && (
-                  <div className="mt-3">
+                  <div className="pt-2">
                     <SourcesFooter sources={parsedAssistant.sources} />
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
 
         {/* Timestamp & model info & token usage */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
-          <span className="text-[12px] text-[#8A8A8A]">{timestamp}</span>
+          <span className="text-[12px] text-text-muted">{timestamp}</span>
           {!isUser && message.model_used && (
-            <span className="hidden sm:inline text-[12px] text-[#8A8A8A]">
+            <span className="hidden sm:inline text-[12px] text-text-muted">
               {message.provider_used === 'openrouter' ? '🔵' : '🟢'} {message.model_used}
             </span>
           )}
           {!isUser && message.usage && (message.usage.prompt_tokens > 0 || message.usage.completion_tokens > 0) && (
-            <span className="text-[11px] text-[#6A6A6A]">
+            <span className="text-[11px] text-text-muted opacity-70">
               ↑{message.usage.prompt_tokens.toLocaleString()} ↓{message.usage.completion_tokens.toLocaleString()}
             </span>
           )}
@@ -351,7 +351,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
       {/* User avatar — hidden on mobile */}
       {isUser && (
-        <div className="hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[hsl(0_0%_12%)] text-[11px] font-medium text-[hsl(0_0%_50%)] mt-1">
+        <div className="hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface border border-border-default text-[11px] font-medium text-text-muted mt-1">
           U
         </div>
       )}

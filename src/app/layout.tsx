@@ -16,18 +16,22 @@ export const viewport: Viewport = {
   themeColor: "#0a0a0a",
 };
 
+import { ThemeProvider } from "@/components/theme-provider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className="dark">
+    <html lang="id" suppressHydrationWarning>
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="antialiased">
-        <AppShell>{children}</AppShell>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+          <AppShell>{children}</AppShell>
+        </ThemeProvider>
       </body>
     </html>
   );
