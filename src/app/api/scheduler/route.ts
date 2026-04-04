@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 // ── Debug logging ──
-// Collects structured debug entries for both console AND HTTP response
+// Collects structured debug entries for console, HTTP response, AND centralized logger
 interface DebugEntry { ts: string; tag: string; msg: string; data?: unknown }
 function createDebugLog() {
   const entries: DebugEntry[] = [];
@@ -21,10 +21,22 @@ function createDebugLog() {
     log(tag: string, msg: string, data?: unknown) {
       const ts = new Date().toISOString();
       entries.push({ ts, tag, msg, data });
+      // Console logging for development
       if (data !== undefined) {
         console.log(`[${ts}] [SCHEDULER] [${tag}] ${msg}`, typeof data === 'string' ? data : JSON.stringify(data));
       } else {
         console.log(`[${ts}] [SCHEDULER] [${tag}] ${msg}`);
+      }
+      // Centralized logger — errors go as ERROR level, everything else as DEBUG
+      const isError = tag.includes('ERROR') || tag.includes('EXCEPTION') || tag.includes('FATAL');
+      if (isError) {
+        logger.error('SCHEDULER', `[${tag}] ${msg}`, {
+          code: tag,
+          error: typeof data === 'string' ? data : JSON.stringify(data ?? ''),
+          data: (typeof data === 'object' && data !== null) ? data as Record<string, unknown> : undefined,
+        });
+      } else {
+        logger.debug('SCHEDULER', `[${tag}] ${msg}`, (typeof data === 'object' && data !== null) ? data as Record<string, unknown> : undefined);
       }
     },
   };
@@ -34,6 +46,12 @@ function createDebugLog() {
 function log(tag: string, ...args: unknown[]) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] [SCHEDULER] [${tag}]`, ...args);
+  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+  if (tag === 'ERROR' || tag === 'FATAL') {
+    logger.error('SCHEDULER', `[${tag}] ${msg}`, { code: tag, error: msg });
+  } else {
+    logger.debug('SCHEDULER', `[${tag}] ${msg}`);
+  }
 }
 
 // ── Flat token budget: 300 max_tokens for all tasks ──

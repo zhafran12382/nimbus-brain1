@@ -13,11 +13,15 @@ export const dynamic = 'force-dynamic';
 function log(tag: string, ...args: unknown[]) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] [${tag}]`, ...args);
+  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+  logger.debug('AI', `[CHAT] [${tag}] ${msg}`);
 }
 
 function logError(tag: string, ...args: unknown[]) {
   const timestamp = new Date().toISOString();
   console.error(`[${timestamp}] [${tag}]`, ...args);
+  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+  logger.error('AI', `[CHAT] [${tag}] ${msg}`, { code: tag, error: msg });
 }
 
 const toolLabels: Record<string, string> = {
@@ -682,6 +686,7 @@ async function callProviderStream(
           throw e;
         }
         console.log('[SSE Parse Error]', data, e);
+        logger.warn('AI', '[CHAT] SSE parse error', { data: String(data).slice(0, 200), error: e instanceof Error ? e.message : String(e) });
       }
     }
   }
