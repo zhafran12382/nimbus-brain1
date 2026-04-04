@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
@@ -27,6 +28,9 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="antialiased">
+        <Script id="eruda-init" strategy="afterInteractive">
+          {`(function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/eruda';s.onload=function(){eruda.init()};document.head.appendChild(s)})()`}
+        </Script>
         <AppShell>{children}</AppShell>
       </body>
     </html>
