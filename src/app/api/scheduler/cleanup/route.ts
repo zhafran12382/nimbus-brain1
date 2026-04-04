@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
 function log(tag: string, ...args: unknown[]) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] [SCHEDULER] [CLEANUP] [${tag}]`, ...args);
+  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+  if (tag === 'ERROR') {
+    logger.error('SCHEDULER', `[CLEANUP] [${tag}] ${msg}`, { code: `CLEANUP_${tag}`, error: msg });
+  } else {
+    logger.debug('SCHEDULER', `[CLEANUP] [${tag}] ${msg}`);
+  }
 }
 
 /**

@@ -1,6 +1,7 @@
 export const maxDuration = 120;
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,9 +27,13 @@ interface ValidatedQuestion {
 }
 
 export async function POST(req: NextRequest) {
+  const correlationId = logger.createCorrelationId();
+  const start = Date.now();
   try {
     const body: GenerateBody = await req.json();
     const { topic, numQuestions: rawNum, difficulty: rawDiff } = body;
+
+    logger.ai('Quiz generation started', { topic, numQuestions: rawNum, difficulty: rawDiff }, correlationId);
 
     if (!topic || typeof topic !== 'string' || !topic.trim()) {
       return NextResponse.json(
@@ -79,7 +84,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
     });
 
     if (!response.ok) {
-      console.error('Quiz AI generation failed:', response.status);
+      logger.error('AI', 'Quiz AI generation failed', { code: 'AI_GENERATION_FAIL', data: { status: response.status }, correlationId });
       return NextResponse.json(
         { error: `Gagal generate quiz (${response.status})` },
         { status: 502 }
@@ -144,7 +149,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
       .single();
 
     if (dbError) {
-      console.error('Failed to save quiz:', dbError);
+      logger.error('AI', 'Failed to save quiz to DB', { code: 'DB_SAVE_FAIL', error: dbError.message, correlationId });
       return NextResponse.json(
         { error: `Database error: ${dbError.message}` },
         { status: 500 }
@@ -158,6 +163,8 @@ JSON ARRAY ONLY. NO other text before or after.`;
       options: q.options,
     }));
 
+    logger.ai('Quiz generated successfully', { quizId: quiz.id, topic: topic.trim(), difficulty, total_questions: validatedQuestions.length, durationMs: Date.now() - start }, correlationId);
+
     return NextResponse.json({
       id: quiz.id,
       topic: topic.trim(),
@@ -167,7 +174,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
       created_at: quiz.created_at,
     });
   } catch (error) {
-    console.error('Error generating quiz:', error);
+    logger.error('AI', 'Error generating quiz', { code: 'QUIZ_GENERATE_ERROR', error: error instanceof Error ? error : String(error), correlationId, durationMs: Date.now() - start });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
 interface QuizQuestion {
   id: number;
@@ -15,9 +16,12 @@ interface SubmitBody {
 }
 
 export async function POST(req: NextRequest) {
+  const correlationId = logger.createCorrelationId();
   try {
     const body: SubmitBody = await req.json();
     const { quizId, answers } = body;
+
+    logger.ai('Quiz submission started', { quizId, answerCount: answers?.length }, correlationId);
 
     if (!quizId || !answers || !Array.isArray(answers)) {
       return NextResponse.json(
@@ -78,10 +82,12 @@ export async function POST(req: NextRequest) {
       });
 
     if (attemptError) {
-      console.error('Failed to save quiz attempt:', attemptError);
+      logger.error('AI', 'Failed to save quiz attempt', { code: 'QUIZ_ATTEMPT_SAVE_FAIL', error: attemptError.message, correlationId });
       // Include warning in response but don't fail the request
       // User experience is prioritized over data consistency
     }
+
+    logger.ai('Quiz submitted successfully', { quizId, score, total: questions.length, attemptSaved: !attemptError }, correlationId);
 
     return NextResponse.json({
       score,
@@ -90,7 +96,7 @@ export async function POST(req: NextRequest) {
       attemptSaved: !attemptError,
     });
   } catch (error) {
-    console.error('Error submitting quiz:', error);
+    logger.error('AI', 'Error submitting quiz', { code: 'QUIZ_SUBMIT_ERROR', error: error instanceof Error ? error : String(error), correlationId });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

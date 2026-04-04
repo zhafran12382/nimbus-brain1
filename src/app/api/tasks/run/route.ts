@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export async function GET() {
+  const correlationId = logger.createCorrelationId();
+  const start = Date.now();
+  logger.tool('Task run triggered', undefined, correlationId);
+
   const now = new Date();
 
   const { data: dueTasks, error } = await supabase
@@ -15,17 +20,18 @@ export async function GET() {
     .order('next_run_at', { ascending: true });
 
   if (error) {
-    console.error('[CRON] Error fetching tasks:', error.message);
+    logger.error('TOOL', 'Error fetching due tasks', { code: 'TASK_FETCH_ERROR', error: error.message, correlationId });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   if (!dueTasks || dueTasks.length === 0) {
+    logger.tool('No tasks due', undefined, correlationId);
     return NextResponse.json({ message: 'No tasks due.', ran: 0 });
   }
 
   let ranCount = 0;
   for (const task of dueTasks) {
-    console.log(`[CRON] Running task: ${task.name} (${task.id})`);
+    logger.tool('Running task', { task_id: task.id, task_name: task.name }, correlationId);
 
     await supabase.from('notifications').insert({
       title: `Task Dijalankan: ${task.name}`,
@@ -59,6 +65,6 @@ export async function GET() {
     ranCount++;
   }
 
-  console.log(`[CRON] Completed: ${ranCount} tasks ran.`);
+  logger.tool('Task run completed', { ranCount, durationMs: Date.now() - start }, correlationId);
   return NextResponse.json({ message: `Ran ${ranCount} tasks.`, ran: ranCount });
 }

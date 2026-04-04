@@ -3,6 +3,7 @@ import { tools } from '@/lib/tools';
 import { executeTool } from '@/lib/tool-executor';
 import { getModelById, getModelByIdAndProvider, getProviderConfig, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_ID } from '@/lib/models';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 import type { GroqRateLimit, ProviderId } from '@/types';
 
 // Vercel Serverless: max 180 detik
@@ -12,11 +13,15 @@ export const dynamic = 'force-dynamic';
 function log(tag: string, ...args: unknown[]) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] [${tag}]`, ...args);
+  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+  logger.debug('AI', `[CHAT] [${tag}] ${msg}`);
 }
 
 function logError(tag: string, ...args: unknown[]) {
   const timestamp = new Date().toISOString();
   console.error(`[${timestamp}] [${tag}]`, ...args);
+  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+  logger.error('AI', `[CHAT] [${tag}] ${msg}`, { code: tag, error: msg });
 }
 
 const toolLabels: Record<string, string> = {
@@ -681,6 +686,7 @@ async function callProviderStream(
           throw e;
         }
         console.log('[SSE Parse Error]', data, e);
+        logger.warn('AI', '[CHAT] SSE parse error', { data: String(data).slice(0, 200), error: e instanceof Error ? e.message : String(e) });
       }
     }
   }
@@ -689,8 +695,20 @@ async function callProviderStream(
 }
 
 export async function POST(req: NextRequest) {
+  const chatStart = Date.now();
+  const correlationId = logger.createCorrelationId();
   const { messages, model: modelId = DEFAULT_MODEL_ID, personality, conversationId: incomingConvId, mode = 'flash', provider: incomingProvider, maxThinkTokens, searchSourceLimit } = await req.json();
   const signal = req.signal;
+
+  logger.request('Chat request started', {
+    endpoint: '/api/chat',
+    method: 'POST',
+    model: modelId,
+    provider: incomingProvider || '(auto)',
+    mode,
+    message_count: messages?.length,
+    conversation_id: incomingConvId || '(new)',
+  }, correlationId);
 
   // === PROVIDER RESOLUTION: prefer frontend provider, validate match ===
   let providerId: ProviderId;
@@ -810,11 +828,22 @@ export async function POST(req: NextRequest) {
         let totalCompletionTokens = 0;
 
         log('API CALL', `provider=${providerId}, Sending ${apiMessages.length} messages, useTools=${useTools}`);
+        logger.ai('AI model call started', { provider: providerId, model: modelId, messages_count: apiMessages.length, use_tools: useTools, max_tokens: maxTokens, temperature: targetTemperature }, correlationId);
+        const aiCallStart = Date.now();
         const data = await callProvider(providerId, modelId, apiMessages, useTools, maxTokens, targetTemperature, signal, sendRateLimit, (text) => send({ type: "status", text }));
+        const aiCallDuration = Date.now() - aiCallStart;
         if (data.usage) {
           totalPromptTokens += data.usage.prompt_tokens || 0;
           totalCompletionTokens += data.usage.completion_tokens || 0;
         }
+        logger.ai('AI model call completed', {
+          provider: providerId,
+          model: modelId,
+          tokens_in: totalPromptTokens,
+          tokens_out: totalCompletionTokens,
+          latency_ms: aiCallDuration,
+          has_tool_calls: !!data.choices?.[0]?.message?.tool_calls,
+        }, correlationId);
         let assistantMsg = data.choices[0].message;
         log('API RESP', `hasContent=${!!assistantMsg.content?.trim()}, hasToolCalls=${!!assistantMsg.tool_calls}, toolCount=${assistantMsg.tool_calls?.length || 0}`);
 
@@ -898,6 +927,7 @@ export async function POST(req: NextRequest) {
               }
 
               log('TOOL EXEC', `Executing: ${fnName}`, JSON.stringify(fnArgs));
+              logger.tool(`Executing tool: ${fnName}`, { tool: fnName, args_preview: JSON.stringify(fnArgs).slice(0, 200) }, correlationId);
 
               send({
                 type: "tool_start",
@@ -907,9 +937,12 @@ export async function POST(req: NextRequest) {
               });
 
               try {
+                const toolStart = Date.now();
                 const result = await executeTool(fnName, fnArgs, { searchSourceLimit: effectiveSearchLimit, modelId, providerId });
+                const toolDuration = Date.now() - toolStart;
                 log('TOOL EXEC', `${fnName} result:`, result.substring(0, 200));
                 log('TOOL STATE', `${fnName} success=true, resultLength=${result.length}`);
+                logger.tool(`Tool completed: ${fnName}`, { tool: fnName, duration_ms: toolDuration, output_chars: result.length, status: 'success' }, correlationId);
 
                 if (fnName === 'get_information') {
                   citationSources = buildCitationSourceMap(result);
@@ -926,6 +959,7 @@ export async function POST(req: NextRequest) {
               } catch (execErr) {
                 const errMsg = execErr instanceof Error ? execErr.message : String(execErr);
                 logError('TOOL ERROR', `${fnName} execution failed:`, errMsg);
+                logger.error('TOOL', `Tool failed: ${fnName}`, { code: 'TOOL_EXEC_ERROR', error: execErr instanceof Error ? execErr : errMsg, data: { tool: fnName }, correlationId });
 
                 toolCallMessages.push({
                   role: "tool",
@@ -1225,6 +1259,15 @@ export async function POST(req: NextRequest) {
         }
 
         log('DONE', `Tools: ${allToolCalls.length}, Content: ${finalContent.length} chars, ConvId: ${conversationId}`);
+        const chatDuration = Date.now() - chatStart;
+        logger.perf('Chat request completed', chatDuration, {
+          model: modelId,
+          provider: providerId,
+          tools_used: allToolCalls.length,
+          content_length: finalContent.length,
+          tokens_in: totalPromptTokens,
+          tokens_out: totalCompletionTokens,
+        }, correlationId);
 
         send({
           type: "done",
@@ -1251,6 +1294,7 @@ export async function POST(req: NextRequest) {
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Terjadi kesalahan.";
         logError('REQUEST', 'Unhandled error:', message);
+        logger.error('REQUEST', 'Chat request failed', { code: 'CHAT_ERROR', error: error instanceof Error ? error : message, data: { model: modelId, provider: providerId }, correlationId, durationMs: Date.now() - chatStart });
         send({
           type: "error",
           message,

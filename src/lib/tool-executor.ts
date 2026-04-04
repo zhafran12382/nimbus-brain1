@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { QUIZ_DATA_PREFIX } from './constants';
+import { logger } from './logger';
 
 interface SearchResult {
   title?: string;
@@ -260,6 +261,7 @@ export async function executeTool(name: string, args: Record<string, unknown>, o
       console.log('[PYTHON] endpoint:', endpoint);
 
       if (!endpoint || !apiKey) {
+        logger.error('TOOL', 'Python runtime not configured', { code: 'PYTHON_NOT_CONFIGURED', error: 'Missing PYTHON_RUNTIME_ENDPOINT or PYTHON_RUNTIME_API_KEY' });
         return 'Error: Python runtime belum dikonfigurasi (PYTHON_RUNTIME_ENDPOINT / PYTHON_RUNTIME_API_KEY tidak tersedia).';
       }
 
@@ -288,10 +290,12 @@ export async function executeTool(name: string, args: Record<string, unknown>, o
 
           if (res.status === 401) {
             console.log('[PYTHON] 401 unauthorized — terminal error, no retry');
+            logger.error('TOOL', 'Python runtime 401 unauthorized', { code: 'PYTHON_AUTH_FAILED', error: '401 Unauthorized' });
             return 'Error: Python runtime unauthorized (401). Periksa PYTHON_RUNTIME_API_KEY.';
           }
 
           if (!res.ok) {
+            logger.error('TOOL', `Python execution failed HTTP ${res.status}`, { code: `PYTHON_HTTP_${res.status}`, error: `Status ${res.status}` });
             return `Error: Python execution failed (status ${res.status}).`;
           }
 
@@ -319,6 +323,7 @@ export async function executeTool(name: string, args: Record<string, unknown>, o
             lastError = error instanceof Error ? error.message : 'Unknown error';
           }
           console.log('[PYTHON] retry:', attempt, 'error:', lastError);
+          logger.warn('TOOL', `Python execution error (attempt ${attempt}/${MAX_ATTEMPTS})`, { error: lastError });
 
           if (attempt < MAX_ATTEMPTS) {
             continue;
@@ -990,9 +995,11 @@ JSON ARRAY ONLY. NO other text before or after.`;
           const easycronData = await easycronRes.json();
           if (easycronData.status !== 'success') {
             console.error('[EASYCRON] Delete failed:', easycronData);
+            logger.error('TOOL', 'EasyCron delete failed', { code: 'EASYCRON_DELETE_FAILED', error: JSON.stringify(easycronData) });
           }
         } catch (err) {
           console.error('[EASYCRON] Delete request failed:', err);
+          logger.error('TOOL', 'EasyCron delete request failed', { code: 'EASYCRON_REQUEST_FAILED', error: err instanceof Error ? err.message : String(err) });
         }
       }
 
