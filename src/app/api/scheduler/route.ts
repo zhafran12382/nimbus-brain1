@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getProviderConfig } from '@/lib/models';
 import { logger } from '@/lib/logger';
@@ -573,58 +574,63 @@ export async function GET(request: NextRequest) {
   dbg.log('PHASE1', `Completed in ${phase1Ms}ms — notification=${inserted} completed=${completed}`);
 
   // ═══════════════════════════════════════════════════════════
-  // PHASE 2 — AI upgrade + EasyCron cleanup (awaited)
-  // AI upgrade uses openai/gpt-oss-120b via openrouter-paid, routed to Groq.
-  // Flat 300 max_tokens. AbortController timeout is 15s.
-  // Promise.allSettled ensures both run even if one fails.
+  // PHASE 2 — AI upgrade + EasyCron cleanup (background via after())
+  // Runs AFTER the HTTP response is sent so the cron caller gets
+  // a fast 200 OK. Results are written directly to the database.
   // ═══════════════════════════════════════════════════════════
 
-  dbg.log('PHASE2', 'Starting AI upgrade + EasyCron cleanup');
-  logger.scheduler('Phase 2 starting: AI upgrade + EasyCron cleanup', { task_id: task.id, task_name: task.name }, correlationId);
+  dbg.log('PHASE2', 'Scheduling AI upgrade + EasyCron cleanup via after()');
+  logger.scheduler('Phase 2 scheduling: AI upgrade + EasyCron cleanup (background)', { task_id: task.id, task_name: task.name }, correlationId);
 
-  const phase2Results = await Promise.allSettled([
-    tryAiUpgrade(task.id, task.name, task.prompt, dbg),
-    task.run_once && task.easycron_id
-      ? deleteEasyCronJob(task.easycron_id)
-      : Promise.resolve(),
-  ]);
+  after(async () => {
+    const bgDbg = createDebugLog();
+    bgDbg.log('BG:START', `Background AI upgrade for task "${task.name}" (${task.id})`);
 
-  const aiSettled = phase2Results[0];
-  let aiResult: AiUpgradeResult | null = null;
-  if (aiSettled.status === 'fulfilled') {
-    aiResult = aiSettled.value;
-    if (aiResult.success) {
-      logger.ai('AI upgrade succeeded', {
-        task_id: task.id,
-        task_name: task.name,
-        model: aiResult.model,
-        provider: aiResult.providerUsed,
-        duration_ms: aiResult.durationMs,
-      }, correlationId);
+    const bgResults = await Promise.allSettled([
+      tryAiUpgrade(task.id, task.name, task.prompt, bgDbg),
+      task.run_once && task.easycron_id
+        ? deleteEasyCronJob(task.easycron_id)
+        : Promise.resolve(),
+    ]);
+
+    const aiSettled = bgResults[0];
+    if (aiSettled.status === 'fulfilled') {
+      const aiResult = aiSettled.value;
+      if (aiResult.success) {
+        logger.ai('AI upgrade succeeded (background)', {
+          task_id: task.id,
+          task_name: task.name,
+          model: aiResult.model,
+          provider: aiResult.providerUsed,
+          duration_ms: aiResult.durationMs,
+        }, correlationId);
+      } else {
+        logger.error('AI', `AI upgrade failed (background): ${aiResult.errorCode}`, {
+          code: aiResult.errorCode || 'UNKNOWN',
+          error: aiResult.errorDetail || 'Unknown error',
+          data: { task_id: task.id, task_name: task.name, model: aiResult.model, provider: aiResult.providerUsed },
+          correlationId,
+          durationMs: aiResult.durationMs,
+        });
+      }
     } else {
-      logger.error('AI', `AI upgrade failed: ${aiResult.errorCode}`, {
-        code: aiResult.errorCode || 'UNKNOWN',
-        error: aiResult.errorDetail || 'Unknown error',
-        data: { task_id: task.id, task_name: task.name, model: aiResult.model, provider: aiResult.providerUsed },
+      bgDbg.log('BG:ERROR', `AI upgrade Promise rejected: ${aiSettled.reason}`);
+      logger.error('AI', 'AI upgrade Promise rejected (background)', {
+        code: 'PROMISE_REJECTED',
+        error: String(aiSettled.reason),
+        data: { task_id: task.id },
         correlationId,
-        durationMs: aiResult.durationMs,
       });
     }
-  } else {
-    dbg.log('PHASE2', `AI upgrade Promise rejected: ${aiSettled.reason}`);
-    logger.error('AI', 'AI upgrade Promise rejected', {
-      code: 'PROMISE_REJECTED',
-      error: String(aiSettled.reason),
-      data: { task_id: task.id },
-      correlationId,
-    });
-  }
+
+    bgDbg.log('BG:DONE', `Background tasks completed for "${task.name}"`);
+  });
 
   const totalMs = Date.now() - handlerStart;
-  dbg.log('DONE', `Total handler time: ${totalMs}ms (phase1=${phase1Ms}ms phase2=${totalMs - phase1Ms}ms)`);
-  logger.perf('Scheduler handler completed', totalMs, { task_id: task.id, phase1_ms: phase1Ms, phase2_ms: totalMs - phase1Ms }, correlationId);
+  dbg.log('DONE', `Handler time: ${totalMs}ms (phase1=${phase1Ms}ms, phase2=scheduled-background)`);
+  logger.perf('Scheduler handler completed (phase2 in background)', totalMs, { task_id: task.id, phase1_ms: phase1Ms }, correlationId);
 
-  // ── Return response with full debug info ──
+  // ── Return response immediately — AI upgrade runs in background ──
   return NextResponse.json({
     status: 'ok',
     task: task.name,
@@ -635,16 +641,7 @@ export async function GET(request: NextRequest) {
     phase1_ms: phase1Ms,
     total_ms: totalMs,
     executed_at: new Date().toISOString(),
-    ai_upgrade: aiResult ? {
-      success: aiResult.success,
-      error_code: aiResult.errorCode || null,
-      error_detail: aiResult.errorDetail?.slice(0, 300) || null,
-      duration_ms: aiResult.durationMs,
-      model_used: aiResult.model || null,
-      provider_used: aiResult.providerUsed || null,
-      raw_response_preview: aiResult.rawResponse?.slice(0, 200) || null,
-      notification_updated: aiResult.notificationUpdated ?? null,
-    } : { success: false, error_code: 'PROMISE_REJECTED', error_detail: String(aiSettled.status === 'rejected' ? aiSettled.reason : 'unknown') },
+    ai_upgrade: { status: 'scheduled_background', note: 'AI upgrade is running in the background via after(). Results will be saved to the database.' },
     debug_log: dbg.entries,
   });
 }

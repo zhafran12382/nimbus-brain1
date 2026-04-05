@@ -18,11 +18,13 @@ function log(tag: string, ...args: unknown[]) {
 /**
  * GET /api/scheduler/cleanup
  *
- * Recovery endpoint for stuck tasks.
- * Finds all tasks with status='active', run_once=true, and created_at > 1 hour ago.
- * Marks them as completed and inserts a notification if one doesn't exist.
+ * Recovery endpoint for stuck tasks + auto-delete old notifications.
+ * 
+ * 1. Finds all tasks with status='active', run_once=true, and created_at > 1 hour ago.
+ *    Marks them as completed and inserts a notification if one doesn't exist.
+ * 2. Deletes notifications older than 7 days.
  *
- * Can be called manually or by a separate cron job to recover from timeout failures.
+ * Can be called manually or by a separate cron job.
  */
 export async function GET() {
   const startMs = Date.now();
@@ -30,6 +32,8 @@ export async function GET() {
   const oneHourAgo = new Date(Date.now() - STUCK_TASK_THRESHOLD_MS).toISOString();
 
   log('START', `Looking for stuck tasks (run_once + active + created before ${oneHourAgo})`);
+
+  // ── Phase A: Clean up stuck tasks ──
 
   // Find stuck tasks: active + run_once + created more than 1 hour ago
   const { data: stuckTasks, error: fetchErr } = await supabase
@@ -139,11 +143,35 @@ export async function GET() {
   const durationMs = Date.now() - startMs;
   log('DONE', `Cleaned ${cleaned}/${stuckTasks.length} tasks in ${durationMs}ms`);
 
+  // ── Phase B: Auto-delete old notifications (older than 7 days) ──
+
+  const NOTIFICATION_RETENTION_DAYS = 7;
+  const retentionCutoff = new Date(Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  log('CLEANUP', `Deleting notifications older than ${NOTIFICATION_RETENTION_DAYS} days (before ${retentionCutoff})`);
+
+  const { data: deletedNotifications, error: deleteErr } = await supabase
+    .from('notifications')
+    .delete()
+    .lt('created_at', retentionCutoff)
+    .select('id');
+
+  const deletedCount = deletedNotifications?.length ?? 0;
+  if (deleteErr) {
+    log('ERROR', `Failed to delete old notifications: ${deleteErr.message}`);
+  } else {
+    log('CLEANUP', `Deleted ${deletedCount} notification(s) older than ${NOTIFICATION_RETENTION_DAYS} days`);
+  }
+
+  const totalDurationMs = Date.now() - startMs;
+  log('DONE', `Total cleanup completed in ${totalDurationMs}ms`);
+
   return NextResponse.json({
     status: 'ok',
     cleaned,
     total_stuck: stuckTasks.length,
     results,
-    duration_ms: durationMs,
+    notifications_deleted: deletedCount,
+    notification_retention_days: NOTIFICATION_RETENTION_DAYS,
+    duration_ms: totalDurationMs,
   });
 }
