@@ -448,11 +448,12 @@ function ChatPageContent() {
   }, [messages, activeConversationId, chatMode, modelId, providerId]);
 
   // ── Once conversation is set and handleSend has the new ID, fire the continuation ──
+  // 150ms delay allows React to fully settle state after setActiveConversationId
+  // so that handleSend captures the correct conversationId in its closure.
   useEffect(() => {
     const pending = pendingContinuation.current;
     if (pending && activeConversationId === pending.conversationId) {
       pendingContinuation.current = null;
-      // Small delay to ensure React state is fully settled
       const timer = setTimeout(() => handleSend(pending.prompt), 150);
       return () => clearTimeout(timer);
     }

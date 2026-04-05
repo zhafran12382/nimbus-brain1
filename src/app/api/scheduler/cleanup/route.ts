@@ -144,8 +144,8 @@ export async function GET() {
   log('DONE', `Cleaned ${cleaned}/${stuckTasks.length} tasks in ${durationMs}ms`);
 
   // ── Phase B: Auto-delete old notifications (older than 7 days) ──
-
-  const NOTIFICATION_RETENTION_DAYS = 7;
+  // Configurable via NOTIFICATION_RETENTION_DAYS env var, defaults to 7
+  const NOTIFICATION_RETENTION_DAYS = parseInt(process.env.NOTIFICATION_RETENTION_DAYS || '7', 10);
   const retentionCutoff = new Date(Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
   log('CLEANUP', `Deleting notifications older than ${NOTIFICATION_RETENTION_DAYS} days (before ${retentionCutoff})`);
 
