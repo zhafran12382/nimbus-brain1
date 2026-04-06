@@ -5,9 +5,15 @@ import { getProviderConfig } from '@/lib/models';
 import { logger } from '@/lib/logger';
 import type { ProviderId } from '@/types';
 
-// Hardcoded AI model for notification upgrade — via OpenRouter routed to Groq
-const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b';
-const AI_UPGRADE_PROVIDER: ProviderId = 'openrouter-paid';
+// AI model for notification upgrade — uses free tier via OpenRouter (same as chatbot default)
+const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b:free';
+const AI_UPGRADE_PROVIDER: ProviderId = 'openrouter';
+
+// Fallback models if primary returns empty/fails
+const AI_FALLBACK_MODELS: { model: string; provider: ProviderId }[] = [
+  { model: 'meta-llama/llama-3.3-70b-instruct:free', provider: 'openrouter' },
+  { model: 'mistralai/mistral-small-3.1-24b-instruct:free', provider: 'openrouter' },
+];
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -127,23 +133,27 @@ async function tryAiUpgrade(
   taskName: string,
   prompt: string,
   dbg: ReturnType<typeof createDebugLog>,
+  modelOverride?: string,
+  providerOverride?: ProviderId,
 ): Promise<AiUpgradeResult> {
   const startMs = Date.now();
   const result: AiUpgradeResult = { success: false, durationMs: 0 };
+  const useModel = modelOverride || AI_UPGRADE_MODEL;
+  const useProviderId = providerOverride || AI_UPGRADE_PROVIDER;
 
   // ── Step 1: Validate provider config ──
-  const provider = getProviderConfig(AI_UPGRADE_PROVIDER);
-  dbg.log('AI:CONFIG', `Provider="${AI_UPGRADE_PROVIDER}" Model="${AI_UPGRADE_MODEL}" MaxTokens=${AI_MAX_TOKENS}`);
+  const provider = getProviderConfig(useProviderId);
+  dbg.log('AI:CONFIG', `Provider="${useProviderId}" Model="${useModel}" MaxTokens=${AI_MAX_TOKENS}`);
   dbg.log('AI:CONFIG', `Provider found: ${!!provider}`);
 
   if (!provider) {
     result.errorCode = 'PROVIDER_NOT_FOUND';
-    result.errorDetail = `No provider config for "${AI_UPGRADE_PROVIDER}"`;
+    result.errorDetail = `No provider config for "${useProviderId}"`;
     result.durationMs = Date.now() - startMs;
     dbg.log('AI:ERROR', result.errorDetail);
     await insertNotification(
       `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
-      `Provider "${AI_UPGRADE_PROVIDER}" tidak ditemukan. Kode: PROVIDER_NOT_FOUND`,
+      `Provider "${useProviderId}" tidak ditemukan. Kode: PROVIDER_NOT_FOUND`,
       taskId, undefined, undefined, 'warning',
     );
     return result;
@@ -178,14 +188,13 @@ async function tryAiUpgrade(
   try {
     // ── Step 4: Build request ──
     const requestBody = {
-      model: AI_UPGRADE_MODEL,
+      model: useModel,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: `Task: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
       ],
       temperature: 0.7,
       max_tokens: AI_MAX_TOKENS,
-      provider: { order: ['Groq'], require_parameters: true },
     };
     const requestUrl = `${provider.baseUrl}/chat/completions`;
 
@@ -194,7 +203,7 @@ async function tryAiUpgrade(
       model: requestBody.model,
       temperature: requestBody.temperature,
       max_tokens: requestBody.max_tokens,
-      provider: requestBody.provider,
+      provider_id: useProviderId,
       messages_count: requestBody.messages.length,
       system_prompt_len: SYSTEM_PROMPT.length,
       user_prompt_len: requestBody.messages[1].content.length,
@@ -586,40 +595,45 @@ export async function GET(request: NextRequest) {
     const bgDbg = createDebugLog();
     bgDbg.log('BG:START', `Background AI upgrade for task "${task.name}" (${task.id})`);
 
-    const bgResults = await Promise.allSettled([
-      tryAiUpgrade(task.id, task.name, task.prompt, bgDbg),
-      task.run_once && task.easycron_id
-        ? deleteEasyCronJob(task.easycron_id)
-        : Promise.resolve(),
-    ]);
+    // Try primary model first, then fallbacks if it fails
+    let aiResult: AiUpgradeResult | null = null;
+    const attempts: { model: string; provider: ProviderId }[] = [
+      { model: AI_UPGRADE_MODEL, provider: AI_UPGRADE_PROVIDER },
+      ...AI_FALLBACK_MODELS,
+    ];
 
-    const aiSettled = bgResults[0];
-    if (aiSettled.status === 'fulfilled') {
-      const aiResult = aiSettled.value;
-      if (aiResult.success) {
-        logger.ai('AI upgrade succeeded (background)', {
-          task_id: task.id,
-          task_name: task.name,
-          model: aiResult.model,
-          provider: aiResult.providerUsed,
-          duration_ms: aiResult.durationMs,
-        }, correlationId);
-      } else {
-        logger.error('AI', `AI upgrade failed (background): ${aiResult.errorCode}`, {
-          code: aiResult.errorCode || 'UNKNOWN',
-          error: aiResult.errorDetail || 'Unknown error',
-          data: { task_id: task.id, task_name: task.name, model: aiResult.model, provider: aiResult.providerUsed },
-          correlationId,
-          durationMs: aiResult.durationMs,
-        });
+    for (const attempt of attempts) {
+      bgDbg.log('BG:ATTEMPT', `Trying model="${attempt.model}" provider="${attempt.provider}"`);
+      const result = await tryAiUpgrade(task.id, task.name, task.prompt, bgDbg, attempt.model, attempt.provider);
+      if (result.success) {
+        aiResult = result;
+        bgDbg.log('BG:OK', `Model "${attempt.model}" succeeded`);
+        break;
       }
+      bgDbg.log('BG:FAIL', `Model "${attempt.model}" failed: ${result.errorCode} — trying next fallback`);
+      aiResult = result; // keep last failure for logging
+    }
+
+    // Run EasyCron cleanup in parallel (non-blocking)
+    if (task.run_once && task.easycron_id) {
+      await deleteEasyCronJob(task.easycron_id).catch(() => {});
+    }
+
+    if (aiResult?.success) {
+      logger.ai('AI upgrade succeeded (background)', {
+        task_id: task.id,
+        task_name: task.name,
+        model: aiResult.model,
+        provider: aiResult.providerUsed,
+        duration_ms: aiResult.durationMs,
+      }, correlationId);
     } else {
-      bgDbg.log('BG:ERROR', `AI upgrade Promise rejected: ${aiSettled.reason}`);
-      logger.error('AI', 'AI upgrade Promise rejected (background)', {
-        code: 'PROMISE_REJECTED',
-        error: String(aiSettled.reason),
-        data: { task_id: task.id },
+      logger.error('AI', `AI upgrade failed (background, all attempts): ${aiResult?.errorCode}`, {
+        code: aiResult?.errorCode || 'UNKNOWN',
+        error: aiResult?.errorDetail || 'Unknown error',
+        data: { task_id: task.id, task_name: task.name, model: aiResult?.model, provider: aiResult?.providerUsed },
         correlationId,
+        durationMs: aiResult?.durationMs,
       });
     }
 
