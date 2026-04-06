@@ -616,7 +616,7 @@ export async function GET(request: NextRequest) {
 
     // Run EasyCron cleanup in parallel (non-blocking)
     if (task.run_once && task.easycron_id) {
-      await deleteEasyCronJob(task.easycron_id).catch(() => {});
+      await deleteEasyCronJob(task.easycron_id).catch((err) => bgDbg.log('BG:EASYCRON_FAIL', `EasyCron cleanup failed: ${err}`));
     }
 
     if (aiResult?.success) {
