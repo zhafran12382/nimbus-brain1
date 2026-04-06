@@ -75,20 +75,9 @@ ${truncatedContent}
 
 Lanjutkan teks di atas dengan tepat dan lengkap. Gunakan bahasa Indonesia.`;
 
-    // Save the user message
-    const { error: msgErr } = await supabase.from('chat_messages').insert({
-      role: 'user',
-      content: continuationPrompt,
-      conversation_id: conversation.id,
-    });
-
-    if (msgErr) {
-      logger.error('DB', 'Failed to save continuation message', {
-        code: 'MSG_INSERT_FAILED',
-        error: msgErr.message,
-        correlationId,
-      });
-    }
+    // Note: We do NOT save the user message here. The chat page's handleSend()
+    // will create and save the user message when it auto-sends the continuation prompt.
+    // This avoids duplicate messages in the conversation.
 
     // Mark notification as read
     await supabase

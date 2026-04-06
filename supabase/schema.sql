@@ -173,6 +173,22 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- Add is_truncated/original_prompt to notifications if missing (for "Lanjutkan percakapan" feature)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'notifications' AND column_name = 'is_truncated'
+  ) THEN
+    ALTER TABLE notifications ADD COLUMN is_truncated BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'notifications' AND column_name = 'original_prompt'
+  ) THEN
+    ALTER TABLE notifications ADD COLUMN original_prompt TEXT;
+  END IF;
+END $$;
+
 -- Add provider_used and token usage columns if chat_messages already existed without them
 DO $$ BEGIN
   IF NOT EXISTS (
