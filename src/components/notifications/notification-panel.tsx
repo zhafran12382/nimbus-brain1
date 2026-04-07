@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Info, AlertTriangle, XCircle, CheckCircle, X, Check, Clock, MessageSquare, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -341,7 +340,6 @@ function NotificationItem({
 
 // --- Main bell + panel ---
 export function NotificationBell() {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -466,14 +464,13 @@ export function NotificationBell() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-      // Store the conversation ID and continuation prompt for the chat page to pick up
-      localStorage.setItem("nimbus-continue-conv-id", data.conversation_id);
-      localStorage.setItem("nimbus-continue-prompt", data.continuation_prompt);
-
       setSelectedNotification(null);
 
-      // Navigate to chat page — it will detect the continuation and auto-send
-      router.push("/chat");
+      // Dispatch event directly — NotificationBell is always rendered on the chat page,
+      // so the event listener in chat page will pick this up immediately.
+      window.dispatchEvent(new CustomEvent("nimbus-continue-chat", {
+        detail: { conversationId: data.conversation_id, prompt: data.continuation_prompt },
+      }));
     } catch (err) {
       console.error("Continue chat failed:", err);
     } finally {

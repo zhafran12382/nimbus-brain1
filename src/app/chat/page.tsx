@@ -130,31 +130,25 @@ function ChatPageContent() {
     setMessages([]);
   }, []);
 
-  // ── Detect "Lanjutkan percakapan" continuation from notification ──
+  // ── "Lanjutkan percakapan" continuation from notification ──
   // When user clicks "Lanjutkan percakapan" in a truncated notification,
-  // it stores conv ID + prompt in localStorage, then navigates here.
-  const continuationHandled = useRef(false);
+  // the notification panel dispatches a nimbus-continue-chat event.
+  // We store the pending continuation in a ref, set the conversation,
+  // then send once the conversation state has updated.
+  const pendingContinuation = useRef<{ conversationId: string; prompt: string } | null>(null);
+
+  // Handle the continuation event: store pending data and switch conversation
   useEffect(() => {
-    if (!initialized || continuationHandled.current) return;
-    const contConvId = localStorage.getItem("nimbus-continue-conv-id");
-    const contPrompt = localStorage.getItem("nimbus-continue-prompt");
-    if (contConvId && contPrompt) {
-      continuationHandled.current = true;
-      // Clean up immediately to prevent re-triggering
-      localStorage.removeItem("nimbus-continue-conv-id");
-      localStorage.removeItem("nimbus-continue-prompt");
-      // Set the conversation and trigger the send after a short delay
-      setActiveConversationId(contConvId);
-      // We need to wait for the conversation to be set before sending
-      setTimeout(() => {
-        // Programmatically trigger the send by dispatching a custom event
-        // that the chat input can pick up, or directly call handleSend
-        window.dispatchEvent(new CustomEvent("nimbus-continue-chat", {
-          detail: { conversationId: contConvId, prompt: contPrompt },
-        }));
-      }, 500);
-    }
-  }, [initialized]);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.conversationId && detail?.prompt) {
+        pendingContinuation.current = { conversationId: detail.conversationId, prompt: detail.prompt };
+        setActiveConversationId(detail.conversationId);
+      }
+    };
+    window.addEventListener("nimbus-continue-chat", handler);
+    return () => window.removeEventListener("nimbus-continue-chat", handler);
+  }, []);
 
   const handleModeChange = useCallback((mode: ChatMode) => {
     setChatMode(mode);
@@ -453,17 +447,17 @@ function ChatPageContent() {
     }
   }, [messages, activeConversationId, chatMode, modelId, providerId]);
 
-  // ── Listen for continuation event from notification "Lanjutkan percakapan" ──
+  // ── Once conversation is set and handleSend has the new ID, fire the continuation ──
+  // 150ms delay allows React to fully settle state after setActiveConversationId
+  // so that handleSend captures the correct conversationId in its closure.
   useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.prompt) {
-        handleSend(detail.prompt);
-      }
-    };
-    window.addEventListener("nimbus-continue-chat", handler);
-    return () => window.removeEventListener("nimbus-continue-chat", handler);
-  }, [handleSend]);
+    const pending = pendingContinuation.current;
+    if (pending && activeConversationId === pending.conversationId) {
+      pendingContinuation.current = null;
+      const timer = setTimeout(() => handleSend(pending.prompt), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activeConversationId, handleSend]);
 
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden">
