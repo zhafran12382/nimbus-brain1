@@ -52,9 +52,6 @@ export async function GET() {
   // Test 5: Check NEXT_PUBLIC_SITE_URL
   results.site_url = process.env.NEXT_PUBLIC_SITE_URL || '(not set — using fallback)';
 
-  // Test 6: Check EasyCron API key
-  results.easycron_key = process.env.EASYCRON_API_KEY ? 'set' : 'NOT SET';
-
   const inserted = !e1 || !results.minimal_insert || (results.minimal_insert as { ok?: boolean }).ok;
 
   return NextResponse.json({

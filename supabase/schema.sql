@@ -93,21 +93,39 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 9. Scheduled Tasks table (EasyCron-based) — must come before notifications (FK dependency)
+-- 9. Scheduled Tasks table — must come before notifications (FK dependency)
 CREATE TABLE IF NOT EXISTS scheduled_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  easycron_id TEXT,
   name TEXT NOT NULL,
   prompt TEXT NOT NULL,
   cron_expression TEXT NOT NULL,
+  run_at TIMESTAMPTZ,
   run_once BOOLEAN NOT NULL DEFAULT FALSE,
   model_used TEXT,
   provider_used TEXT,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'done', 'failed', 'paused', 'cancelled')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Add run_once column if table already existed without it
+-- Add run_at column if table already existed without it
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'scheduled_tasks' AND column_name = 'run_at'
+  ) THEN
+    ALTER TABLE scheduled_tasks ADD COLUMN run_at TIMESTAMPTZ;
+  END IF;
+END $$;
+
+-- Remove easycron_id column if it exists (migrated away from EasyCron)
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'scheduled_tasks' AND column_name = 'easycron_id'
+  ) THEN
+    ALTER TABLE scheduled_tasks DROP COLUMN easycron_id;
+  END IF;
+END $$;
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -217,7 +235,7 @@ CREATE INDEX IF NOT EXISTS idx_quiz_attempts_completed ON quiz_attempts(complete
 CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_status ON scheduled_tasks(status);
-CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_easycron ON scheduled_tasks(easycron_id);
+CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_run_at ON scheduled_tasks(run_at);
 
 -- ========================================
 -- RLS Policies (allow all for simplicity)
@@ -308,5 +326,31 @@ DO $$ BEGIN
   CREATE TRIGGER set_targets_updated_at
     BEFORE UPDATE ON targets
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- ========================================
+-- 11. Scheduler Logs table
+-- ========================================
+CREATE TABLE IF NOT EXISTS scheduler_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID REFERENCES scheduled_tasks(id) ON DELETE SET NULL,
+  task_name TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('done', 'failed')),
+  duration_ms INT,
+  detail TEXT,
+  executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduler_logs_task ON scheduler_logs(task_id);
+CREATE INDEX IF NOT EXISTS idx_scheduler_logs_executed ON scheduler_logs(executed_at DESC);
+
+DO $$ BEGIN
+  ALTER TABLE scheduler_logs ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow all on scheduler_logs" ON scheduler_logs FOR ALL USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;

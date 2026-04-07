@@ -478,26 +478,7 @@ async function tryAiUpgrade(
 
 // ── Background helpers ──
 
-async function deleteEasyCronJob(easycronId: string): Promise<void> {
-  if (!process.env.EASYCRON_API_KEY) {
-    log('EASYCRON', `No API key, skipping delete for job ${easycronId}`);
-    return;
-  }
-  try {
-    const body = new URLSearchParams();
-    body.append('token', process.env.EASYCRON_API_KEY);
-    body.append('cron_job_id', easycronId);
-    const res = await fetch('https://www.easycron.com/rest/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
-    });
-    log('EASYCRON', `Delete job ${easycronId}: HTTP ${res.status}`);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log('EASYCRON', `Failed to delete job ${easycronId}: ${msg}`);
-  }
-}
+// (EasyCron integration removed — VPS worker handles scheduling)
 
 // ── Main handler ──
 
@@ -573,26 +554,22 @@ export async function GET(request: NextRequest) {
   dbg.log('PHASE1', `Completed in ${phase1Ms}ms — notification=${inserted} completed=${completed}`);
 
   // ═══════════════════════════════════════════════════════════
-  // PHASE 2 — AI upgrade + EasyCron cleanup (awaited)
+  // PHASE 2 — AI upgrade (awaited)
   // AI upgrade uses openai/gpt-oss-120b via openrouter-paid, routed to Groq.
   // Flat 300 max_tokens. AbortController timeout is 15s.
-  // Promise.allSettled ensures both run even if one fails.
   // ═══════════════════════════════════════════════════════════
 
-  dbg.log('PHASE2', 'Starting AI upgrade + EasyCron cleanup');
-  logger.scheduler('Phase 2 starting: AI upgrade + EasyCron cleanup', { task_id: task.id, task_name: task.name }, correlationId);
+  dbg.log('PHASE2', 'Starting AI upgrade');
+  logger.scheduler('Phase 2 starting: AI upgrade', { task_id: task.id, task_name: task.name }, correlationId);
 
-  const phase2Results = await Promise.allSettled([
+  const aiSettled = await Promise.allSettled([
     tryAiUpgrade(task.id, task.name, task.prompt, dbg),
-    task.run_once && task.easycron_id
-      ? deleteEasyCronJob(task.easycron_id)
-      : Promise.resolve(),
   ]);
 
-  const aiSettled = phase2Results[0];
+  const aiResult_ = aiSettled[0];
   let aiResult: AiUpgradeResult | null = null;
-  if (aiSettled.status === 'fulfilled') {
-    aiResult = aiSettled.value;
+  if (aiResult_.status === 'fulfilled') {
+    aiResult = aiResult_.value;
     if (aiResult.success) {
       logger.ai('AI upgrade succeeded', {
         task_id: task.id,
@@ -611,10 +588,10 @@ export async function GET(request: NextRequest) {
       });
     }
   } else {
-    dbg.log('PHASE2', `AI upgrade Promise rejected: ${aiSettled.reason}`);
+    dbg.log('PHASE2', `AI upgrade Promise rejected: ${aiResult_.reason}`);
     logger.error('AI', 'AI upgrade Promise rejected', {
       code: 'PROMISE_REJECTED',
-      error: String(aiSettled.reason),
+      error: String(aiResult_.reason),
       data: { task_id: task.id },
       correlationId,
     });
@@ -644,7 +621,7 @@ export async function GET(request: NextRequest) {
       provider_used: aiResult.providerUsed || null,
       raw_response_preview: aiResult.rawResponse?.slice(0, 200) || null,
       notification_updated: aiResult.notificationUpdated ?? null,
-    } : { success: false, error_code: 'PROMISE_REJECTED', error_detail: String(aiSettled.status === 'rejected' ? aiSettled.reason : 'unknown') },
+    } : { success: false, error_code: 'PROMISE_REJECTED', error_detail: String(aiResult_.status === 'rejected' ? aiResult_.reason : 'unknown') },
     debug_log: dbg.entries,
   });
 }

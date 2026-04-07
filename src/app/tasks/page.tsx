@@ -106,15 +106,18 @@ function timeAgo(dateStr: string): string {
 }
 
 const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
-  active: { bg: "bg-emerald-500/10", text: "text-emerald-400", dot: "bg-emerald-400" },
+  pending: { bg: "bg-emerald-500/10", text: "text-emerald-400", dot: "bg-emerald-400" },
+  running: { bg: "bg-blue-500/10", text: "text-blue-400", dot: "bg-blue-400" },
   paused: { bg: "bg-amber-500/10", text: "text-amber-400", dot: "bg-amber-400" },
-  completed: { bg: "bg-zinc-500/10", text: "text-zinc-400", dot: "bg-zinc-400" },
+  done: { bg: "bg-zinc-500/10", text: "text-zinc-400", dot: "bg-zinc-400" },
+  failed: { bg: "bg-red-500/10", text: "text-red-400", dot: "bg-red-400" },
+  cancelled: { bg: "bg-zinc-500/10", text: "text-zinc-400", dot: "bg-zinc-400" },
 };
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "active" | "paused" | "completed">("all");
+  const [filter, setFilter] = useState<"all" | "pending" | "running" | "paused" | "done" | "failed">("all");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const fetchTasks = useCallback(async () => {
@@ -180,24 +183,8 @@ export default function TasksPage() {
   }, []);
 
   const handleToggleStatus = async (task: ScheduledTask) => {
-    const newStatus = task.status === "active" ? "paused" : "active";
+    const newStatus = task.status === "pending" ? "paused" : "pending";
     setActionLoading(task.id);
-
-    // If has easycron_id, toggle on EasyCron too
-    if (task.easycron_id) {
-      try {
-        const endpoint = newStatus === "active" ? "enable" : "disable";
-        const body = new URLSearchParams();
-        body.append("token", ""); // Token is server-side only, use API route
-        await fetch(`/api/tasks/toggle`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskId: task.id, action: endpoint }),
-        }).catch(() => {});
-      } catch {
-        // Best effort — update DB regardless
-      }
-    }
 
     await supabase
       .from("scheduled_tasks")
@@ -212,21 +199,6 @@ export default function TasksPage() {
     if (!confirm(`Hapus task "${task.name}"?`)) return;
     setActionLoading(task.id);
 
-    // Delete from EasyCron if exists
-    if (task.easycron_id) {
-      try {
-        const body = new URLSearchParams();
-        body.append("token", "");
-        await fetch(`/api/tasks/delete-cron`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskId: task.id }),
-        }).catch(() => {});
-      } catch {
-        // Best effort
-      }
-    }
-
     await supabase
       .from("scheduled_tasks")
       .delete()
@@ -237,7 +209,7 @@ export default function TasksPage() {
   };
 
   const filtered = tasks;
-  const activeCount = tasks.filter((t) => t.status === "active").length;
+  const activeCount = tasks.filter((t) => t.status === "pending").length;
 
   return (
     <div className="flex flex-col min-h-[100dvh]">
@@ -266,7 +238,7 @@ export default function TasksPage() {
 
           {/* Filter Tabs */}
           <div className="flex gap-1 p-0.5 rounded-lg bg-[hsl(0_0%_7%)] border border-border-subtle w-fit">
-            {(["all", "active", "paused", "completed"] as const).map((f) => (
+            {(["all", "pending", "running", "paused", "done", "failed"] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -276,7 +248,7 @@ export default function TasksPage() {
                     : "text-text-muted hover:text-text-secondary"
                 }`}
               >
-                {f === "all" ? "Semua" : f === "active" ? "Aktif" : f === "paused" ? "Dijeda" : "Selesai"}
+                {f === "all" ? "Semua" : f === "pending" ? "Pending" : f === "running" ? "Berjalan" : f === "paused" ? "Dijeda" : f === "done" ? "Selesai" : "Gagal"}
               </button>
             ))}
           </div>
@@ -300,7 +272,7 @@ export default function TasksPage() {
           ) : (
             <AnimatePresence mode="popLayout">
               {filtered.map((task) => {
-                const sc = statusColors[task.status] || statusColors.active;
+                const sc = statusColors[task.status] || statusColors.pending;
                 return (
                   <motion.div
                     key={task.id}
@@ -338,25 +310,22 @@ export default function TasksPage() {
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-muted">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {task.run_once && task.status === "completed"
-                          ? `Selesai — ${formatCron(task.cron_expression)}`
+                        {(task.status === "done" || task.status === "failed")
+                          ? `${task.status === "done" ? "Selesai" : "Gagal"} — ${formatCron(task.cron_expression)}`
                           : formatCron(task.cron_expression)}
                       </span>
                       <span>Dibuat {timeAgo(task.created_at)}</span>
-                      {task.easycron_id && task.status !== "completed" && (
-                        <span className="text-blue-400/60">EasyCron #{task.easycron_id.slice(0, 8)}</span>
-                      )}
                     </div>
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 pt-1">
-                      {task.status !== "completed" && (
+                      {(task.status === "pending" || task.status === "paused") && (
                         <button
                           onClick={() => handleToggleStatus(task)}
                           disabled={actionLoading === task.id}
                           className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-hover transition-colors disabled:opacity-50"
                         >
-                          {task.status === "active" ? (
+                          {task.status === "pending" ? (
                             <>
                               <Pause className="h-3 w-3" /> Jeda
                             </>

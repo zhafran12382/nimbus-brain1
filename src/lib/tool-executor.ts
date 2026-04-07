@@ -2,6 +2,62 @@ import { supabase } from './supabase';
 import { QUIZ_DATA_PREFIX } from './constants';
 import { logger } from './logger';
 
+/**
+ * Calculates the next run_at datetime from a 5-field cron expression.
+ * Supports: specific minute/hour/day/month combos and wildcard patterns.
+ * Returns ISO string for the next matching time.
+ */
+function calculateNextRunAt(cronExpression: string): string {
+  const parts = cronExpression.trim().split(/\s+/);
+  if (parts.length !== 5) return new Date().toISOString();
+
+  const [minStr, hourStr, domStr, monStr] = parts;
+  const now = new Date();
+
+  // For specific date-time cron (e.g., "30 14 28 3 *")
+  const isSpecificMin = /^\d+$/.test(minStr);
+  const isSpecificHour = /^\d+$/.test(hourStr);
+  const isSpecificDom = /^\d+$/.test(domStr);
+  const isSpecificMon = /^\d+$/.test(monStr);
+
+  if (isSpecificMin && isSpecificHour) {
+    const minute = parseInt(minStr, 10);
+    const hour = parseInt(hourStr, 10);
+
+    if (isSpecificDom && isSpecificMon) {
+      // Specific date: "30 14 28 3 *" → March 28 at 14:30
+      const month = parseInt(monStr, 10) - 1;
+      const day = parseInt(domStr, 10);
+      let year = now.getFullYear();
+      let target = new Date(year, month, day, hour, minute, 0, 0);
+      if (target <= now) {
+        target = new Date(year + 1, month, day, hour, minute, 0, 0);
+      }
+      return target.toISOString();
+    }
+
+    if (isSpecificDom) {
+      // Monthly: "0 9 1 * *" → 1st of each month at 09:00
+      const day = parseInt(domStr, 10);
+      const target = new Date(now.getFullYear(), now.getMonth(), day, hour, minute, 0, 0);
+      if (target <= now) {
+        target.setMonth(target.getMonth() + 1);
+      }
+      return target.toISOString();
+    }
+
+    // Daily or weekly: "0 7 * * *" → every day at 07:00
+    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
+    if (target <= now) {
+      target.setDate(target.getDate() + 1);
+    }
+    return target.toISOString();
+  }
+
+  // For interval-based patterns (e.g., "*/30 * * * *"), run immediately
+  return new Date(Date.now() + 60000).toISOString(); // 1 minute from now
+}
+
 interface SearchResult {
   title?: string;
   url?: string;
@@ -862,7 +918,9 @@ JSON ARRAY ONLY. NO other text before or after.`;
       const taskName = String(args.name).trim();
       const runOnce = args.run_once === true;
 
-      // 1. Save to database first
+      // Calculate next run_at from cron expression
+      const runAt = calculateNextRunAt(cronExp);
+
       const { data, error } = await supabase
         .from('scheduled_tasks')
         .insert({
@@ -870,6 +928,8 @@ JSON ARRAY ONLY. NO other text before or after.`;
           prompt: args.prompt,
           cron_expression: cronExp,
           run_once: runOnce,
+          run_at: runAt,
+          status: 'pending',
           model_used: options?.modelId || null,
           provider_used: options?.providerId || null,
         })
@@ -877,38 +937,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
         .single();
       if (error) return `Error menyimpan ke database: ${error.message}`;
 
-      // 2. Call EasyCron API with x-www-form-urlencoded
-      const schedulerUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://nimbus-brain.vercel.app'}/api/scheduler?id=${data.id}`;
-      try {
-        const body = new URLSearchParams();
-        body.append('token', process.env.EASYCRON_API_KEY || '');
-        body.append('url', schedulerUrl);
-        body.append('cron_expression', cronExp);
-
-        const easycronRes = await fetch('https://www.easycron.com/rest/add', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body.toString(),
-        });
-        const easycronData = await easycronRes.json();
-
-        if (easycronData.status === 'success' && easycronData.cron_job_id) {
-          // 3. Store cron_job_id back to database
-          await supabase
-            .from('scheduled_tasks')
-            .update({ easycron_id: String(easycronData.cron_job_id) })
-            .eq('id', data.id);
-          return `📅 Task "${data.name}" berhasil dibuat${runOnce ? ' (sekali jalan)' : ''}! Cron: ${cronExp} | EasyCron ID: ${easycronData.cron_job_id} | DB ID: ${data.id}`;
-        } else {
-          // DB saved but EasyCron failed — clean up
-          await supabase.from('scheduled_tasks').delete().eq('id', data.id);
-          return `❌ EasyCron error: ${easycronData.error || easycronData.message || JSON.stringify(easycronData)}`;
-        }
-      } catch (err) {
-        // DB saved but EasyCron unreachable — clean up
-        await supabase.from('scheduled_tasks').delete().eq('id', data.id);
-        return `❌ Gagal menghubungi EasyCron: ${err instanceof Error ? err.message : 'Unknown error'}`;
-      }
+      return `📅 Task "${data.name}" berhasil dibuat${runOnce ? ' (sekali jalan)' : ''}! Jadwal: ${cronExp} | ID: ${data.id}`;
     }
 
     case 'get_scheduled_tasks': {
@@ -919,8 +948,8 @@ JSON ARRAY ONLY. NO other text before or after.`;
       if (error) return `Error: ${error.message}`;
       if (!data?.length) return 'Belum ada scheduled tasks.';
 
-      return data.map((t: { id: string; name: string; status: string; prompt: string; cron_expression: string; easycron_id: string | null; run_once?: boolean }) => {
-        return `• ${t.name} [${t.status}]${t.run_once ? ' (sekali)' : ''} — "${t.prompt}" | Cron: ${t.cron_expression} | ID: ${t.id}${t.easycron_id ? ` | EasyCron: ${t.easycron_id}` : ''}`;
+      return data.map((t: { id: string; name: string; status: string; prompt: string; cron_expression: string; run_once?: boolean; run_at?: string | null }) => {
+        return `• ${t.name} [${t.status}]${t.run_once ? ' (sekali)' : ''} — "${t.prompt}" | Cron: ${t.cron_expression} | ID: ${t.id}${t.run_at ? ` | Next: ${t.run_at}` : ''}`;
       }).join('\n');
     }
 
@@ -938,31 +967,12 @@ JSON ARRAY ONLY. NO other text before or after.`;
         .single();
       if (findErr || !task) return `Task dengan ID "${taskId}" tidak ditemukan.`;
 
-      // Update EasyCron
-      if (task.easycron_id) {
-        try {
-          const body = new URLSearchParams();
-          body.append('token', process.env.EASYCRON_API_KEY || '');
-          body.append('cron_job_id', task.easycron_id);
-          body.append('cron_expression', newCron);
-
-          const easycronRes = await fetch('https://www.easycron.com/rest/edit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body.toString(),
-          });
-          const easycronData = await easycronRes.json();
-          if (easycronData.status !== 'success') {
-            return `❌ EasyCron error: ${easycronData.error || easycronData.message || JSON.stringify(easycronData)}`;
-          }
-        } catch (err) {
-          return `❌ Gagal menghubungi EasyCron: ${err instanceof Error ? err.message : 'Unknown error'}`;
-        }
-      }
+      // Calculate new run_at from updated cron expression
+      const newRunAt = calculateNextRunAt(newCron);
 
       const { data, error } = await supabase
         .from('scheduled_tasks')
-        .update({ cron_expression: newCron })
+        .update({ cron_expression: newCron, run_at: newRunAt, status: 'pending' })
         .eq('id', taskId)
         .select()
         .single();
@@ -980,32 +990,9 @@ JSON ARRAY ONLY. NO other text before or after.`;
         .single();
       if (findErr || !task) return `Task dengan ID "${taskId}" tidak ditemukan.`;
 
-      // Delete from EasyCron
-      if (task.easycron_id) {
-        try {
-          const body = new URLSearchParams();
-          body.append('token', process.env.EASYCRON_API_KEY || '');
-          body.append('cron_job_id', task.easycron_id);
-
-          const easycronRes = await fetch('https://www.easycron.com/rest/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body.toString(),
-          });
-          const easycronData = await easycronRes.json();
-          if (easycronData.status !== 'success') {
-            console.error('[EASYCRON] Delete failed:', easycronData);
-            logger.error('TOOL', 'EasyCron delete failed', { code: 'EASYCRON_DELETE_FAILED', error: JSON.stringify(easycronData) });
-          }
-        } catch (err) {
-          console.error('[EASYCRON] Delete request failed:', err);
-          logger.error('TOOL', 'EasyCron delete request failed', { code: 'EASYCRON_REQUEST_FAILED', error: err instanceof Error ? err.message : String(err) });
-        }
-      }
-
       const { error } = await supabase.from('scheduled_tasks').delete().eq('id', taskId);
       if (error) return `Error: ${error.message}`;
-      return `🗑️ Task "${task.name}" berhasil dihapus dari EasyCron dan database.`;
+      return `🗑️ Task "${task.name}" berhasil dihapus.`;
     }
 
     case 'reset_finance': {

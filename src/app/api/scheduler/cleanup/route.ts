@@ -113,23 +113,7 @@ export async function GET() {
       notifCreated = true; // Already existed
     }
 
-    // Try to delete EasyCron job if exists
-    if (task.easycron_id && process.env.EASYCRON_API_KEY) {
-      try {
-        const body = new URLSearchParams();
-        body.append('token', process.env.EASYCRON_API_KEY);
-        body.append('cron_job_id', task.easycron_id);
-        await fetch('https://www.easycron.com/rest/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body.toString(),
-        });
-        log('EASYCRON', `Deleted orphaned job ${task.easycron_id} for task "${task.name}"`);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log('EASYCRON', `Failed to delete job ${task.easycron_id}: ${msg}`);
-      }
-    }
+    // Task cleaned — no external services to clean up
 
     cleaned++;
     results.push({ task_id: task.id, name: task.name, completed: true, notification: notifCreated });

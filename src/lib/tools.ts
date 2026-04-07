@@ -399,7 +399,7 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "create_scheduled_task",
-      description: "Buat scheduled task baru menggunakan EasyCron. Konversi jadwal user ke format cron expression. Contoh: harian jam 7 pagi = '0 7 * * *', setiap Senin jam 9 = '0 9 * * 1'. Untuk one-time task (misal 'ingatkan 20 menit lagi', 'besok jam 7'), set run_once=true dan buat cron expression yang spesifik ke waktu tersebut.",
+      description: "Buat scheduled task baru. Konversi jadwal user ke format cron expression. Contoh: harian jam 7 pagi = '0 7 * * *', setiap Senin jam 9 = '0 9 * * 1'. Untuk one-time task (misal 'ingatkan 20 menit lagi', 'besok jam 7'), set run_once=true dan buat cron expression yang spesifik ke waktu tersebut.",
       parameters: {
         type: "object",
         properties: {
@@ -433,7 +433,7 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "update_scheduled_task",
-      description: "Update jadwal scheduled task yang sudah ada di EasyCron.",
+      description: "Update jadwal scheduled task yang sudah ada.",
       parameters: {
         type: "object",
         properties: {
@@ -448,7 +448,7 @@ export const tools = [
     type: "function" as const,
     function: {
       name: "delete_scheduled_task",
-      description: "Hapus scheduled task dari EasyCron dan database.",
+      description: "Hapus scheduled task dari database.",
       parameters: {
         type: "object",
         properties: {
