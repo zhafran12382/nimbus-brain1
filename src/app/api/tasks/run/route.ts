@@ -24,6 +24,54 @@ const MAX_ORIGINAL_PROMPT = 2000;
 
 // ── Helpers ──
 
+/**
+ * Calculate the next run_at from a 5-field cron expression.
+ */
+function calculateNextRunFromCron(cronExpression: string): string {
+  const parts = cronExpression.trim().split(/\s+/);
+  if (parts.length !== 5) return new Date(Date.now() + 3600000).toISOString();
+
+  const [minStr, hourStr, domStr, monStr] = parts;
+  const now = new Date();
+
+  const isSpecificMin = /^\d+$/.test(minStr);
+  const isSpecificHour = /^\d+$/.test(hourStr);
+  const isSpecificDom = /^\d+$/.test(domStr);
+  const isSpecificMon = /^\d+$/.test(monStr);
+
+  if (isSpecificMin && isSpecificHour) {
+    const minute = parseInt(minStr, 10);
+    const hour = parseInt(hourStr, 10);
+
+    if (isSpecificDom && isSpecificMon) {
+      const month = parseInt(monStr, 10) - 1;
+      const day = parseInt(domStr, 10);
+      const year = now.getFullYear();
+      let target = new Date(year, month, day, hour, minute, 0, 0);
+      if (target <= now) target = new Date(year + 1, month, day, hour, minute, 0, 0);
+      return target.toISOString();
+    }
+
+    if (isSpecificDom) {
+      const day = parseInt(domStr, 10);
+      const target = new Date(now.getFullYear(), now.getMonth(), day, hour, minute, 0, 0);
+      if (target <= now) {
+        target.setMonth(target.getMonth() + 1);
+        target.setDate(day);
+      }
+      return target.toISOString();
+    }
+
+    // Daily
+    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
+    if (target <= now) target.setDate(target.getDate() + 1);
+    return target.toISOString();
+  }
+
+  // Interval-based: 1 minute from now
+  return new Date(Date.now() + 60000).toISOString();
+}
+
 async function insertNotification(
   title: string,
   message: string,
@@ -285,16 +333,25 @@ export async function GET() {
     const taskDuration = Date.now() - taskStart;
 
     // Step 4: Update task status to done or failed
-    if (task.run_once || finalStatus === 'done') {
+    if (task.run_once) {
+      // One-time tasks: mark final status, clear run_at
       await supabase
         .from('scheduled_tasks')
-        .update({ status: finalStatus })
+        .update({ status: finalStatus, run_at: null })
+        .eq('id', task.id);
+    } else if (finalStatus === 'done') {
+      // Recurring tasks that succeeded: calculate next run_at
+      const nextRunAt = calculateNextRunFromCron(task.cron_expression);
+      await supabase
+        .from('scheduled_tasks')
+        .update({ status: 'pending', run_at: nextRunAt })
         .eq('id', task.id);
     } else {
-      // For recurring tasks that failed, reset to pending so they can retry
+      // Recurring tasks that failed: retry after 5 minutes to avoid rapid loops
+      const retryAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
       await supabase
         .from('scheduled_tasks')
-        .update({ status: 'pending' })
+        .update({ status: 'pending', run_at: retryAt })
         .eq('id', task.id);
     }
 

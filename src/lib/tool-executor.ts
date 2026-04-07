@@ -9,7 +9,7 @@ import { logger } from './logger';
  */
 function calculateNextRunAt(cronExpression: string): string {
   const parts = cronExpression.trim().split(/\s+/);
-  if (parts.length !== 5) return new Date().toISOString();
+  if (parts.length !== 5) return new Date(Date.now() + 3600000).toISOString(); // 1 hour from now for invalid crons
 
   const [minStr, hourStr, domStr, monStr] = parts;
   const now = new Date();
@@ -42,6 +42,8 @@ function calculateNextRunAt(cronExpression: string): string {
       const target = new Date(now.getFullYear(), now.getMonth(), day, hour, minute, 0, 0);
       if (target <= now) {
         target.setMonth(target.getMonth() + 1);
+        // Handle day overflow (e.g., day 31 in a 30-day month)
+        target.setDate(day);
       }
       return target.toISOString();
     }
