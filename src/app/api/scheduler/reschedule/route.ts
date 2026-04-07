@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing task_id, date, or time' }, { status: 400 });
   }
 
-  // Parse date and time
-  const [year, month, day] = date.split('-').map(Number);
+  // Parse date and time for validation
+  const [, month, day] = date.split('-').map(Number);
   const [hour, minute] = time.split(':').map(Number);
 
   if (
@@ -53,8 +53,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   }
 
-  // Compute run_at from the specific date/time
-  const runAt = new Date(year, month - 1, day, hour, minute).toISOString();
+  // Compute run_at from the specific date/time in Asia/Jakarta timezone
+  // Create date in Jakarta timezone: the user specifies date/time in their local tz (Asia/Jakarta)
+  const jakartaDateStr = `${date}T${time}:00+07:00`; // Jakarta is UTC+7
+  const runAt = new Date(jakartaDateStr).toISOString();
 
   // Update task in database
   const { error: updateErr } = await supabase
