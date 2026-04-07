@@ -5,15 +5,9 @@ import { getProviderConfig } from '@/lib/models';
 import { logger } from '@/lib/logger';
 import type { ProviderId } from '@/types';
 
-// AI model for notification upgrade — uses free tier via OpenRouter (same as chatbot default)
-const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b:free';
-const AI_UPGRADE_PROVIDER: ProviderId = 'openrouter';
-
-// Fallback models if primary returns empty/fails
-const AI_FALLBACK_MODELS: { model: string; provider: ProviderId }[] = [
-  { model: 'meta-llama/llama-3.3-70b-instruct:free', provider: 'openrouter' },
-  { model: 'mistralai/mistral-small-3.1-24b-instruct:free', provider: 'openrouter' },
-];
+// AI model for notification upgrade — paid tier via OpenRouter locked to DeepInfra
+const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b';
+const AI_UPGRADE_PROVIDER: ProviderId = 'openrouter-paid';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -187,15 +181,20 @@ async function tryAiUpgrade(
 
   try {
     // ── Step 4: Build request ──
-    const requestBody = {
+    const messages = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: `Task: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
+    ];
+    const requestBody: Record<string, unknown> = {
       model: useModel,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Task: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
-      ],
+      messages,
       temperature: 0.7,
       max_tokens: AI_MAX_TOKENS,
     };
+    // Lock to DeepInfra when using openrouter-paid provider
+    if (useProviderId === 'openrouter-paid') {
+      requestBody.provider = { order: ['DeepInfra'], require_parameters: true };
+    }
     const requestUrl = `${provider.baseUrl}/chat/completions`;
 
     dbg.log('AI:REQUEST', `URL: ${requestUrl}`);
@@ -204,9 +203,9 @@ async function tryAiUpgrade(
       temperature: requestBody.temperature,
       max_tokens: requestBody.max_tokens,
       provider_id: useProviderId,
-      messages_count: requestBody.messages.length,
+      messages_count: messages.length,
       system_prompt_len: SYSTEM_PROMPT.length,
-      user_prompt_len: requestBody.messages[1].content.length,
+      user_prompt_len: messages[1].content.length,
     });
 
     // ── Step 5: Make the API call ──
@@ -595,31 +594,14 @@ export async function GET(request: NextRequest) {
     const bgDbg = createDebugLog();
     bgDbg.log('BG:START', `Background AI upgrade for task "${task.name}" (${task.id})`);
 
-    // Try primary model first, then fallbacks if it fails
-    let aiResult: AiUpgradeResult | null = null;
-    const attempts: { model: string; provider: ProviderId }[] = [
-      { model: AI_UPGRADE_MODEL, provider: AI_UPGRADE_PROVIDER },
-      ...AI_FALLBACK_MODELS,
-    ];
+    const aiResult = await tryAiUpgrade(task.id, task.name, task.prompt, bgDbg);
 
-    for (const attempt of attempts) {
-      bgDbg.log('BG:ATTEMPT', `Trying model="${attempt.model}" provider="${attempt.provider}"`);
-      const result = await tryAiUpgrade(task.id, task.name, task.prompt, bgDbg, attempt.model, attempt.provider);
-      if (result.success) {
-        aiResult = result;
-        bgDbg.log('BG:OK', `Model "${attempt.model}" succeeded`);
-        break;
-      }
-      bgDbg.log('BG:FAIL', `Model "${attempt.model}" failed: ${result.errorCode} — trying next fallback`);
-      aiResult = result; // keep last failure for logging
-    }
-
-    // Run EasyCron cleanup in parallel (non-blocking)
+    // Run EasyCron cleanup (non-blocking)
     if (task.run_once && task.easycron_id) {
       await deleteEasyCronJob(task.easycron_id).catch((err) => bgDbg.log('BG:EASYCRON_FAIL', `EasyCron cleanup failed: ${err}`));
     }
 
-    if (aiResult?.success) {
+    if (aiResult.success) {
       logger.ai('AI upgrade succeeded (background)', {
         task_id: task.id,
         task_name: task.name,
@@ -628,12 +610,12 @@ export async function GET(request: NextRequest) {
         duration_ms: aiResult.durationMs,
       }, correlationId);
     } else {
-      logger.error('AI', `AI upgrade failed (background, all attempts): ${aiResult?.errorCode}`, {
-        code: aiResult?.errorCode || 'UNKNOWN',
-        error: aiResult?.errorDetail || 'Unknown error',
-        data: { task_id: task.id, task_name: task.name, model: aiResult?.model, provider: aiResult?.providerUsed },
+      logger.error('AI', `AI upgrade failed (background): ${aiResult.errorCode}`, {
+        code: aiResult.errorCode || 'UNKNOWN',
+        error: aiResult.errorDetail || 'Unknown error',
+        data: { task_id: task.id, task_name: task.name, model: aiResult.model, provider: aiResult.providerUsed },
         correlationId,
-        durationMs: aiResult?.durationMs,
+        durationMs: aiResult.durationMs,
       });
     }
 
