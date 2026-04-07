@@ -478,7 +478,7 @@ async function tryAiUpgrade(
 
 // ── Background helpers ──
 
-// (EasyCron integration removed — VPS worker handles scheduling)
+// (VPS worker handles scheduling externally)
 
 // ── Main handler ──
 

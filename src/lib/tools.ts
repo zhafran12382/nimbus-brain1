@@ -422,7 +422,7 @@ export const tools = [
         properties: {
           status: {
             type: "string",
-            enum: ["active", "paused", "completed", "all"],
+            enum: ["pending", "running", "done", "failed", "paused", "cancelled", "all"],
             description: "Filter status. Default: all"
           }
         }

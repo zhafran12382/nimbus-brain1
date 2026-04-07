@@ -28,7 +28,7 @@ function calculateNextRunAt(cronExpression: string): string {
       // Specific date: "30 14 28 3 *" → March 28 at 14:30
       const month = parseInt(monStr, 10) - 1;
       const day = parseInt(domStr, 10);
-      let year = now.getFullYear();
+      const year = now.getFullYear();
       let target = new Date(year, month, day, hour, minute, 0, 0);
       if (target <= now) {
         target = new Date(year + 1, month, day, hour, minute, 0, 0);
