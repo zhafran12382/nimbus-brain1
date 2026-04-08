@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { getNextRunAt } from '@/lib/cron-utils';
@@ -13,10 +13,24 @@ export const maxDuration = 60;
  * Selects due tasks, claims them atomically, executes the AI workflow,
  * updates statuses, and inserts logs into scheduler_logs.
  *
+ * Authentication: requires CRON_SECRET via query param `key` or header `x-cron-secret`.
+ *
  * Safe to call repeatedly — concurrent calls cannot execute the same task twice
  * thanks to the atomic status update (pending → running WHERE status = 'pending').
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // ── Auth: allow requests that provide the correct CRON_SECRET ──
+  const keyParam = request.nextUrl.searchParams.get('key');
+  const headerSecret = request.headers.get('x-cron-secret');
+  const cronSecret = process.env.CRON_SECRET;
+
+  const isAuthorized =
+    cronSecret &&
+    (keyParam === cronSecret || headerSecret === cronSecret);
+
+  if (!isAuthorized) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
   const correlationId = logger.createCorrelationId();
   const start = Date.now();
   logger.scheduler('VPS worker triggered', undefined, correlationId);
