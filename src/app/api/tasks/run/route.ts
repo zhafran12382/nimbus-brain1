@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { getNextRunAt } from '@/lib/cron-utils';
+import { timingSafeEqual } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -20,15 +21,23 @@ export const maxDuration = 60;
  */
 export async function GET(request: NextRequest) {
   // ── Auth: allow requests that provide the correct CRON_SECRET ──
-  const keyParam = request.nextUrl.searchParams.get('key');
-  const headerSecret = request.headers.get('x-cron-secret');
+  const keyParam = request.nextUrl.searchParams.get('key') || '';
+  const headerSecret = request.headers.get('x-cron-secret') || '';
   const cronSecret = process.env.CRON_SECRET;
 
-  const isAuthorized =
-    cronSecret &&
-    (keyParam === cronSecret || headerSecret === cronSecret);
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
 
-  if (!isAuthorized) {
+  const secretBuf = Buffer.from(cronSecret);
+  const keyMatch =
+    keyParam.length === cronSecret.length &&
+    timingSafeEqual(Buffer.from(keyParam), secretBuf);
+  const headerMatch =
+    headerSecret.length === cronSecret.length &&
+    timingSafeEqual(Buffer.from(headerSecret), secretBuf);
+
+  if (!keyMatch && !headerMatch) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const correlationId = logger.createCorrelationId();
