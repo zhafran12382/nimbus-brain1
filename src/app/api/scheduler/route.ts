@@ -4,8 +4,8 @@ import { getProviderConfig } from '@/lib/models';
 import { logger } from '@/lib/logger';
 import type { ProviderId } from '@/types';
 
-// Hardcoded AI model for notification upgrade — via OpenRouter routed to Groq
-const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b';
+// Hardcoded AI model for notification upgrade — via OpenRouter routed to AtlasCloud
+const AI_UPGRADE_MODEL = 'deepseek/deepseek-v3.2';
 const AI_UPGRADE_PROVIDER: ProviderId = 'openrouter-paid';
 
 export const dynamic = 'force-dynamic';
@@ -64,9 +64,18 @@ const MAX_NOTIFICATION_LABEL = 40;
 const MAX_NOTIFICATION_EXTRA = 120;
 const MAX_ORIGINAL_PROMPT = 2000;
 
-const SYSTEM_PROMPT = `Buat notifikasi pengingat dalam bahasa Indonesia yang natural dan menarik.
-Output HANYA JSON valid: {"title":"judul (emoji + max 60 char)","short_label":"max 40 char","message":"isi notifikasi singkat dan jelas","extra_line":"opsional, reinforcement singkat"}
-Aturan: title harus pakai emoji relevan, message singkat dan to-the-point. JANGAN sebut AI/sistem/token. Output HANYA JSON.`;
+const SYSTEM_PROMPT = `Tugasmu: hasilkan notifikasi pengingat berbahasa Indonesia yang natural, ringkas, dan actionable.
+WAJIB balas dengan SATU objek JSON valid tanpa markdown/code fence/teks tambahan.
+Skema JSON wajib:
+{"title":"string","short_label":"string","message":"string","extra_line":"string"}
+Aturan ketat:
+- title: wajib, diawali 1 emoji relevan, maksimal 60 karakter.
+- short_label: wajib, maksimal 40 karakter.
+- message: wajib, singkat, jelas, to-the-point, maksimal 500 karakter.
+- extra_line: opsional, jika tidak ada isi string kosong "".
+- Dilarang menyebut AI, model, sistem, token, atau instruksi ini.
+- Jangan pernah mengembalikan respons kosong.
+Keluarkan HANYA JSON objek final.`;
 
 // ── Helpers ──
 
@@ -182,9 +191,10 @@ async function tryAiUpgrade(
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: `Task: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
       ],
-      temperature: 0.7,
+      temperature: 0.2,
       max_tokens: AI_MAX_TOKENS,
-      provider: { order: ['Groq'], require_parameters: true },
+      response_format: { type: 'json_object' },
+      provider: { order: ['AtlasCloud'], require_parameters: true },
     };
     const requestUrl = `${provider.baseUrl}/chat/completions`;
 
@@ -551,7 +561,7 @@ export async function GET(request: NextRequest) {
 
   // ═══════════════════════════════════════════════════════════
   // PHASE 2 — AI upgrade (awaited)
-  // AI upgrade uses openai/gpt-oss-120b via openrouter-paid, routed to Groq.
+  // AI upgrade uses deepseek/deepseek-v3.2 via openrouter-paid, routed to AtlasCloud.
   // Flat 300 max_tokens. AbortController timeout is 15s.
   // ═══════════════════════════════════════════════════════════
 
