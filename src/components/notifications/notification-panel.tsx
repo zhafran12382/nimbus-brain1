@@ -485,7 +485,7 @@ export function NotificationBell() {
     if (!date || !time) return;
 
     if (notification.task_id) {
-      // Call the reschedule API to update DB + create/edit EasyCron job
+      // Call the reschedule API to update DB + compute new run_at
       const res = await fetch("/api/scheduler/reschedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

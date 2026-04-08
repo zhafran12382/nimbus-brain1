@@ -29,14 +29,13 @@ export async function GET() {
   const STUCK_TASK_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
   const oneHourAgo = new Date(Date.now() - STUCK_TASK_THRESHOLD_MS).toISOString();
 
-  log('START', `Looking for stuck tasks (run_once + active + created before ${oneHourAgo})`);
+  log('START', `Looking for stuck tasks (running status + created before ${oneHourAgo})`);
 
-  // Find stuck tasks: active + run_once + created more than 1 hour ago
+  // Find stuck tasks: running + created more than 1 hour ago (likely stuck)
   const { data: stuckTasks, error: fetchErr } = await supabase
     .from('scheduled_tasks')
     .select('*')
-    .eq('status', 'active')
-    .eq('run_once', true)
+    .eq('status', 'running')
     .lt('created_at', oneHourAgo);
 
   if (fetchErr) {
@@ -60,14 +59,14 @@ export async function GET() {
   const results: Array<{ task_id: string; name: string; completed: boolean; notification: boolean }> = [];
 
   for (const task of stuckTasks) {
-    // Mark task as completed
+    // Mark task as failed (stuck tasks are failures)
     const { error: updateErr } = await supabase
       .from('scheduled_tasks')
-      .update({ status: 'completed' })
+      .update({ status: 'failed' })
       .eq('id', task.id);
 
     if (updateErr) {
-      log('ERROR', `Failed to mark task "${task.name}" (${task.id}) as completed: ${updateErr.message}`);
+      log('ERROR', `Failed to mark task "${task.name}" (${task.id}) as failed: ${updateErr.message}`);
       results.push({ task_id: task.id, name: task.name, completed: false, notification: false });
       continue;
     }
@@ -111,24 +110,6 @@ export async function GET() {
     } else {
       log('SKIP', `Notification already exists for task "${task.name}"`);
       notifCreated = true; // Already existed
-    }
-
-    // Try to delete EasyCron job if exists
-    if (task.easycron_id && process.env.EASYCRON_API_KEY) {
-      try {
-        const body = new URLSearchParams();
-        body.append('token', process.env.EASYCRON_API_KEY);
-        body.append('cron_job_id', task.easycron_id);
-        await fetch('https://www.easycron.com/rest/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body.toString(),
-        });
-        log('EASYCRON', `Deleted orphaned job ${task.easycron_id} for task "${task.name}"`);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log('EASYCRON', `Failed to delete job ${task.easycron_id}: ${msg}`);
-      }
     }
 
     cleaned++;

@@ -476,29 +476,6 @@ async function tryAiUpgrade(
   }
 }
 
-// ── Background helpers ──
-
-async function deleteEasyCronJob(easycronId: string): Promise<void> {
-  if (!process.env.EASYCRON_API_KEY) {
-    log('EASYCRON', `No API key, skipping delete for job ${easycronId}`);
-    return;
-  }
-  try {
-    const body = new URLSearchParams();
-    body.append('token', process.env.EASYCRON_API_KEY);
-    body.append('cron_job_id', easycronId);
-    const res = await fetch('https://www.easycron.com/rest/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
-    });
-    log('EASYCRON', `Delete job ${easycronId}: HTTP ${res.status}`);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log('EASYCRON', `Failed to delete job ${easycronId}: ${msg}`);
-  }
-}
-
 // ── Main handler ──
 
 export async function GET(request: NextRequest) {
@@ -535,7 +512,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Task not found', debug: dbg.entries }, { status: 404 });
   }
 
-  if (task.status === 'completed') {
+  if (task.status === 'completed' || task.status === 'done') {
     dbg.log('SKIP', `Task "${task.name}" already completed`);
     return NextResponse.json({ status: 'skipped', reason: 'completed', debug: dbg.entries });
   }
@@ -556,37 +533,33 @@ export async function GET(request: NextRequest) {
 
   dbg.log('OK', `Notification created for "${task.name}"`);
 
-  // ── STEP 3: Mark task completed (if run_once) ──
+  // ── STEP 3: Mark task done (if run_once) ──
   let completed = false;
   if (task.run_once) {
     const { error: upErr } = await supabase
       .from('scheduled_tasks')
-      .update({ status: 'completed' })
+      .update({ status: 'done' })
       .eq('id', task.id);
 
     completed = !upErr;
-    if (upErr) dbg.log('ERROR', `Failed to mark completed: ${upErr.message}`);
-    else dbg.log('OK', 'Task marked as completed');
+    if (upErr) dbg.log('ERROR', `Failed to mark done: ${upErr.message}`);
+    else dbg.log('OK', 'Task marked as done');
   }
 
   const phase1Ms = Date.now() - handlerStart;
   dbg.log('PHASE1', `Completed in ${phase1Ms}ms — notification=${inserted} completed=${completed}`);
 
   // ═══════════════════════════════════════════════════════════
-  // PHASE 2 — AI upgrade + EasyCron cleanup (awaited)
+  // PHASE 2 — AI upgrade (awaited)
   // AI upgrade uses openai/gpt-oss-120b via openrouter-paid, routed to Groq.
   // Flat 300 max_tokens. AbortController timeout is 15s.
-  // Promise.allSettled ensures both run even if one fails.
   // ═══════════════════════════════════════════════════════════
 
-  dbg.log('PHASE2', 'Starting AI upgrade + EasyCron cleanup');
-  logger.scheduler('Phase 2 starting: AI upgrade + EasyCron cleanup', { task_id: task.id, task_name: task.name }, correlationId);
+  dbg.log('PHASE2', 'Starting AI upgrade');
+  logger.scheduler('Phase 2 starting: AI upgrade', { task_id: task.id, task_name: task.name }, correlationId);
 
   const phase2Results = await Promise.allSettled([
     tryAiUpgrade(task.id, task.name, task.prompt, dbg),
-    task.run_once && task.easycron_id
-      ? deleteEasyCronJob(task.easycron_id)
-      : Promise.resolve(),
   ]);
 
   const aiSettled = phase2Results[0];
