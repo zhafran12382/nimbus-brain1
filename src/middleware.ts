@@ -37,7 +37,8 @@ function getSessionSecret(): string {
 }
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const url = new URL(req.url);
+  const { pathname } = url;
 
   // Allow auth API routes and login page through without auth
   if (
@@ -50,6 +51,33 @@ export async function middleware(req: NextRequest) {
     pathname.endsWith('.ico')
   ) {
     return NextResponse.next();
+  }
+
+  // Allow /api/tasks/run with valid cron secret (for VPS cron worker)
+  if (pathname === '/api/tasks/run') {
+    const keyParam = url.searchParams.get('key');
+    const headerSecret = req.headers.get('x-cron-secret');
+    const cronSecret = process.env.CRON_SECRET;
+
+    if (cronSecret) {
+      const encoder = new TextEncoder();
+      const expected = encoder.encode(cronSecret);
+
+      // Constant-time comparison to prevent timing attacks
+      const timingSafeEqual = (candidate: string | null): boolean => {
+        if (!candidate || candidate.length !== cronSecret.length) return false;
+        const a = encoder.encode(candidate);
+        let diff = 0;
+        for (let i = 0; i < a.length; i++) {
+          diff |= a[i] ^ expected[i];
+        }
+        return diff === 0;
+      };
+
+      if (timingSafeEqual(keyParam) || timingSafeEqual(headerSecret)) {
+        return NextResponse.next();
+      }
+    }
   }
 
   const token = req.cookies.get('nimbus-session')?.value;
