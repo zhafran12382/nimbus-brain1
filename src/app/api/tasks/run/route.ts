@@ -139,9 +139,7 @@ export async function GET(request: NextRequest) {
       // Trigger AI upgrade via the scheduler endpoint (reuses existing AI logic)
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://nimbus-brain.vercel.app';
       try {
-        const schedulerRes = await fetch(`${siteUrl}/api/scheduler?id=${task.id}`, {
-          method: 'GET',
-        });
+        const schedulerRes = await fetch(`${siteUrl}/api/scheduler?id=${task.id}`);
         if (!schedulerRes.ok) {
           logger.warn('SCHEDULER', `AI upgrade returned ${schedulerRes.status} for "${task.name}"`, undefined, correlationId);
         }

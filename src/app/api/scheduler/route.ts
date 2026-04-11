@@ -77,23 +77,44 @@ Aturan ketat:
 - Jangan pernah mengembalikan respons kosong.
 Keluarkan HANYA JSON objek final.`;
 
-function decodeJsonString(value: string): string {
-  try {
-    return JSON.parse(`"${value}"`);
-  } catch {
-    return value
-      .replace(/\\"/g, '"')
-      .replace(/\\n/g, '\n')
-      .replace(/\\t/g, '\t')
-      .replace(/\\\\/g, '\\');
-  }
-}
-
 function extractJsonStringField(content: string, field: string): string | undefined {
-  const regex = new RegExp(`"${field}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, 'i');
-  const match = content.match(regex);
-  if (!match?.[1]) return undefined;
-  return decodeJsonString(match[1]).trim();
+  if (!content || content.length > 10000) return undefined;
+  const keyToken = `"${field}"`;
+  const keyIndex = content.indexOf(keyToken);
+  if (keyIndex === -1) return undefined;
+
+  const colonIndex = content.indexOf(':', keyIndex + keyToken.length);
+  if (colonIndex === -1) return undefined;
+
+  let startQuote = -1;
+  for (let i = colonIndex + 1; i < content.length; i += 1) {
+    const ch = content[i];
+    if (ch === '"') {
+      startQuote = i;
+      break;
+    }
+    if (!/\s/.test(ch)) return undefined;
+  }
+  if (startQuote === -1) return undefined;
+
+  let out = '';
+  for (let i = startQuote + 1; i < content.length; i += 1) {
+    const ch = content[i];
+    if (ch === '\\') {
+      const next = content[i + 1];
+      if (next === undefined) break;
+      if (next === 'n') out += '\n';
+      else if (next === 't') out += '\t';
+      else if (next === '"' || next === '\\' || next === '/') out += next;
+      else out += next;
+      i += 1;
+      continue;
+    }
+    if (ch === '"') return out.trim();
+    out += ch;
+  }
+
+  return undefined;
 }
 
 // ── Helpers ──
@@ -385,7 +406,7 @@ async function tryAiUpgrade(
           short_label: extractJsonStringField(cleaned, 'short_label') || taskName.slice(0, MAX_NOTIFICATION_LABEL),
           message:
             extractJsonStringField(cleaned, 'message') ||
-            cleaned.replace(/^[^{]*/, '').slice(0, MAX_NOTIFICATION_MESSAGE),
+            prompt.slice(0, MAX_NOTIFICATION_MESSAGE),
           extra_line: extractJsonStringField(cleaned, 'extra_line') || '',
         };
         dbg.log('AI:WARN', 'JSON parse failed on truncated response, using partial fallback fields', {
@@ -430,19 +451,6 @@ async function tryAiUpgrade(
         );
         return result;
       }
-    }
-
-    if (!parsed.title || !parsed.message) {
-      result.errorCode = 'MISSING_FIELDS';
-      result.errorDetail = `JSON missing title or message. Keys: ${Object.keys(parsed).join(', ')}`;
-      result.durationMs = Date.now() - startMs;
-      dbg.log('AI:ERROR', result.errorDetail);
-      await insertNotification(
-        `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
-        `JSON tidak punya field title/message. Kode: MISSING_FIELDS`.slice(0, 160),
-        taskId, undefined, undefined, 'warning',
-      );
-      return result;
     }
 
     // ── Step 11: Find existing notification to upgrade ──
