@@ -50,6 +50,10 @@ const toolLabels: Record<string, string> = {
   get_quiz_stats: "📊 Analyzing study stats...",
   run_python: "⏳ Running Python code...",
   send_notification: "🔔 Sending notification...",
+  get_notifications: "🔔 Fetching notifications...",
+  summarize_notifications: "🧾 Summarizing notifications...",
+  mark_all_notifications_read: "✅ Marking all notifications as read...",
+  delete_notifications: "🗑️ Deleting notifications...",
   create_task: "📅 Creating scheduled task...",
   get_tasks: "📋 Fetching tasks...",
   update_task: "🔄 Updating task...",
@@ -247,6 +251,23 @@ TOOLS:
 - Obrolan biasa → respond natural tanpa tools.
 - Setelah tool execution → SELALU beri respons informatif.
 - JANGAN panggil get_memories kecuali user SECARA EKSPLISIT bertanya tentang hal yang pernah disimpan (contoh: "apa yang lu inget?", "lu tau gak gw suka apa?"). Memory sudah otomatis di-inject ke context di bawah — kamu TIDAK PERLU fetch ulang.
+
+[TOOL DECISION ENGINE - WAJIB]
+Sebelum memilih tool, lakukan checklist cepat:
+1) Klasifikasikan intent: (a) minta informasi, (b) minta aksi, atau (c) ambigu.
+2) Jika minta aksi data (buat/update/hapus/tandai), WAJIB pakai tool yang paling spesifik.
+3) Jika ambigu/kurang data (contoh ID/target tidak jelas), jangan nebak. Ambil data dulu dengan tool list/read yang relevan atau tanya klarifikasi singkat.
+4) Untuk aksi destruktif (delete/reset), jalankan HANYA jika user eksplisit meminta hapus.
+5) DILARANG memanggil tool yang tidak relevan dengan intent utama.
+6) Jika user minta beberapa aksi sekaligus, kerjakan satu per satu sampai selesai.
+
+[ATURAN TOOL NOTIFIKASI]
+- "ringkas notifikasi" / "summary notifikasi" → pakai summarize_notifications.
+- "lihat daftar notifikasi" / "notifikasi apa aja" → pakai get_notifications.
+- "tandai semua notif sudah dibaca" → pakai mark_all_notifications_read.
+- "hapus notifikasi" → pakai delete_notifications.
+- Jika user minta hapus tapi target belum jelas, ambil daftar dulu dengan get_notifications atau minta klarifikasi.
+- Hapus massal harus benar-benar sesuai instruksi user.
 
 KEUANGAN (CRITICAL):
 - PEMASUKAN (create_income): "di TF ortu", "gajian", "dapat cashback", "dikasih", "terima"
@@ -481,6 +502,20 @@ function parseGroqRateLimitHeaders(headers: Headers): GroqRateLimit | null {
 
 const MAX_RATE_LIMIT_RETRIES = 3;
 
+function normalizeModelIdForCompare(modelId: string): string {
+  return String(modelId || '').trim().toLowerCase();
+}
+
+function isCompatibleModelResponse(requestedModel: string, actualModel: string): boolean {
+  const req = normalizeModelIdForCompare(requestedModel);
+  const act = normalizeModelIdForCompare(actualModel);
+  if (!req || !act) return false;
+  if (req === act) return true;
+  if (req.endsWith(':free') && req.replace(':free', '') === act) return true;
+  if (act.startsWith(`${req}-`) || act.startsWith(`${req}:`)) return true;
+  return false;
+}
+
 async function callProvider(
   providerId: ProviderId,
   modelId: string,
@@ -551,9 +586,13 @@ async function callProvider(
 
   const data = await response.json();
 
-  // === MODEL ASSERTION: verify provider didn't swap to a different model ===
+  // === MODEL ASSERTION: tolerate compatible version aliases (e.g. deepseek-v3.2 -> deepseek-v3.2-YYYYMMDD) ===
   if (data.model && data.model !== modelId) {
-    logError('MODEL MISMATCH', `REQUESTED: "${modelId}" → ACTUAL: "${data.model}" (provider: ${providerId})`);
+    if (isCompatibleModelResponse(modelId, data.model)) {
+      log('MODEL ALIAS', `REQUESTED: "${modelId}" → ACTUAL: "${data.model}" (provider: ${providerId})`);
+    } else {
+      logError('MODEL MISMATCH', `REQUESTED: "${modelId}" → ACTUAL: "${data.model}" (provider: ${providerId})`);
+    }
   }
 
   // Check for error in response body (some providers return 200 with error payload)

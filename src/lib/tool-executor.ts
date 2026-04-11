@@ -66,6 +66,23 @@ async function insertNotification(title: string, message: string, type: string =
   await supabase.from('notifications').insert({ title, message, type });
 }
 
+function formatNotificationListItem(n: {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  is_read: boolean;
+  created_at: string;
+}): string {
+  const created = new Date(n.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+  const status = n.is_read ? 'dibaca' : 'belum dibaca';
+  return `• [${n.id}] (${n.type}, ${status}, ${created}) ${n.title} — ${n.message}`;
+}
+
+function sanitizeFilterKeyword(keyword: string): string {
+  return keyword.replace(/[,%()]/g, ' ').trim();
+}
+
 export async function executeTool(name: string, args: Record<string, unknown>, options?: { searchSourceLimit?: number; modelId?: string; providerId?: string }): Promise<string> {
   switch (name) {
     case 'create_target': {
@@ -852,6 +869,128 @@ JSON ARRAY ONLY. NO other text before or after.`;
         });
       if (error) return `Error: ${error.message}`;
       return `🔔 Notifikasi terkirim: "${args.title}"`;
+    }
+
+    case 'get_notifications': {
+      const unreadOnly = args.unread_only === true;
+      const keywordRaw = typeof args.keyword === 'string' ? args.keyword.trim() : '';
+      const keyword = sanitizeFilterKeyword(keywordRaw);
+      const limit = Math.min(Math.max(Number(args.limit) || 20, 1), 50);
+
+      let query = supabase
+        .from('notifications')
+        .select('id, title, message, type, is_read, created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (unreadOnly) query = query.eq('is_read', false);
+      if (keyword) query = query.or(`title.ilike.%${keyword}%,message.ilike.%${keyword}%`);
+
+      const { data, error } = await query;
+      if (error) return `Error: ${error.message}`;
+      if (!data?.length) return 'Tidak ada notifikasi yang cocok.';
+
+      const unreadCount = data.filter((n) => !n.is_read).length;
+      return [
+        `📋 Ditemukan ${data.length} notifikasi (unread: ${unreadCount}).`,
+        ...data.map(formatNotificationListItem),
+      ].join('\n');
+    }
+
+    case 'summarize_notifications': {
+      const unreadOnly = args.unread_only === true;
+      const limit = Math.min(Math.max(Number(args.limit) || 20, 1), 50);
+
+      let query = supabase
+        .from('notifications')
+        .select('id, title, message, type, is_read, created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (unreadOnly) query = query.eq('is_read', false);
+
+      const { data, error } = await query;
+      if (error) return `Error: ${error.message}`;
+      if (!data?.length) return '📭 Tidak ada notifikasi untuk diringkas.';
+
+      const unread = data.filter((n) => !n.is_read).length;
+      const byType = data.reduce<Record<string, number>>((acc, n) => {
+        acc[n.type] = (acc[n.type] || 0) + 1;
+        return acc;
+      }, {});
+      const typeSummary = Object.entries(byType)
+        .sort((a, b) => b[1] - a[1])
+        .map(([type, count]) => `${type}: ${count}`)
+        .join(', ');
+
+      const highlights = data
+        .slice(0, 5)
+        .map((n, i) => `${i + 1}. ${n.title}${n.is_read ? '' : ' (unread)'}`)
+        .join('\n');
+
+      return [
+        `🧾 Ringkasan notifikasi (${data.length} data terakhir):`,
+        `- Unread: ${unread}`,
+        `- Distribusi tipe: ${typeSummary}`,
+        '- Highlight terbaru:',
+        highlights,
+      ].join('\n');
+    }
+
+    case 'mark_all_notifications_read': {
+      const { data: unreadRows, error: fetchErr } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('is_read', false);
+      if (fetchErr) return `Error: ${fetchErr.message}`;
+
+      const unreadCount = unreadRows?.length || 0;
+      if (unreadCount === 0) return '✅ Semua notifikasi sudah dibaca.';
+
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('is_read', false);
+      if (error) return `Error: ${error.message}`;
+
+      return `✅ Berhasil menandai ${unreadCount} notifikasi sebagai sudah dibaca.`;
+    }
+
+    case 'delete_notifications': {
+      const ids = Array.isArray(args.ids)
+        ? args.ids.map((v) => String(v).trim()).filter(Boolean)
+        : [];
+      const keywordRaw = typeof args.keyword === 'string' ? args.keyword.trim() : '';
+      const keyword = sanitizeFilterKeyword(keywordRaw);
+      const deleteAll = args.delete_all === true;
+      const onlyRead = args.only_read === true;
+      const confirm = args.confirm === true;
+
+      if (deleteAll && !confirm) {
+        return '⚠️ Hapus semua notifikasi butuh konfirmasi. Kirim dengan delete_all: true dan confirm: true.';
+      }
+
+      let query = supabase.from('notifications').select('id, title, is_read');
+      if (ids.length > 0) query = query.in('id', ids);
+      if (keyword) query = query.or(`title.ilike.%${keyword}%,message.ilike.%${keyword}%`);
+      if (onlyRead) query = query.eq('is_read', true);
+      if (!deleteAll && ids.length === 0 && !keyword && !onlyRead) {
+        return '⚠️ Tentukan target hapus (ids/keyword/only_read) atau gunakan delete_all + confirm.';
+      }
+
+      const { data: candidates, error: fetchErr } = await query.limit(deleteAll ? 200 : 100);
+      if (fetchErr) return `Error: ${fetchErr.message}`;
+      if (!candidates?.length) return 'Tidak ada notifikasi yang cocok untuk dihapus.';
+
+      const targetIds = candidates.map((n) => n.id);
+      const { error: deleteErr } = await supabase.from('notifications').delete().in('id', targetIds);
+      if (deleteErr) return `Error: ${deleteErr.message}`;
+
+      const preview = candidates.slice(0, 5).map((n) => `• ${n.title}`).join('\n');
+      return [
+        `🗑️ Berhasil menghapus ${targetIds.length} notifikasi.`,
+        preview ? `Contoh terhapus:\n${preview}` : '',
+      ].filter(Boolean).join('\n');
     }
 
     case 'create_scheduled_task': {

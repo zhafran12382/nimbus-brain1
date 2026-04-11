@@ -13,6 +13,11 @@ const actionConfig: Record<string, { icon: string; label: string; bgClass: strin
   get_expenses: { icon: "📋", label: "daftar pengeluaran", bgClass: "bg-orange-500/10", textClass: "text-orange-400", borderClass: "border-orange-500/20" },
   get_expense_summary: { icon: "📊", label: "ringkasan pengeluaran", bgClass: "bg-orange-500/10", textClass: "text-orange-400", borderClass: "border-orange-500/20" },
   delete_expense: { icon: "🗑️", label: "hapus pengeluaran", bgClass: "bg-red-500/10", textClass: "text-red-400", borderClass: "border-red-500/20" },
+  send_notification: { icon: "🔔", label: "kirim notifikasi", bgClass: "bg-sky-500/10", textClass: "text-sky-400", borderClass: "border-sky-500/20" },
+  get_notifications: { icon: "🔔", label: "lihat notifikasi", bgClass: "bg-blue-500/10", textClass: "text-blue-400", borderClass: "border-blue-500/20" },
+  summarize_notifications: { icon: "🧾", label: "ringkas notifikasi", bgClass: "bg-indigo-500/10", textClass: "text-indigo-400", borderClass: "border-indigo-500/20" },
+  mark_all_notifications_read: { icon: "✅", label: "tandai semua dibaca", bgClass: "bg-emerald-500/10", textClass: "text-emerald-400", borderClass: "border-emerald-500/20" },
+  delete_notifications: { icon: "🗑️", label: "hapus notifikasi", bgClass: "bg-red-500/10", textClass: "text-red-400", borderClass: "border-red-500/20" },
 };
 
 interface ActionBadgeProps {
