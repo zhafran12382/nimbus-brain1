@@ -80,7 +80,10 @@ function formatNotificationListItem(n: {
 }
 
 function sanitizeFilterKeyword(keyword: string): string {
-  return keyword.replace(/[,%()]/g, ' ').trim();
+  // Remove chars that alter PostgREST/ILIKE semantics:
+  // % and _ (ILIKE wildcards), , (PostgREST list separator),
+  // () (filter grouping), and \ (escape char).
+  return keyword.replace(/[,%_()\\]/g, ' ').trim();
 }
 
 export async function executeTool(name: string, args: Record<string, unknown>, options?: { searchSourceLimit?: number; modelId?: string; providerId?: string }): Promise<string> {
