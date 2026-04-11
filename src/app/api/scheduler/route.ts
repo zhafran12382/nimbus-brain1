@@ -4,8 +4,8 @@ import { getProviderConfig } from '@/lib/models';
 import { logger } from '@/lib/logger';
 import type { ProviderId } from '@/types';
 
-// Hardcoded AI model for notification upgrade — via OpenRouter routed to AtlasCloud
-const AI_UPGRADE_MODEL = 'deepseek/deepseek-v3.2';
+// Hardcoded AI model for notification upgrade — via OpenRouter routed to Groq
+const AI_UPGRADE_MODEL = 'openai/gpt-oss-120b';
 const AI_UPGRADE_PROVIDER: ProviderId = 'openrouter-paid';
 
 export const dynamic = 'force-dynamic';
@@ -76,6 +76,25 @@ Aturan ketat:
 - Dilarang menyebut AI, model, sistem, token, atau instruksi ini.
 - Jangan pernah mengembalikan respons kosong.
 Keluarkan HANYA JSON objek final.`;
+
+function decodeJsonString(value: string): string {
+  try {
+    return JSON.parse(`"${value}"`);
+  } catch {
+    return value
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\\\/g, '\\');
+  }
+}
+
+function extractJsonStringField(content: string, field: string): string | undefined {
+  const regex = new RegExp(`"${field}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, 'i');
+  const match = content.match(regex);
+  if (!match?.[1]) return undefined;
+  return decodeJsonString(match[1]).trim();
+}
 
 // ── Helpers ──
 
@@ -177,12 +196,6 @@ async function tryAiUpgrade(
   };
   dbg.log('AI:ENV', 'Environment check', envCheck);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => {
-    dbg.log('AI:TIMEOUT', 'AbortController fired after 15s');
-    controller.abort();
-  }, 15000);
-
   try {
     // ── Step 4: Build request ──
     const requestBody = {
@@ -194,7 +207,7 @@ async function tryAiUpgrade(
       temperature: 0.2,
       max_tokens: AI_MAX_TOKENS,
       response_format: { type: 'json_object' },
-      provider: { order: ['AtlasCloud'], require_parameters: true },
+      provider: { order: ['Groq'], require_parameters: true },
     };
     const requestUrl = `${provider.baseUrl}/chat/completions`;
 
@@ -217,7 +230,6 @@ async function tryAiUpgrade(
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
-      signal: controller.signal,
     });
 
     const fetchMs = Date.now() - fetchStart;
@@ -312,18 +324,28 @@ async function tryAiUpgrade(
     });
     result.isTruncated = isTruncated;
 
-    const raw = firstChoice?.message?.content?.trim();
+    let raw = firstChoice?.message?.content?.trim();
     if (!raw) {
-      result.errorCode = 'EMPTY_RESPONSE';
-      result.errorDetail = `No content in choices[0].message.content. choices=${JSON.stringify(choices).slice(0, 300)}`;
-      result.durationMs = Date.now() - startMs;
-      dbg.log('AI:ERROR', result.errorDetail);
-      await insertNotification(
-        `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
-        `Respons AI kosong. Kode: EMPTY_RESPONSE`.slice(0, 160),
-        taskId, undefined, undefined, 'warning',
-      );
-      return result;
+      if (isTruncated) {
+        raw = JSON.stringify({
+          title: `⏰ ${taskName}`.slice(0, MAX_NOTIFICATION_TITLE),
+          short_label: taskName.slice(0, MAX_NOTIFICATION_LABEL),
+          message: prompt.slice(0, MAX_NOTIFICATION_MESSAGE),
+          extra_line: '',
+        });
+        dbg.log('AI:WARN', 'AI content empty with finish_reason=length, using fallback payload');
+      } else {
+        result.errorCode = 'EMPTY_RESPONSE';
+        result.errorDetail = `No content in choices[0].message.content. choices=${JSON.stringify(choices).slice(0, 300)}`;
+        result.durationMs = Date.now() - startMs;
+        dbg.log('AI:ERROR', result.errorDetail);
+        await insertNotification(
+          `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
+          `Respons AI kosong. Kode: EMPTY_RESPONSE`.slice(0, 160),
+          taskId, undefined, undefined, 'warning',
+        );
+        return result;
+      }
     }
 
     result.rawResponse = raw.slice(0, 500);
@@ -357,20 +379,58 @@ async function tryAiUpgrade(
     try {
       parsed = JSON.parse(jsonStr);
     } catch (jsonErr) {
-      result.errorCode = 'JSON_PARSE_FAILED';
-      result.errorDetail = `JSON.parse failed: ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}. String: ${jsonStr.slice(0, 200)}`;
-      result.durationMs = Date.now() - startMs;
-      dbg.log('AI:ERROR', result.errorDetail);
-      await insertNotification(
-        `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
-        `JSON parse gagal. Kode: JSON_PARSE_FAILED`.slice(0, 160),
-        taskId, undefined, undefined, 'warning',
-      );
-      return result;
+      if (isTruncated) {
+        parsed = {
+          title: extractJsonStringField(cleaned, 'title') || `⏰ ${taskName}`.slice(0, MAX_NOTIFICATION_TITLE),
+          short_label: extractJsonStringField(cleaned, 'short_label') || taskName.slice(0, MAX_NOTIFICATION_LABEL),
+          message:
+            extractJsonStringField(cleaned, 'message') ||
+            cleaned.replace(/^[^{]*/, '').slice(0, MAX_NOTIFICATION_MESSAGE),
+          extra_line: extractJsonStringField(cleaned, 'extra_line') || '',
+        };
+        dbg.log('AI:WARN', 'JSON parse failed on truncated response, using partial fallback fields', {
+          parse_error: jsonErr instanceof Error ? jsonErr.message : String(jsonErr),
+          parsed_fallback: parsed,
+        });
+      } else {
+        result.errorCode = 'JSON_PARSE_FAILED';
+        result.errorDetail = `JSON.parse failed: ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}. String: ${jsonStr.slice(0, 200)}`;
+        result.durationMs = Date.now() - startMs;
+        dbg.log('AI:ERROR', result.errorDetail);
+        await insertNotification(
+          `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
+          `JSON parse gagal. Kode: JSON_PARSE_FAILED`.slice(0, 160),
+          taskId, undefined, undefined, 'warning',
+        );
+        return result;
+      }
     }
 
     result.parsedJson = parsed;
     dbg.log('AI:PARSED_JSON', 'Parsed notification JSON', parsed);
+
+    const parsedTitle = String(parsed.title || '').trim();
+    const parsedMessage = String(parsed.message || '').trim();
+    if (!parsedTitle || !parsedMessage) {
+      if (isTruncated) {
+        parsed.title = parsedTitle || `⏰ ${taskName}`.slice(0, MAX_NOTIFICATION_TITLE);
+        parsed.message = parsedMessage || prompt.slice(0, MAX_NOTIFICATION_MESSAGE);
+        if (!parsed.short_label) parsed.short_label = taskName.slice(0, MAX_NOTIFICATION_LABEL);
+        if (typeof parsed.extra_line !== 'string') parsed.extra_line = '';
+        dbg.log('AI:WARN', 'Missing title/message on truncated response, backfilled required fields', parsed);
+      } else {
+        result.errorCode = 'MISSING_FIELDS';
+        result.errorDetail = `JSON missing title or message. Keys: ${Object.keys(parsed).join(', ')}`;
+        result.durationMs = Date.now() - startMs;
+        dbg.log('AI:ERROR', result.errorDetail);
+        await insertNotification(
+          `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
+          `JSON tidak punya field title/message. Kode: MISSING_FIELDS`.slice(0, 160),
+          taskId, undefined, undefined, 'warning',
+        );
+        return result;
+      }
+    }
 
     if (!parsed.title || !parsed.message) {
       result.errorCode = 'MISSING_FIELDS';
@@ -460,16 +520,14 @@ async function tryAiUpgrade(
     return result;
   } catch (err: unknown) {
     const elapsed = Date.now() - startMs;
-    const isTimeout = err instanceof Error && err.name === 'AbortError';
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : undefined;
 
-    result.errorCode = isTimeout ? 'TIMEOUT' : 'NETWORK_ERROR';
+    result.errorCode = 'NETWORK_ERROR';
     result.errorDetail = `${msg}${stack ? `\n${stack}` : ''}`;
     result.durationMs = elapsed;
 
     dbg.log('AI:EXCEPTION', `AI upgrade failed after ${elapsed}ms`, {
-      isTimeout,
       errorName: err instanceof Error ? err.name : '(not Error)',
       errorMessage: msg,
       stack: stack?.slice(0, 500),
@@ -477,12 +535,10 @@ async function tryAiUpgrade(
 
     await insertNotification(
       `⚠️ AI upgrade gagal — ${taskName}`.slice(0, 60),
-      `${isTimeout ? 'Timeout (>15s)' : msg.slice(0, 100)}. Kode: ${result.errorCode}`.slice(0, 160),
+      `${msg.slice(0, 100)}. Kode: ${result.errorCode}`.slice(0, 160),
       taskId, undefined, undefined, 'warning',
     );
     return result;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -560,9 +616,9 @@ export async function GET(request: NextRequest) {
   dbg.log('PHASE1', `Completed in ${phase1Ms}ms — notification=${inserted} completed=${completed}`);
 
   // ═══════════════════════════════════════════════════════════
-  // PHASE 2 — AI upgrade (awaited)
-  // AI upgrade uses deepseek/deepseek-v3.2 via openrouter-paid, routed to AtlasCloud.
-  // Flat 300 max_tokens. AbortController timeout is 15s.
+  // AI upgrade (awaited)
+  // Uses openai/gpt-oss-120b via openrouter-paid, routed to Groq.
+  // Flat 300 max_tokens.
   // ═══════════════════════════════════════════════════════════
 
   dbg.log('PHASE2', 'Starting AI upgrade');

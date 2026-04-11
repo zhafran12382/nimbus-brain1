@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://nimbus-brain.vercel.app';
       try {
         const schedulerRes = await fetch(`${siteUrl}/api/scheduler?id=${task.id}`, {
-          signal: AbortSignal.timeout(25000),
+          method: 'GET',
         });
         if (!schedulerRes.ok) {
           logger.warn('SCHEDULER', `AI upgrade returned ${schedulerRes.status} for "${task.name}"`, undefined, correlationId);
