@@ -627,16 +627,32 @@ export function AssistantMessage({ state }: AssistantMessageProps) {
                 )}
               </div>
               <div className="flex items-center gap-3 text-[hsl(0_0%_50%)]">
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                <button
+                  className="hover:text-[hsl(0_0%_80%)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+                  aria-label="Lock message"
+                  title="Lock message"
+                >
                   <Lock className="w-4 h-4" />
                 </button>
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                <button
+                  className="hover:text-[hsl(0_0%_80%)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+                  aria-label="Download message"
+                  title="Download message"
+                >
                   <Download className="w-4 h-4" />
                 </button>
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                <button
+                  className="hover:text-[hsl(0_0%_80%)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+                  aria-label="Copy message"
+                  title="Copy message"
+                >
                   <Copy className="w-4 h-4" />
                 </button>
-                <button className="hover:text-[hsl(0_0%_80%)] transition-colors">
+                <button
+                  className="hover:text-[hsl(0_0%_80%)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+                  aria-label="Regenerate message"
+                  title="Regenerate message"
+                >
                   <RefreshCw className="w-4 h-4" />
                 </button>
               </div>
