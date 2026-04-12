@@ -466,10 +466,15 @@ export const tools = [
         properties: {
           name: { type: "string", description: "Nama task (unik, untuk identifikasi)" },
           prompt: { type: "string", description: "Prompt/perintah yang akan dieksekusi saat waktunya tiba" },
+          task_type: {
+            type: "string",
+            enum: ["reminder", "information_to_give"],
+            description: "Jenis task. reminder = mengingatkan user; information_to_give = memberikan informasi yang diminta user saat waktunya tiba."
+          },
           cron_expression: { type: "string", description: "Cron expression (5 field: menit jam tanggal bulan hari). Contoh: '0 7 * * *' = setiap hari jam 7:00, '*/30 * * * *' = setiap 30 menit, '30 14 28 3 *' = 28 Maret jam 14:30 (one-time)" },
           run_once: { type: "boolean", description: "Set true untuk task sekali jalan (reminder, alarm). Task akan otomatis selesai setelah dieksekusi. Default: false (recurring)" }
         },
-        required: ["name", "prompt", "cron_expression"]
+        required: ["name", "prompt", "task_type", "cron_expression"]
       }
     }
   },

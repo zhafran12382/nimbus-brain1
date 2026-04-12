@@ -86,6 +86,31 @@ function sanitizeFilterKeyword(keyword: string): string {
   return keyword.replace(/[,%_()\\]/g, ' ').trim();
 }
 
+type ScheduledTaskType = 'reminder' | 'information_to_give';
+
+function inferScheduledTaskType(text: string): ScheduledTaskType {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return 'reminder';
+
+  // Information-to-give intent (user asks AI to deliver info later)
+  if (/^(kasih|berikan|beri|give)\s+(gw|gue|aku|saya|me)\b/.test(normalized)) {
+    return 'information_to_give';
+  }
+  if (/^(kasih|berikan|beri|give)\b/.test(normalized)) {
+    return 'information_to_give';
+  }
+
+  // Reminder intent (default for "ingatkan"/"remind"/study prompts)
+  if (/(ingetin|ingatkan|remind|pengingat|alarm)\b/.test(normalized)) {
+    return 'reminder';
+  }
+  if (/\bbelajar\b/.test(normalized)) {
+    return 'reminder';
+  }
+
+  return 'reminder';
+}
+
 export async function executeTool(name: string, args: Record<string, unknown>, options?: { searchSourceLimit?: number; modelId?: string; providerId?: string }): Promise<string> {
   switch (name) {
     case 'create_target': {
@@ -1004,6 +1029,12 @@ JSON ARRAY ONLY. NO other text before or after.`;
 
       const taskName = String(args.name).trim();
       const runOnce = args.run_once === true;
+      const taskTypeRaw = typeof args.task_type === 'string' ? args.task_type.trim().toLowerCase() : '';
+      const inferredTaskType = inferScheduledTaskType(`${taskName} ${String(args.prompt || '')}`);
+      const taskType: ScheduledTaskType =
+        taskTypeRaw === 'reminder' || taskTypeRaw === 'information_to_give'
+          ? taskTypeRaw
+          : inferredTaskType;
 
       // Compute next run time from cron expression
       const runAt = getNextRunAt(cronExp);
@@ -1017,6 +1048,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
         .insert({
           name: taskName,
           prompt: args.prompt,
+          task_type: taskType,
           cron_expression: cronExp,
           run_once: runOnce,
           run_at: runAt,
@@ -1028,7 +1060,7 @@ JSON ARRAY ONLY. NO other text before or after.`;
         .single();
       if (error) return `Error menyimpan ke database: ${error.message}`;
 
-      return `📅 Task "${data.name}" berhasil dibuat${runOnce ? ' (sekali jalan)' : ''}! Cron: ${cronExp} | Jadwal berikutnya: ${new Date(runAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} | DB ID: ${data.id}`;
+      return `📅 Task "${data.name}" berhasil dibuat${runOnce ? ' (sekali jalan)' : ''}! Jenis: ${taskType === 'information_to_give' ? 'information_to_give' : 'reminder'} | Cron: ${cronExp} | Jadwal berikutnya: ${new Date(runAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} | DB ID: ${data.id}`;
     }
 
     case 'get_scheduled_tasks': {
@@ -1039,9 +1071,9 @@ JSON ARRAY ONLY. NO other text before or after.`;
       if (error) return `Error: ${error.message}`;
       if (!data?.length) return 'Belum ada scheduled tasks.';
 
-      return data.map((t: { id: string; name: string; status: string; prompt: string; cron_expression: string; run_at: string | null; run_once?: boolean }) => {
+      return data.map((t: { id: string; name: string; status: string; prompt: string; task_type?: ScheduledTaskType; cron_expression: string; run_at: string | null; run_once?: boolean }) => {
         const nextRun = t.run_at ? new Date(t.run_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '-';
-        return `• ${t.name} [${t.status}]${t.run_once ? ' (sekali)' : ''} — "${t.prompt}" | Cron: ${t.cron_expression} | Jadwal: ${nextRun} | ID: ${t.id}`;
+        return `• ${t.name} [${t.status}]${t.run_once ? ' (sekali)' : ''} [${t.task_type || 'reminder'}] — "${t.prompt}" | Cron: ${t.cron_expression} | Jadwal: ${nextRun} | ID: ${t.id}`;
       }).join('\n');
     }
 

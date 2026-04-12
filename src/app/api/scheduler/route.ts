@@ -64,7 +64,19 @@ const MAX_NOTIFICATION_LABEL = 40;
 const MAX_NOTIFICATION_EXTRA = 120;
 const MAX_ORIGINAL_PROMPT = 2000;
 
-const SYSTEM_PROMPT = `Tugasmu: hasilkan notifikasi pengingat berbahasa Indonesia yang natural, ringkas, dan actionable.
+type ScheduledTaskType = 'reminder' | 'information_to_give';
+
+function normalizeTaskType(value: unknown): ScheduledTaskType {
+  return value === 'information_to_give' ? 'information_to_give' : 'reminder';
+}
+
+function getSchedulerSystemPrompt(taskType: ScheduledTaskType): string {
+  const roleInstruction =
+    taskType === 'information_to_give'
+      ? 'Tugasmu: hasilkan notifikasi INFORMASI berbahasa Indonesia yang natural, ringkas, dan to-the-point. Fokus pada informasi yang diminta user (bukan kalimat mengingatkan).'
+      : 'Tugasmu: hasilkan notifikasi PENGINGAT berbahasa Indonesia yang natural, ringkas, dan actionable.';
+
+  return `${roleInstruction}
 WAJIB balas dengan SATU objek JSON valid tanpa markdown/code fence/teks tambahan.
 Skema JSON wajib:
 {"title":"string","short_label":"string","message":"string","extra_line":"string"}
@@ -76,6 +88,7 @@ Aturan ketat:
 - Dilarang menyebut AI, model, sistem, token, atau instruksi ini.
 - Jangan pernah mengembalikan respons kosong.
 Keluarkan HANYA JSON objek final.`;
+}
 
 function extractJsonStringField(content: string, field: string): string | undefined {
   if (!content || content.length > 10000) return undefined;
@@ -174,6 +187,7 @@ async function tryAiUpgrade(
   taskId: string,
   taskName: string,
   prompt: string,
+  taskType: ScheduledTaskType,
   dbg: ReturnType<typeof createDebugLog>,
 ): Promise<AiUpgradeResult> {
   const startMs = Date.now();
@@ -219,11 +233,12 @@ async function tryAiUpgrade(
 
   try {
     // ── Step 4: Build request ──
+    const systemPrompt = getSchedulerSystemPrompt(taskType);
     const requestBody = {
       model: AI_UPGRADE_MODEL,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Task: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Task type: "${taskType}"\nTask: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
       ],
       temperature: 0.2,
       max_tokens: AI_MAX_TOKENS,
@@ -239,7 +254,7 @@ async function tryAiUpgrade(
       max_tokens: requestBody.max_tokens,
       provider: requestBody.provider,
       messages_count: requestBody.messages.length,
-      system_prompt_len: SYSTEM_PROMPT.length,
+      system_prompt_len: systemPrompt.length,
       user_prompt_len: requestBody.messages[1].content.length,
     });
 
@@ -349,7 +364,7 @@ async function tryAiUpgrade(
     if (!raw) {
       if (isTruncated) {
         raw = JSON.stringify({
-          title: `⏰ ${taskName}`.slice(0, MAX_NOTIFICATION_TITLE),
+          title: `${taskType === 'information_to_give' ? '📌' : '⏰'} ${taskName}`.slice(0, MAX_NOTIFICATION_TITLE),
           short_label: taskName.slice(0, MAX_NOTIFICATION_LABEL),
           message: prompt.slice(0, MAX_NOTIFICATION_MESSAGE),
           extra_line: '',
@@ -402,7 +417,7 @@ async function tryAiUpgrade(
     } catch (jsonErr) {
       if (isTruncated) {
         parsed = {
-          title: extractJsonStringField(cleaned, 'title') || `⏰ ${taskName}`.slice(0, MAX_NOTIFICATION_TITLE),
+          title: extractJsonStringField(cleaned, 'title') || `${taskType === 'information_to_give' ? '📌' : '⏰'} ${taskName}`.slice(0, MAX_NOTIFICATION_TITLE),
           short_label: extractJsonStringField(cleaned, 'short_label') || taskName.slice(0, MAX_NOTIFICATION_LABEL),
           message:
             extractJsonStringField(cleaned, 'message') ||
@@ -434,7 +449,7 @@ async function tryAiUpgrade(
     const parsedMessage = String(parsed.message || '').trim();
     if (!parsedTitle || !parsedMessage) {
       if (isTruncated) {
-        parsed.title = parsedTitle || `⏰ ${taskName}`.slice(0, MAX_NOTIFICATION_TITLE);
+        parsed.title = parsedTitle || `${taskType === 'information_to_give' ? '📌' : '⏰'} ${taskName}`.slice(0, MAX_NOTIFICATION_TITLE);
         parsed.message = parsedMessage || prompt.slice(0, MAX_NOTIFICATION_MESSAGE);
         if (!parsed.short_label) parsed.short_label = taskName.slice(0, MAX_NOTIFICATION_LABEL);
         if (typeof parsed.extra_line !== 'string') parsed.extra_line = '';
@@ -592,9 +607,10 @@ export async function GET(request: NextRequest) {
   }
 
   dbg.log('EXEC', `Task found: "${task.name}" status=${task.status} run_once=${task.run_once} id=${task.id}`);
+  const taskType = normalizeTaskType(task.task_type);
 
   // ── STEP 2: Create notification IMMEDIATELY (static content) ──
-  const title = `⏰ ${task.name}`.slice(0, 60);
+  const title = `${taskType === 'information_to_give' ? '📌' : '⏰'} ${task.name}`.slice(0, 60);
   const message = String(task.prompt).slice(0, 500);
 
   dbg.log('NOTIFY', `Inserting static notification: title="${title}" message_len=${message.length}`);
@@ -633,7 +649,7 @@ export async function GET(request: NextRequest) {
   logger.scheduler('Phase 2 starting: AI upgrade', { task_id: task.id, task_name: task.name }, correlationId);
 
   const phase2Results = await Promise.allSettled([
-    tryAiUpgrade(task.id, task.name, task.prompt, dbg),
+    tryAiUpgrade(task.id, task.name, task.prompt, taskType, dbg),
   ]);
 
   const aiSettled = phase2Results[0];
