@@ -124,7 +124,9 @@ DO $$ BEGIN
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'scheduled_tasks' AND column_name = 'task_type'
   ) THEN
-    ALTER TABLE scheduled_tasks ADD COLUMN task_type TEXT NOT NULL DEFAULT 'reminder';
+    ALTER TABLE scheduled_tasks
+      ADD COLUMN task_type TEXT NOT NULL DEFAULT 'reminder'
+      CHECK (task_type IN ('reminder', 'information_to_give'));
   END IF;
 END $$;
 

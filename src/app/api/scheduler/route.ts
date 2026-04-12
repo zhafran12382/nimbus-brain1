@@ -96,8 +96,11 @@ function extractJsonStringField(content: string, field: string): string | undefi
   const keyIndex = content.indexOf(keyToken);
   if (keyIndex === -1) return undefined;
 
-  const colonIndex = content.indexOf(':', keyIndex + keyToken.length);
-  if (colonIndex === -1) return undefined;
+  const searchStart = keyIndex + keyToken.length;
+  const searchWindow = content.slice(searchStart, Math.min(content.length, searchStart + 40));
+  const colonOffset = searchWindow.indexOf(':');
+  if (colonOffset === -1) return undefined;
+  const colonIndex = searchStart + colonOffset;
 
   let startQuote = -1;
   for (let i = colonIndex + 1; i < content.length; i += 1) {
@@ -234,11 +237,14 @@ async function tryAiUpgrade(
   try {
     // ── Step 4: Build request ──
     const systemPrompt = getSchedulerSystemPrompt(taskType);
+    const safeTaskType = JSON.stringify(taskType);
+    const safeTaskName = JSON.stringify(taskName);
+    const safePrompt = JSON.stringify(prompt);
     const requestBody = {
       model: AI_UPGRADE_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Task type: "${taskType}"\nTask: "${taskName}"\nUser request: "${prompt}"\n\nGenerate JSON.` },
+        { role: 'user', content: `Task type: ${safeTaskType}\nTask: ${safeTaskName}\nUser request: ${safePrompt}\n\nGenerate JSON.` },
       ],
       temperature: 0.2,
       max_tokens: AI_MAX_TOKENS,
