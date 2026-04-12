@@ -1,0 +1,3 @@
+## 2025-04-12 - Missing ARIA Labels on Message Actions
+**Learning:** Icon-only action buttons (Lock, Download, Copy, Refresh) in the chat assistant messages (`AssistantMessage` component) lacked ARIA labels and tooltips, making them inaccessible to screen readers and difficult to understand without visual context.
+**Action:** Always ensure that any button containing only an icon has an explicit `aria-label` attribute and ideally a `title` for a native tooltip. Additionally, added `focus-visible` styles (`focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm`) to support proper keyboard navigation and focus states.
