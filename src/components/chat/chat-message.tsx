@@ -157,6 +157,11 @@ const toolDisplayMap: Record<string, { icon: string; label: string }> = {
   get_quiz_history: { icon: "📚", label: "Quiz history loaded" },
   get_quiz_stats: { icon: "📊", label: "Stats loaded" },
   run_python: { icon: "terminal", label: "Python executed" },
+  send_notification: { icon: "🔔", label: "Notification sent" },
+  get_notifications: { icon: "🔔", label: "Notifications loaded" },
+  summarize_notifications: { icon: "🧾", label: "Notification summary" },
+  mark_all_notifications_read: { icon: "✅", label: "All marked read" },
+  delete_notifications: { icon: "🗑️", label: "Notifications deleted" },
 };
 
 // Parse QUIZ_DATA:: prefix from message content

@@ -159,6 +159,7 @@ export interface ScheduledTask {
   id: string;
   name: string;
   prompt: string;
+  task_type: 'reminder' | 'information_to_give';
   cron_expression: string;
   run_once: boolean;
   run_at: string | null;

@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   prompt TEXT NOT NULL,
+  task_type TEXT NOT NULL DEFAULT 'reminder' CHECK (task_type IN ('reminder', 'information_to_give')),
   cron_expression TEXT NOT NULL,
   run_once BOOLEAN NOT NULL DEFAULT FALSE,
   run_at TIMESTAMPTZ,
@@ -114,6 +115,18 @@ DO $$ BEGIN
     WHERE table_name = 'scheduled_tasks' AND column_name = 'run_once'
   ) THEN
     ALTER TABLE scheduled_tasks ADD COLUMN run_once BOOLEAN NOT NULL DEFAULT FALSE;
+  END IF;
+END $$;
+
+-- Add task_type column if table already existed without it
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'scheduled_tasks' AND column_name = 'task_type'
+  ) THEN
+    ALTER TABLE scheduled_tasks
+      ADD COLUMN task_type TEXT NOT NULL DEFAULT 'reminder'
+      CHECK (task_type IN ('reminder', 'information_to_give'));
   END IF;
 END $$;
 
@@ -142,6 +155,13 @@ DO $$ BEGIN
   ALTER TABLE scheduled_tasks DROP CONSTRAINT IF EXISTS scheduled_tasks_status_check;
   ALTER TABLE scheduled_tasks ADD CONSTRAINT scheduled_tasks_status_check
     CHECK (status IN ('pending', 'running', 'done', 'failed', 'paused', 'cancelled'));
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE scheduled_tasks DROP CONSTRAINT IF EXISTS scheduled_tasks_task_type_check;
+  ALTER TABLE scheduled_tasks ADD CONSTRAINT scheduled_tasks_task_type_check
+    CHECK (task_type IN ('reminder', 'information_to_give'));
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 

@@ -9,7 +9,7 @@ import type { PluggableList } from "unified";
 // remarkMath MUST come before remarkGfm so that $...$ delimiters are parsed
 // before GFM interprets _ * ~ inside math as emphasis/strikethrough.
 export const chatRemarkPlugins: PluggableList = [
-  [remarkMath, { singleDollarTextMath: true }],
+  [remarkMath, { singleDollarTextMath: false }],
   remarkGfm,
 ];
 export const chatRehypePlugins: PluggableList = [

@@ -117,31 +117,10 @@ export async function GET(request: NextRequest) {
     try {
       logger.scheduler(`Executing task: ${task.name}`, { task_id: task.id }, correlationId);
 
-      // Create notification
-      const title = `⏰ ${task.name}`.slice(0, 60);
-      const message = String(task.prompt).slice(0, 500);
-
-      const { error: notifErr } = await supabase.from('notifications').insert({
-        title,
-        message,
-        type: 'info',
-        task_id: task.id,
-      });
-
-      if (notifErr) {
-        logger.error('SCHEDULER', `Notification insert failed for "${task.name}"`, {
-          code: 'NOTIF_INSERT_ERROR',
-          error: notifErr.message,
-          correlationId,
-        });
-      }
-
-      // Trigger AI upgrade via the scheduler endpoint (reuses existing AI logic)
+      // Trigger scheduler endpoint (notification creation + AI upgrade in one flow)
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://nimbus-brain.vercel.app';
       try {
-        const schedulerRes = await fetch(`${siteUrl}/api/scheduler?id=${task.id}`, {
-          signal: AbortSignal.timeout(25000),
-        });
+        const schedulerRes = await fetch(`${siteUrl}/api/scheduler?id=${task.id}`);
         if (!schedulerRes.ok) {
           logger.warn('SCHEDULER', `AI upgrade returned ${schedulerRes.status} for "${task.name}"`, undefined, correlationId);
         }

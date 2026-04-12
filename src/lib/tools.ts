@@ -398,6 +398,67 @@ export const tools = [
   {
     type: "function" as const,
     function: {
+      name: "get_notifications",
+      description: "Ambil daftar notifikasi terbaru user. Gunakan sebelum hapus notifikasi jika user belum jelas notifikasi mana yang dimaksud.",
+      parameters: {
+        type: "object",
+        properties: {
+          unread_only: { type: "boolean", description: "true untuk hanya notifikasi belum dibaca" },
+          limit: { type: "number", description: "Jumlah maksimal hasil (default 20, max 50)" },
+          keyword: { type: "string", description: "Filter judul/pesan mengandung kata ini" }
+        }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "summarize_notifications",
+      description: "Ringkas notifikasi user (jumlah unread, tipe, dan highlight terbaru). Gunakan saat user minta rangkum notifikasi.",
+      parameters: {
+        type: "object",
+        properties: {
+          unread_only: { type: "boolean", description: "true untuk merangkum hanya notifikasi belum dibaca" },
+          limit: { type: "number", description: "Jumlah notifikasi yang dianalisis (default 20, max 50)" }
+        }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "mark_all_notifications_read",
+      description: "Tandai semua notifikasi sebagai sudah dibaca.",
+      parameters: {
+        type: "object",
+        properties: {}
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "delete_notifications",
+      description: "Hapus notifikasi berdasarkan ID, keyword, atau mass delete. Untuk hapus semua notifikasi WAJIB set confirm=true.",
+      parameters: {
+        type: "object",
+        properties: {
+          ids: {
+            type: "array",
+            description: "Daftar ID notifikasi yang akan dihapus",
+            items: { type: "string" }
+          },
+          keyword: { type: "string", description: "Hapus notifikasi yang judul/pesannya mengandung keyword ini" },
+          only_read: { type: "boolean", description: "Jika true, hapus hanya notifikasi yang sudah dibaca" },
+          delete_all: { type: "boolean", description: "Jika true, hapus seluruh notifikasi (wajib confirm=true)" },
+          confirm: { type: "boolean", description: "Wajib true jika delete_all=true" }
+        }
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "create_scheduled_task",
       description: "Buat scheduled task baru. Konversi jadwal user ke format cron expression. Contoh: harian jam 7 pagi = '0 7 * * *', setiap Senin jam 9 = '0 9 * * 1'. Untuk one-time task (misal 'ingatkan 20 menit lagi', 'besok jam 7'), set run_once=true dan buat cron expression yang spesifik ke waktu tersebut.",
       parameters: {
@@ -405,10 +466,15 @@ export const tools = [
         properties: {
           name: { type: "string", description: "Nama task (unik, untuk identifikasi)" },
           prompt: { type: "string", description: "Prompt/perintah yang akan dieksekusi saat waktunya tiba" },
+          task_type: {
+            type: "string",
+            enum: ["reminder", "information_to_give"],
+            description: "Jenis task. reminder = mengingatkan user; information_to_give = memberikan informasi yang diminta user saat waktunya tiba."
+          },
           cron_expression: { type: "string", description: "Cron expression (5 field: menit jam tanggal bulan hari). Contoh: '0 7 * * *' = setiap hari jam 7:00, '*/30 * * * *' = setiap 30 menit, '30 14 28 3 *' = 28 Maret jam 14:30 (one-time)" },
           run_once: { type: "boolean", description: "Set true untuk task sekali jalan (reminder, alarm). Task akan otomatis selesai setelah dieksekusi. Default: false (recurring)" }
         },
-        required: ["name", "prompt", "cron_expression"]
+        required: ["name", "prompt", "task_type", "cron_expression"]
       }
     }
   },

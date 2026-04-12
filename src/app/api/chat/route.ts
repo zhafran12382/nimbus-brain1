@@ -50,6 +50,10 @@ const toolLabels: Record<string, string> = {
   get_quiz_stats: "📊 Analyzing study stats...",
   run_python: "⏳ Running Python code...",
   send_notification: "🔔 Sending notification...",
+  get_notifications: "🔔 Fetching notifications...",
+  summarize_notifications: "🧾 Summarizing notifications...",
+  mark_all_notifications_read: "✅ Marking all notifications as read...",
+  delete_notifications: "🗑️ Deleting notifications...",
   create_task: "📅 Creating scheduled task...",
   get_tasks: "📋 Fetching tasks...",
   update_task: "🔄 Updating task...",
@@ -248,6 +252,23 @@ TOOLS:
 - Setelah tool execution → SELALU beri respons informatif.
 - JANGAN panggil get_memories kecuali user SECARA EKSPLISIT bertanya tentang hal yang pernah disimpan (contoh: "apa yang lu inget?", "lu tau gak gw suka apa?"). Memory sudah otomatis di-inject ke context di bawah — kamu TIDAK PERLU fetch ulang.
 
+[TOOL DECISION ENGINE - WAJIB]
+Sebelum memilih tool, lakukan checklist cepat:
+1) Klasifikasikan intent: (a) minta informasi, (b) minta aksi, atau (c) ambigu.
+2) Jika minta aksi data (buat/update/hapus/tandai), WAJIB pakai tool yang paling spesifik.
+3) Jika ambigu/kurang data (contoh ID/target tidak jelas), jangan nebak. Ambil data dulu dengan tool list/read yang relevan atau tanya klarifikasi singkat.
+4) Untuk aksi destruktif (delete/reset), jalankan HANYA jika user eksplisit meminta hapus.
+5) DILARANG memanggil tool yang tidak relevan dengan intent utama.
+6) Jika user minta beberapa aksi sekaligus, kerjakan satu per satu sampai selesai.
+
+[ATURAN TOOL NOTIFIKASI]
+- "ringkas notifikasi" / "summary notifikasi" → pakai summarize_notifications.
+- "lihat daftar notifikasi" / "notifikasi apa aja" → pakai get_notifications.
+- "tandai semua notif sudah dibaca" → pakai mark_all_notifications_read.
+- "hapus notifikasi" → pakai delete_notifications.
+- Jika user minta hapus tapi target belum jelas, ambil daftar dulu dengan get_notifications atau minta klarifikasi.
+- Hapus massal harus benar-benar sesuai instruksi user.
+
 KEUANGAN (CRITICAL):
 - PEMASUKAN (create_income): "di TF ortu", "gajian", "dapat cashback", "dikasih", "terima"
 - PENGELUARAN (create_expense): "beli", "bayar", "jajan", "habis buat"
@@ -257,6 +278,7 @@ MULTI-AKSI: Jika user minta 2+ aksi sekaligus, jalankan SEMUA satu per satu. Jan
 
 [SCHEDULING & REMINDER]
 Jika user menyebut jadwal, reminder, atau waktu tertentu, WAJIB panggil tool create_scheduled_task.
+Jika ada pola waktu relatif seperti "dalam 10 menit", "3 menit lagi", "in 2 hours", perlakukan sebagai request scheduling dan WAJIB create_scheduled_task.
 Contoh intent scheduling:
 - "meeting 20 menit lagi"
 - "ingetin gw nanti jam 3"
@@ -271,8 +293,11 @@ Langkah WAJIB:
 1. Deteksi ekspresi waktu dari pesan user.
 2. Konversi waktu relatif (misal "20 menit lagi") ke waktu absolut berdasarkan waktu WIB saat ini.
 3. Generate cron expression yang sesuai.
-4. Panggil create_scheduled_task dengan name, prompt, dan cron_expression.
-5. Konfirmasi task berhasil dibuat.
+4. Tentukan task_type:
+   - reminder: jika user minta diingatkan (contoh: "ingetin gw ...", "remind me ...", "gw mau belajar 3 menit lagi")
+   - information_to_give: jika user minta AI memberikan info nanti (contoh: "kasih gw ... dalam 3 menit", "berikan gw berita AI dalam 3 menit")
+5. Panggil create_scheduled_task dengan name, prompt, task_type, dan cron_expression.
+6. Konfirmasi task berhasil dibuat.
 
 DILARANG mensimulasikan scheduling hanya lewat teks. HARUS ada tool call.
 Jangan pernah klaim task ada kecuali sudah tersimpan di database.
@@ -481,6 +506,41 @@ function parseGroqRateLimitHeaders(headers: Headers): GroqRateLimit | null {
 
 const MAX_RATE_LIMIT_RETRIES = 3;
 
+function normalizeModelIdForCompare(modelId: string): string {
+  return String(modelId || '').trim().toLowerCase();
+}
+
+function isCompatibleModelResponse(requestedModel: string, actualModel: string): boolean {
+  const req = normalizeModelIdForCompare(requestedModel);
+  const act = normalizeModelIdForCompare(actualModel);
+  if (!req || !act) return false;
+  if (req === act) return true;
+  if (req.endsWith(':free') && req.replace(':free', '') === act) return true;
+  if (act.startsWith(`${req}-`) || act.startsWith(`${req}:`)) return true;
+  return false;
+}
+
+function shouldForceScheduledTask(userText: string): boolean {
+  const text = String(userText || '').toLowerCase();
+  if (!text.trim()) return false;
+
+  const hasExplicitTimeExpression =
+    /\b\d{1,2}[:.]\d{2}\b/.test(text) ||
+    /\bjam\s*\d{1,2}\b/.test(text) ||
+    /\b(hari ini|besok|lusa|minggu depan)\b/.test(text);
+
+  const hasRelativeWindow =
+    /\bdalam\s+\d+\s*(detik|menit|jam|hari|minggu|bulan|tahun)\b/.test(text) ||
+    /\bin\s+\d+\s*(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\b/.test(text) ||
+    /\b\d+\s*(detik|menit|jam|hari|minggu|bulan|tahun)\s+lagi\b/.test(text) ||
+    /\b\d+\s*(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+from now\b/.test(text);
+
+  const hasScheduleCue =
+    /\b(ingat|ingetin|ingatkan|remind|nanti|besok|lusa|jam\s*\d|schedule|jadwal|dalam|lagi)\b/.test(text);
+
+  return hasRelativeWindow || (hasScheduleCue && hasExplicitTimeExpression);
+}
+
 async function callProvider(
   providerId: ProviderId,
   modelId: string,
@@ -491,6 +551,7 @@ async function callProvider(
   signal?: AbortSignal,
   onRateLimit?: (rateLimit: GroqRateLimit) => void,
   onStatus?: (text: string) => void,
+  forcedToolName?: string,
   _retryCount = 0,
 ) {
   const provider = getProviderConfig(providerId);
@@ -504,7 +565,9 @@ async function callProvider(
   };
   if (useTools) {
     body.tools = tools;
-    body.tool_choice = "auto";
+    body.tool_choice = forcedToolName
+      ? { type: "function", function: { name: forcedToolName } }
+      : "auto";
   }
 
   // === PROVIDER ROUTING CONTROL ===
@@ -541,7 +604,7 @@ async function callProvider(
       if (waitTimeSec < 150) {
         if (onStatus) onStatus(`⏳ Rate limited (${_retryCount + 1}/${MAX_RATE_LIMIT_RETRIES}). Menunggu ${waitTimeSec}s...`);
         await new Promise(resolve => setTimeout(resolve, waitTimeSec * 1000));
-        return callProvider(providerId, modelId, messages, useTools, maxTokens, temperature, signal, onRateLimit, onStatus, _retryCount + 1);
+        return callProvider(providerId, modelId, messages, useTools, maxTokens, temperature, signal, onRateLimit, onStatus, forcedToolName, _retryCount + 1);
       }
     }
     const err = await response.json().catch(() => ({}));
@@ -551,9 +614,13 @@ async function callProvider(
 
   const data = await response.json();
 
-  // === MODEL ASSERTION: verify provider didn't swap to a different model ===
+  // === MODEL ASSERTION: tolerate compatible version aliases (e.g. deepseek-v3.2 -> deepseek-v3.2-YYYYMMDD) ===
   if (data.model && data.model !== modelId) {
-    logError('MODEL MISMATCH', `REQUESTED: "${modelId}" → ACTUAL: "${data.model}" (provider: ${providerId})`);
+    if (isCompatibleModelResponse(modelId, data.model)) {
+      log('MODEL ALIAS', `REQUESTED: "${modelId}" → ACTUAL: "${data.model}" (provider: ${providerId})`);
+    } else {
+      logError('MODEL MISMATCH', `REQUESTED: "${modelId}" → ACTUAL: "${data.model}" (provider: ${providerId})`);
+    }
   }
 
   // Check for error in response body (some providers return 200 with error payload)
@@ -770,6 +837,8 @@ export async function POST(req: NextRequest) {
 
   // --- Save user message server-side ---
   const lastUserMsg = messages[messages.length - 1];
+  const lastUserContent = String(lastUserMsg?.content || '');
+  const forceScheduledTool = shouldForceScheduledTask(lastUserContent);
   if (lastUserMsg && lastUserMsg.role === 'user' && conversationId) {
     const { error: userMsgErr } = await supabase.from('chat_messages').insert({
       role: 'user',
@@ -792,6 +861,9 @@ export async function POST(req: NextRequest) {
   const effectiveSearchLimit = searchSourceLimit ? Math.min(Math.max(Number(searchSourceLimit), 1), 20) : 5;
   const memoriesContext = await fetchMemoriesContext();
   let systemInstruction = buildSystemInstruction(personality) + getModeInstruction(mode) + memoriesContext;
+  if (forceScheduledTool && useTools) {
+    systemInstruction += '\n\n[HARD RULE: TIME-BASED REQUEST]\nPermintaan user terakhir mengandung pola waktu. Kamu WAJIB membuat scheduled task SEKARANG dengan tool create_scheduled_task (jangan jawab teks dulu). Isi task_type dengan benar: reminder atau information_to_give.\n[/HARD RULE]';
+  }
   
   if (providerId === 'mistral' && useTools) {
     systemInstruction += '\n\nINSTRUKSI KRITIS: Jika kamu memutuskan untuk menggunakan sebuah tool/fungsi, kamu WAJIB HANYA mengeluarkan objek JSON mentah untuk pemanggilan tool tersebut. JANGAN sertakan teks percakapan, sapaan, penjelasan, atau format markdown (seperti ```json) sebelum atau sesudah JSON tersebut.';
@@ -830,7 +902,18 @@ export async function POST(req: NextRequest) {
         log('API CALL', `provider=${providerId}, Sending ${apiMessages.length} messages, useTools=${useTools}`);
         logger.ai('AI model call started', { provider: providerId, model: modelId, messages_count: apiMessages.length, use_tools: useTools, max_tokens: maxTokens, temperature: targetTemperature }, correlationId);
         const aiCallStart = Date.now();
-        const data = await callProvider(providerId, modelId, apiMessages, useTools, maxTokens, targetTemperature, signal, sendRateLimit, (text) => send({ type: "status", text }));
+        const data = await callProvider(
+          providerId,
+          modelId,
+          apiMessages,
+          useTools,
+          maxTokens,
+          targetTemperature,
+          signal,
+          sendRateLimit,
+          (text) => send({ type: "status", text }),
+          forceScheduledTool && useTools ? 'create_scheduled_task' : undefined,
+        );
         const aiCallDuration = Date.now() - aiCallStart;
         if (data.usage) {
           totalPromptTokens += data.usage.prompt_tokens || 0;
